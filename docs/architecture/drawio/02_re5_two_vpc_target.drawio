@@ -1,0 +1,335 @@
+<mxfile host="app.diagrams.net" agent="aegis-pi" version="24.0.0">
+  <diagram name="Overview - 2 VPC Target" id="overview-2vpc-target">
+    <mxGraphModel dx="2200" dy="1500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Aegis-Pi Target Architecture (ADR 0006~0011 반영, 2026-05-15)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="2120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="범례&#10;━━ 데이터 흐름   ┄┄ 제어/배포 흐름   ▬▬ 사용자/인증 흐름&#10;색상: 파랑=AWS managed, 보라=2번 VPC, 노랑=1번 VPC, 초록=Factory Spoke, 회색=외부(GitHub/Browser/Gabia)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;strokeColor=#999999;fillColor=#FAFAFA;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="600" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="admin-browser" value="Admin Browser&#10;(관리자 1~5명)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="160" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="developer" value="Developer / Operator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1840" y="160" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="github" value="GitHub&#10;(코드 + GitOps + 문서)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1840" y="220" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="gabia" value="Gabia&#10;(도메인 등록)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="245" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="aws-cloud" value="AWS Cloud (ap-south-1, 일부 글로벌)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#FF9900;strokeWidth=2;dashed=0;verticalAlign=top;align=left;spacingLeft=20;fontSize=14;fontStyle=1;fontColor=#FF9900;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="2120" height="900" as="geometry" />
+        </mxCell>
+
+        <mxCell id="user-svc-group" value="사용자 진입 / 인증 / 정적 SPA (글로벌·VPC 밖)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1976D2;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;fontColor=#1976D2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="360" width="640" height="240" as="geometry" />
+        </mxCell>
+
+        <mxCell id="route53-dash" value="Route53&#10;dashboard.&lt;도메인&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="400" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cloudfront" value="CloudFront + WAF&#10;(OAC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="470" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s3-spa" value="S3 dashboard-web&#10;bucket (정적 SPA)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="540" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cognito" value="Cognito User Pool&#10;+ Hosted UI&#10;(Self sign-up Disabled,&#10;MFA Required)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="300" y="400" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="route53-api" value="Route53&#10;api.&lt;도메인&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="520" y="400" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="api-gw" value="API Gateway&#10;(custom domain)&#10;Cognito Authorizer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="520" y="470" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acm" value="ACM&#10;(us-east-1: CF, ap-south-1: API GW)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0288D1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="300" y="530" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="api-svc-group" value="Dashboard API + 데이터 저장 (managed, VPC 밖)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;fontColor=#388E3C;" vertex="1" parent="1">
+          <mxGeometry x="760" y="360" width="700" height="240" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lambda-api" value="Lambda&#10;Dashboard API&#10;(VPC 밖, read-only)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="780" y="400" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ddb" value="DynamoDB&#10;aegis-factory-status&#10;LATEST + HISTORY (TTL 24h)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="400" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s3-data" value="S3 aegis-bucket-data&#10;raw/  (IoT Rule write)&#10;processed/  (Lambda write)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="400" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lambda-proc" value="Lambda&#10;data processor&#10;(VPC 밖, IoT Rule trigger)&#10;normalize / risk / pipeline_status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="780" y="500" width="220" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="iot-core" value="AWS IoT Core&#10;(MQTT 수신)&#10;IoT Rule × N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="500" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc1" value="1번 VPC: Data / Dashboard VPC  (MVP — 내부 워크로드 없음)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#F9A825;" vertex="1" parent="1">
+          <mxGeometry x="80" y="640" width="700" height="220" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc1-public" value="Public Subnet (골격만, NAT GW / IGW 없음 — ADR 0011)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="680" width="660" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc1-private-app" value="Private App Subnet (MVP 비어 있음)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="750" width="320" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc1-endpoints" value="VPC Gateway Endpoint&#10;S3, DynamoDB (무료, 후속 워크로드 대비)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="440" y="745" width="320" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc1-note" value="※ Lambda·DDB·S3·CloudFront·Cognito·API GW 모두 VPC 밖.&#10;후속에 컨테이너 워크로드가 추가되면 NAT GW / Interface Endpoint를 ADR로 다시 결정." style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fillColor=none;strokeColor=none;fontColor=#F9A825;" vertex="1" parent="1">
+          <mxGeometry x="100" y="815" width="660" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2" value="2번 VPC: Control / Management VPC  (워크스트림 A — 본 환경 변경 금지)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#7B1FA2;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="640" width="640" height="500" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-public" value="Public Subnet" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#7B1FA2;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="680" width="600" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-natgw" value="NAT Gateway" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1540" y="715" width="120" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-alb" value="Admin UI ALB&#10;(argocd/grafana&#10;.minsoo-tech.cloud)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1690" y="710" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-acm" value="Route53 + ACM&#10;minsoo-tech.cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1900" y="710" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-private" value="Private App Subnet — EKS Hub Cluster" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#7B1FA2;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="800" width="600" height="320" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-eks" value="EKS Hub (AEGIS-EKS, K8s 1.34, t3.medium x2)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1540" y="830" width="560" height="280" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-argocd" value="Hub ArgoCD&#10;(ApplicationSet)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1560" y="870" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-grafana" value="Grafana" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1760" y="870" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-prom" value="Prometheus Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1940" y="870" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-tailscale" value="Tailscale Operator / Connector&#10;(Hub 100.92.186.18, ArgoCD egress 100.104.73.68)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1560" y="950" width="380" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-lbc" value="AWS Load Balancer Controller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1960" y="950" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vpc2-amp" value="AMP (Prometheus 중앙 저장)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1560" y="1030" width="540" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ecr" value="ECR&#10;aegis/edge-agent&#10;tag: sha-&lt;7chars&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="360" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="gha" value="GitHub Actions&#10;(build/test/push/values 갱신)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1700" y="360" width="220" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="gha-note" value="ApplicationSet sync는 워크스트림 A의 Hub ArgoCD가 담당.&#10;워크스트림 B는 manifest/values만 push." style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=9;fillColor=#FFF8E1;strokeColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="450" width="420" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factories-group" value="Factory Spokes (K3s, Edge Agent → IoT Core 송신)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#2E7D32;dashed=1;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1240" width="2120" height="240" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factory-a" value="factory-a&#10;Raspberry Pi 3-node K3s&#10;(master 10.10.10.10 / worker1 .11 / worker2 .12)&#10;BME280 + Camera + Microphone + AI&#10;Edge Agent (real)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1280" width="320" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factory-a-argocd" value="(전환기) Local ArgoCD&#10;safe-edge-config-main GitOps" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1290" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factory-a-tailscale" value="Tailscale tag: aegis-spoke-prod / factory-a&#10;100.117.40.125 (master only)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1370" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factory-b" value="factory-b&#10;Mac mini VM K3s&#10;Dummy Sensor + Edge Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1280" width="280" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factory-c" value="factory-c&#10;Windows VM K3s&#10;Dummy Sensor + Edge Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="1280" width="280" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="factory-future" value="future factory-N (확장)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F8E9;strokeColor=#2E7D32;dashed=1;fontSize=10;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1280" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-browser-r53" value="dashboard.&lt;도메인&gt;" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;" edge="1" parent="1" source="admin-browser" target="route53-dash">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-r53-cf" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#1976D2;" edge="1" parent="1" source="route53-dash" target="cloudfront">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-cf-s3spa" value="OAC" style="endArrow=classic;html=1;rounded=0;strokeColor=#1976D2;fontSize=10;" edge="1" parent="1" source="cloudfront" target="s3-spa">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-browser-cognito" value="OIDC PKCE 로그인&#10;(MFA TOTP)" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;dashed=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-browser" target="cognito">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-browser-apigw" value="Authorization: Bearer JWT&#10;(api.&lt;도메인&gt;)" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-browser" target="route53-api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-r53api-apigw" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#1976D2;" edge="1" parent="1" source="route53-api" target="api-gw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-apigw-lambdaapi" value="JWT 검증 통과 시 invoke" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="api-gw" target="lambda-api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-lambdaapi-ddb" value="Query / GetItem&#10;(read-only)" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="lambda-api" target="ddb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-lambdaapi-s3data" value="GetObject (processed/*)&#10;장기 이력 / 감사" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="lambda-api" target="s3-data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-iot-s3raw" value="IoT Rule → raw/" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="iot-core" target="s3-data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-iot-lambdaproc" value="IoT Rule (신규) → trigger" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="iot-core" target="lambda-proc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-lambdaproc-ddb" value="LATEST overwrite&#10;HISTORY (TTL 24h)" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="lambda-proc" target="ddb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-lambdaproc-s3data" value="processed/ write" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;" edge="1" parent="1" source="lambda-proc" target="s3-data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-fa-iot" value="MQTT publish&#10;factory_state (3s)&#10;infra_state (20s)" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;fontSize=10;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="factory-a" target="iot-core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-fb-iot" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="factory-b" target="iot-core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-fc-iot" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#388E3C;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="factory-c" target="iot-core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-dev-github" value="git push" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;" edge="1" parent="1" source="developer" target="github">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-github-gha" value="webhook" style="endArrow=classic;html=1;rounded=0;strokeColor=#E65100;fontSize=10;dashed=1;" edge="1" parent="1" source="github" target="gha">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-gha-ecr" value="docker push&#10;sha-&lt;7chars&gt;" style="endArrow=classic;html=1;rounded=0;strokeColor=#E65100;fontSize=10;dashed=1;" edge="1" parent="1" source="gha" target="ecr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-argocd-github" value="watch (charts/values)" style="endArrow=classic;html=1;rounded=0;strokeColor=#7B1FA2;fontSize=10;dashed=1;" edge="1" parent="1" source="vpc2-argocd" target="github">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-argocd-tailscale" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#7B1FA2;dashed=1;" edge="1" parent="1" source="vpc2-argocd" target="vpc2-tailscale">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-tailscale-fa" value="ArgoCD sync&#10;via Tailscale&#10;(K3s API)" style="endArrow=classic;html=1;rounded=0;strokeColor=#7B1FA2;fontSize=10;dashed=1;" edge="1" parent="1" source="vpc2-tailscale" target="factory-a-tailscale">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-fa-ecr" value="image pull (imagePullSecret 별도)" style="endArrow=classic;html=1;rounded=0;strokeColor=#E65100;fontSize=9;dashed=1;" edge="1" parent="1" source="factory-a" target="ecr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-prom-amp" value="remote_write" style="endArrow=classic;html=1;rounded=0;strokeColor=#7B1FA2;fontSize=10;dashed=1;" edge="1" parent="1" source="vpc2-prom" target="vpc2-amp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-grafana-amp" value="datasource" style="endArrow=classic;html=1;rounded=0;strokeColor=#7B1FA2;fontSize=10;dashed=1;" edge="1" parent="1" source="vpc2-grafana" target="vpc2-amp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-developer-grafana" value="argocd/grafana&#10;.minsoo-tech.cloud&#10;(Admin UI)" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;" edge="1" parent="1" source="developer" target="vpc2-alb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-gabia-r53dash" value="NS 위임" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;dashed=1;" edge="1" parent="1" source="gabia" target="route53-dash">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-gabia-r53api" value="NS 위임" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;fontSize=10;dashed=1;" edge="1" parent="1" source="gabia" target="route53-api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acm-note" value="ACM 인증서:&#10;us-east-1 → CloudFront&#10;ap-south-1 → API Gateway&#10;(DNS 검증, 무료)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=9;fillColor=#E1F5FE;strokeColor=#0288D1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="585" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="no-peering" value="❌ VPC Peering / TGW / PrivateLink 없음.&#10;합류는 S3, DynamoDB, IoT Core, ECR, GitHub, IAM 권한으로만." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fillColor=#FFEBEE;strokeColor=#C62828;fontColor=#C62828;" vertex="1" parent="1">
+          <mxGeometry x="800" y="640" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cost-note" value="MVP 예상 비용 (factory-a 단독):&#10;1번 VPC 고정 ~$0.50/월 (Route53 hosted zone)&#10;사용량 ~$1.34/월 (CloudFront + API GW + Lambda + DDB + S3)&#10;합계 ~$1.84/월&#10;※ NAT GW 제거(ADR 0011)로 ~$45/월 절감" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=10;fillColor=#FFF8E1;strokeColor=#F9A825;" vertex="1" parent="1">
+          <mxGeometry x="800" y="700" width="380" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="adr-ref" value="결정 근거 (docs/changes/):&#10;0005  워크스트림 A/B 분리&#10;0006  Frontend = Vite 정적 SPA + S3/CloudFront&#10;0007  Dashboard API = Lambda + API Gateway, Lambda는 VPC 밖&#10;0008  Cognito (Self sign-up Disabled, MFA Required)&#10;0009  S3 단일 bucket aegis-bucket-data + raw/processed prefix&#10;0010  Gabia 신규 도메인 + Route53 위임 (Admin UI 도메인과 분리)&#10;0011  1번 VPC NAT Gateway 제거 (MVP)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=10;fillColor=#FAFAFA;strokeColor=#616161;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="700" width="500" height="140" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

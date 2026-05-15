@@ -186,6 +186,8 @@ docs/planning/16_data_dashboard_vpc_workplan.md  진입 순서
 docs/planning/07_dashboard_vpc_extension_plan.md 보안 경계와 지연 기준 (그대로 유지)
 docs/specs/data_storage_pipeline.md             저장 모델 / DDB schema
 docs/changes/0006~0011                            결정 ADR
+docs/architecture/drawio/02_re5_two_vpc_target.drawio   신규 목표 다이어그램
+docs/architecture/drawio/01_re4.drawio                  pre-2VPC 단일 VPC historical reference
 ```
 
 ## 목표 Hub Namespace

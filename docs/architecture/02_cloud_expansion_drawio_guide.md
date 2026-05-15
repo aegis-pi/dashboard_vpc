@@ -1,13 +1,25 @@
 # Cloud Expansion Draw.io Guide
 
 상태: draft
-기준일: 2026-04-29
+기준일: 2026-05-15
+수정 이력:
+  - 2026-05-15  ADR 0006~0011 반영. 신규 목표 다이어그램 `02_re5_two_vpc_target.drawio` 추가. 기존 `01_re4.drawio`는 pre-2VPC 단일 VPC historical reference로 유지.
+  - 2026-04-29  초안
 
 ## 목적
 
 M0 `factory-a` Safe-Edge 기준선을 AWS Hub 중심의 멀티 Spoke 구조로 확장할 때, draw.io에서 그릴 아키텍처 다이어그램의 구성 기준을 정리한다.
 
 이 문서는 구현 완료 상태가 아니라 M1~M7 클라우드 확장 목표 구조를 도식화하기 위한 가이드다.
+
+## 현재 다이어그램 파일
+
+| 파일 | 위상 | 비고 |
+| --- | --- | --- |
+| `drawio/01_re4.drawio` / `images/01_re4.jpg` | historical reference (단일 VPC, ADR 0005 이전) | EKS Hub 안에 Risk Normalizer/Risk Score Engine 컨테이너 표기. 최신 결정과 어긋나므로 신규 다이어그램을 source of truth로 사용 |
+| `drawio/02_re5_two_vpc_target.drawio` | **현재 source of truth** (2026-05-15, ADR 0006~0011 반영) | 2 VPC 분리, Lambda data processor (VPC 밖), 정적 SPA + CloudFront, Cognito, API Gateway, NAT GW 제거, 단일 S3 prefix 분리 |
+
+신규 다이어그램은 단일 페이지 Overview 형태다. 후속에 본 가이드의 5개 분할(Overview / Data Plane / Control Plane / CI/CD / Dashboard Access) 권장에 맞춰 페이지를 추가한다.
 
 ## 최신 기준
 
