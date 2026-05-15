@@ -24,6 +24,13 @@
 | 0002 | Failback controller: Kubernetes CronJob -> master OS cron | accepted | 2026-04-29 | M0, failback |
 | 0003 | NFS cold storage and hot/cold tiering deferred | accepted | 2026-04-29 | M0, data retention |
 | 0004 | GitOps source: local repo -> GitHub repo + ArgoCD UI sync | accepted | 2026-04-28 | M0, deployment |
+| 0005 | Workstream split: team -> 2번 Control/Management VPC, this env -> 1번 Data/Dashboard VPC | accepted | 2026-05-15 | M3~M6, 작업 환경 분리 |
+| 0006 | Dashboard frontend: Vite + React 정적 SPA + S3/CloudFront | accepted | 2026-05-15 | M6, frontend, 1번 VPC |
+| 0007 | Dashboard API runtime: Lambda + API Gateway, Lambda는 VPC 밖 | accepted | 2026-05-15 | M6, Lambda, 1번 VPC |
+| 0008 | Dashboard 인증: Cognito User Pool (관리자 전용) + API Gateway Authorizer | accepted | 2026-05-15 | M6, 인증/인가 |
+| 0009 | S3 저장소: `aegis-bucket-data` 단일 bucket + prefix 분리 | accepted | 2026-05-15 | M4, S3, 워크스트림 합류 |
+| 0010 | Dashboard 도메인: Gabia 신규 + Route53 위임 + Admin UI 도메인과 분리 | accepted | 2026-05-15 | M6, 도메인/DNS |
+| 0011 | 1번 Data/Dashboard VPC NAT Gateway 제거 (MVP) | accepted | 2026-05-15 | M4/M6, 1번 VPC 비용/네트워크 |
 
 ## 파일 형식
 

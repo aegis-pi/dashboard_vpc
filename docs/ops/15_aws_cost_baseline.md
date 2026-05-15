@@ -1,8 +1,12 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-08
-리전: `ap-south-1` / Asia Pacific (Mumbai)
+기준일: 2026-05-15
+리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
+수정 이력:
+  - 2026-05-15 v0.3  ADR 0011 반영. 1번 VPC NAT GW 제거 후 고정 비용 ~$0.50/월로 갱신, S3 dashboard-web bucket 항목 추가.
+  - 2026-05-15 v0.2  ADR 0006~0010 반영. 1번 Data/Dashboard VPC 예상 비용 섹션 추가 (실제 apply 전 추정).
+  - 2026-05-08  Hub destroy 후 baseline
 
 ## 목적
 
@@ -95,6 +99,63 @@ Admin UI Ingress가 만드는 추가 고정성 비용 추정:
 
 Admin UI Ingress를 끄면 위 비용, 약 `0.0419 USD/hour`를 줄일 수 있다. 실제 LCU와 public IPv4 수는 트래픽, AZ, ALB 동작 상태에 따라 달라질 수 있으므로 `aws elbv2 describe-load-balancers`, Cost Explorer, Public IP Insights로 다시 확인한다.
 
+## 1번 Data/Dashboard VPC 예상 비용 (ADR 0006~0011, apply 전 추정)
+
+ADR 0006~0011로 확정된 1번 VPC MVP 토폴로지의 예상 시간/월 비용이다. 실제 apply 후 측정값으로 재갱신한다.
+
+ADR 0011로 NAT Gateway를 만들지 않는다 → 1번 VPC 고정 비용은 Route53 hosted zone만 남는다.
+
+### 고정 시간 비용 (apply 후 켜져 있을 때)
+
+| 비용 항목 | 수량 | 단가 | 시간당 | 월 환산 (730h) |
+| --- | ---: | ---: | ---: | ---: |
+| Route53 public hosted zone (신규 도메인) | 1 | `$0.50 / month` | `$0.0007` | `$0.50` |
+| API Gateway custom domain | 1 | 고정 비용 없음 | `$0.0000` | `$0.00` |
+| ACM public certificate | 2 | 무료 (DNS 검증) | `$0.0000` | `$0.00` |
+| Cognito User Pool (관리자 1~5명) | 1 | 50,000 MAU 무료 티어 | `$0.0000` | `$0.00` |
+| **고정 합계** | | | `~$0.0007 / hour` | **`~$0.50 / month`** |
+
+> 1번 VPC는 NAT GW 없이 시작 (ADR 0011). Lambda가 VPC 밖이라 외부 egress가 필요한 내부 워크로드가 없음.
+> 후속에 1번 VPC 안에 컨테이너 워크로드가 추가되면 NAT GW 또는 Interface Endpoint 도입을 ADR로 다시 결정.
+
+### 사용량 기반 비용 (관제 트래픽 규모 가정)
+
+| 비용 항목 | 단가 | 가정 | 예상 월 |
+| --- | ---: | --- | ---: |
+| CloudFront data out | `$0.085 / GB` (1TB 무료 후) | < 5GB/월 (관제 SPA) | `~$0.00` (무료 티어 내) |
+| CloudFront requests | `$0.0075 / 10k HTTPS` | < 100k/월 | `~$0.08` |
+| API Gateway HTTP API requests | `$1.00 / 1M requests` (첫 300M) | ~50k/월 (10초 polling × 5명 × 8h) | `~$0.05` |
+| Lambda invocations | `$0.20 / 1M` (1M 무료) | < 200k/월 | `~$0.00` (무료 티어 내) |
+| Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k GB-sec 무료) | < 100k GB-sec | `~$0.00` |
+| DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3초/20초 주기 = ~120k write/월 | `~$0.15` |
+| DynamoDB on-demand read | `$0.25 / 1M RCU` | dashboard polling 기반 ~200k read/월 | `~$0.05` |
+| DynamoDB storage | `$0.25 / GB-month` | < 1GB (TTL 24h) | `~$0.25` |
+| S3 `aegis-bucket-data` storage (raw + processed) | `$0.025 / GB-month` (Standard) | factory-a 1개월 누적 ~3GB | `~$0.08` |
+| S3 dashboard-web bucket storage (정적 SPA) | `$0.025 / GB-month` (Standard) | < 50MB | `~$0.00` |
+| S3 PUT requests | `$0.005 / 1k` | ~120k/월 | `~$0.60` |
+| S3 GET requests | `$0.0004 / 1k` | < 100k/월 | `~$0.04` |
+| Route53 DNS queries | `$0.40 / 1M` (첫 1B) | < 100k/월 | `~$0.04` |
+| X-Ray traces | `$5.00 / 1M traces` (100k 무료) | < 100k/월 | `~$0.00` |
+| **사용량 합계 (factory-a 단독, MVP 가정)** | | | **`~$1.34 / month`** |
+
+> 외부 도메인 등록비: Gabia `.com` 연 ~₩15,000 / `.kr` 연 ~₩20,000 (별도, AWS 청구서에 포함되지 않음).
+
+### 1번 VPC MVP 합계 (factory-a 단독, 추정)
+
+```text
+고정 ~$0.50/월 + 사용량 ~$1.34/월 = ~$1.84/월
+```
+
+factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write가 메시지 수에 가장 민감 (factory 1개당 +`~$0.75/월` 추정).
+
+### 절감 옵션 (이미 적용된 것 + 추가 후보)
+
+- ✅ **NAT GW 제거** (ADR 0011 적용). `~$45/월` 절감. 후속에 VPC 내 컨테이너가 필요해지면 재검토.
+- ✅ **항상 켜진 컨테이너 사용 안 함** (ADR 0006/0007). ECS/EKS/EC2 비용 0.
+- **DynamoDB HISTORY TTL 단축**: 24h → 6h로 줄이면 storage 비용 ↓ (이미 매우 작음, 효용 작음)
+- **CloudFront 최소 TTL 상향**: SPA 빌드 산출물 immutable hash naming + 1년 캐시 → CloudFront 요청 ↓
+- **API Gateway → Lambda Function URL**: 인증/throttling 직접 구현 부담 있음. MVP에선 권장 안 함
+
 ## 사용량 기반 추가 비용
 
 아래 항목은 켜져 있다는 사실만으로 큰 비용이 발생하지 않거나, 트래픽/요청량에 따라 비용이 달라진다.
@@ -181,6 +242,7 @@ scripts/destroy/destroy-hub.sh
 - `docs/issues/` 또는 `docs/planning/`에 새 상시 운영 AWS 컴포넌트가 추가됨
 - NAT Gateway 수, node instance type, node desired size, EBS 크기, EKS Kubernetes support tier가 바뀜
 - Dashboard VPC, ALB, WAF, Cognito, CloudFront, Route53 같은 외부 접근 경로가 추가됨
+- API Gateway, Lambda(invocation/GB-sec), DynamoDB(read/write/storage), X-Ray 사용량이 baseline 추정과 크게 달라짐 (ADR 0007/0008/0009 영역)
 - Prometheus/AMP/Grafana/CloudWatch Logs처럼 관측 계층의 수집량 또는 저장량 기준이 바뀜
 - Prometheus Agent scrape job, scrape interval, annotated pod 수집 대상이 늘어남
 - Grafana dashboard 수, refresh interval, Explore 사용량, datasource 수가 늘어남

@@ -1,7 +1,10 @@
 # Monitoring Dashboard Data Model
 
 상태: source of truth
-기준일: 2026-04-28
+기준일: 2026-05-15
+수정 이력:
+  - 2026-05-15  ADR 0007/0009 반영. 후속 모델 섹션을 data_storage_pipeline.md 인용 + 화면-모델 매핑으로 갱신.
+  - 2026-04-28  초안
 
 ## 목적
 
@@ -112,17 +115,43 @@ Network
 Node up/down
 ```
 
-## 후속 모델
+## 후속 모델 (1번 Data/Dashboard VPC)
 
-AWS Hub/Risk Twin 단계에서는 아래 모델을 별도로 정의한다.
+AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipeline.md`를 source of truth로 인용**한다. 본 문서는 화면-모델 매핑만 정리한다.
 
-```text
-FactorySummary
-SensorObservation
-DeviceStatus
-PipelineStatus
-RiskState
-RecentLog
-```
+### 1차 저장소
 
-현재 `factory-a` dashboard에서는 위 후속 모델을 사용하지 않는다.
+| 저장소 | 사용처 |
+| --- | --- |
+| DynamoDB `aegis-factory-status` LATEST | 공장 카드, 현재 상태 화면 |
+| DynamoDB `aegis-factory-status` HISTORY | 최근 1~2시간 그래프 |
+| S3 `aegis-bucket-data/processed/...` | 장기 이력 / 감사 / drill-down |
+| S3 `aegis-bucket-data/raw/...` | 원본 보존 (Dashboard 직접 조회 제한) |
+
+### 화면 ↔ 모델 매핑
+
+| 화면 영역 | 사용 모델 | DDB key 또는 S3 prefix |
+| --- | --- | --- |
+| 공장 카드 (SAFE/WARNING/DANGER) | `LATEST.risk` + `LATEST.dashboard` | `pk=FACTORY#{factory_id}, sk=LATEST` |
+| 환경 상태 카드 | `LATEST.factory_state.sensor` + `.ai_result` | 위와 동일 |
+| 노드 상태 | `LATEST.infra_state.nodes[]` | 위와 동일 |
+| 장치 상태 (BME/Camera/Mic) | `LATEST.infra_state.device_summary` | 위와 동일 |
+| 워크로드 상태 | `LATEST.infra_state.workload_summary` | 위와 동일 |
+| 파이프라인 상태 | `LATEST.pipeline_status` | 위와 동일 |
+| Risk 그래프 (1h) | `HISTORY#RISK#*` (30초 last-value) | `sk begins_with HISTORY#RISK#` |
+| 환경 그래프 (1h) | `HISTORY#FACTORY#*` (30초 last-value) | `sk begins_with HISTORY#FACTORY#` |
+| 노드 그래프 (1h) | `HISTORY#INFRA#*` (20초 수신값) | `sk begins_with HISTORY#INFRA#` |
+| 장기 이력 / 감사 | S3 processed | `processed/{type}/{factory_id}/yyyy=.../...` |
+
+### Risk Twin 상태 매핑 (LATEST.risk.level)
+
+| level | 표시 | 기준 |
+| --- | --- | --- |
+| `safe` | 안전 | (Lambda data processor가 계산, 임계값은 `risk-v0.1.0` 기준) |
+| `warning` | 주의 | 위와 동일 |
+| `danger` | 위험 | 위와 동일 |
+
+### 명시적 비채택
+
+- Dashboard는 InfluxDB / Prometheus / EKS API / ArgoCD API에 직접 붙지 않는다 (`docs/planning/07_dashboard_vpc_extension_plan.md` 결정 유지)
+- Replay/Near-miss/AI Worker 모델은 M7+ 후속

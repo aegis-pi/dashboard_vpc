@@ -22,6 +22,7 @@
 | `13_architecture_adr_backlog.md` | 향후 ADR로 분리할 아키텍처 질문과 쟁점 목록 |
 | `14_argocd_hub_migration_plan.md` | factory local ArgoCD를 Hub ArgoCD 중심으로 이관하는 계획과 장단점 |
 | `15_cloud_architecture_final.md` | 확정된 클라우드 아키텍처와 리소스 배치 |
+| `16_data_dashboard_vpc_workplan.md` | 1번 Data/Dashboard VPC 워크스트림(본 환경) 작업 범위와 진입 순서 |
 
 ## 기준
 

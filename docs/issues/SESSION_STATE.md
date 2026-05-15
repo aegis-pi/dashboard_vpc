@@ -49,21 +49,61 @@
 | M3 | Issue 2 - 배포/ECR 저장소 구성 및 이미지 태그 전략 | 진행 중 | `docs/issues/M3_deploy-pipeline.md` |
 | M3 | Issue 4 - 배포/ArgoCD ApplicationSet 구성 | 완료 | `docs/issues/M3_deploy-pipeline.md` |
 
-현재 바로 이어서 할 이슈:
+## 2026-05-15 워크스트림 분리
+
+이 작업 환경은 2026-05-15부터 1번 Data / Dashboard VPC 측 작업(M4, M6)에 집중한다.
 
 ```text
-M3 Issue 2 - [배포/ECR] 저장소 구성 및 이미지 태그 전략
+워크스트림 A (팀, 다른 환경)
+  - 2번 Control / Management VPC (EKS Hub, ArgoCD, Tailscale, Prometheus, Grafana, Admin UI)
+  - M1, M2, M3, M5
+  - M3 Issue 2/3/5/6/7/8 마무리는 팀 측에서 진행
+
+워크스트림 B (이 환경: /home/jongwon/personal_project/Aegis-pi)
+  - 1번 Data / Dashboard VPC
+  - M4 데이터 플레인, M6 Risk Twin / Dashboard
+  - 본 환경에서는 워크스트림 A 리소스(infra/hub, infra/foundation, Admin UI, ArgoCD ApplicationSet 등)를 신규 변경하지 않는다
 ```
 
-다음 세션 최우선 실행 순서:
+근거 문서:
+
+- `docs/changes/0005-work-split-control-vs-data-dashboard.md`
+- `docs/planning/16_data_dashboard_vpc_workplan.md`
+- `docs/planning/15_cloud_architecture_final.md`의 `2026-05-15 워크스트림 분리` 섹션
+
+현재 바로 이어서 할 이슈 (본 환경):
 
 ```text
-1. M3 Issue 2 남은 항목을 마무리한다.
-   - ECR `aegis/edge-agent` 실제 image push 확인
-   - factory-a K3s imagePullSecret 방식 확정
-   - factory-a K3s에서 ECR image pull 검증
+M4 Issue 1 - [데이터/Schema] 표준 입력 스키마 확정 준비
+  + docs/specs/data_storage_pipeline.md 재확인
+  + S3 processed prefix와 DynamoDB LATEST/HISTORY 스키마 결정 사전 작업
+```
 
-2. 이후 M3 Issue 3으로 넘어가 GitHub Actions OIDC build/push workflow를 구성한다.
+다음 세션 최우선 실행 순서 (본 환경):
+
+```text
+1. 1번 VPC Terraform skeleton 설계 검토
+   - infra/data-dashboard/ root 분리 가능성 검토 (state 분리)
+   - VPC/Subnet/NAT GW/Route table 네이밍 결정 (AEGIS-Data-* 후보)
+   - 비용 영향 사전 산정 후 docs/ops/15_aws_cost_baseline.md 반영 예정 항목 정리
+
+2. DynamoDB / S3 processed 스키마 ADR 작성
+   - aegis-bucket-data와 별 bucket을 둘지, 동일 bucket의 별 prefix를 쓸지 결정
+   - LATEST/HISTORY PK/SK, GSI, TTL 결정
+
+3. Lambda data processor 설계 초안
+   - IoT Rule -> Lambda 트리거 경로 결정 (기존 Rule 확장 vs 신규 Rule)
+   - 처리 단계(normalizer/risk score/pipeline status aggregator)를 Lambda 내부 함수로 통합
+```
+
+워크스트림 A 측의 다음 작업 (참고용, 본 환경에서 실행하지 않음):
+
+```text
+M3 Issue 2 마무리
+  - ECR `aegis/edge-agent` image push 검증
+  - factory-a K3s imagePullSecret 갱신 방식 확정
+  - factory-a K3s에서 ECR image pull 검증
+M3 Issue 3 - GitHub Actions OIDC build/push workflow 구성
 ```
 
 ## 현재 큰 상태
@@ -350,9 +390,11 @@ secret exists, DATA=4
 
 ## 다음에 할 일
 
-### 1. 다음 시작 작업: M3 Issue 2
+### 1. 다음 시작 작업: 본 환경 = M4 데이터 플레인 진입 준비
 
-M1 Issue 12 `runtime-config.yaml` 구조 초안은 완료됐다. M1 Issue 11의 WAF/Cognito/OIDC 같은 운영 보안 강화는 MVP 이후로 보류했다. M2 Issue 1~6은 완료됐다. M3 Issue 1 GitOps 저장소 구조 설계는 `aegis-pi-gitops`에서 완료했다. M3 Issue 4 ApplicationSet은 2026-05-15에 선행 완료했다. EKS API endpoint CIDR 축소는 전체 설계 마무리 후 재검토 대상으로 보류했다. 다음 세션은 M3 Issue 2 ECR 저장소 구성 및 이미지 태그 전략의 남은 검증으로 이어간다.
+2026-05-15 워크스트림 분리 이후 본 환경의 다음 작업은 1번 Data / Dashboard VPC 진입 준비다. M3 Issue 2 등 워크스트림 A 항목은 팀 측 환경에서 진행한다.
+
+M1 Issue 12 `runtime-config.yaml` 구조 초안은 완료됐다. M1 Issue 11의 WAF/Cognito/OIDC 같은 운영 보안 강화는 MVP 이후로 보류했다. M2 Issue 1~6은 완료됐다. M3 Issue 1 GitOps 저장소 구조 설계는 `aegis-pi-gitops`에서 완료했다. M3 Issue 4 ApplicationSet은 2026-05-15에 선행 완료했다. EKS API endpoint CIDR 축소는 전체 설계 마무리 후 재검토 대상으로 보류했다.
 
 2026-05-15 기준 최근 검증 완료 전제:
 
@@ -372,18 +414,23 @@ M1 Issue 12 `runtime-config.yaml` 구조 초안은 완료됐다. M1 Issue 11의 
 - Hub UI credential export: `secret/hub-ui-credentials.txt` 생성, 파일 권한 `0600`
 - 과거 M1/M2 상세 검증 로그는 이 파일의 이전 섹션과 각 이슈 문서에 유지한다.
 
-다음 구현 순서:
+본 환경(워크스트림 B) 다음 구현 순서:
+
+```text
+M4 진입 준비:
+1. docs/specs/data_storage_pipeline.md 재확인 후 DynamoDB LATEST/HISTORY 스키마 후보 정리
+2. S3 processed bucket/prefix 결정 (aegis-bucket-data 재사용 vs 신규 bucket) ADR 작성
+3. infra/data-dashboard/ Terraform root 도입 여부 결정 (state 분리 기준)
+4. Lambda data processor 트리거 경로 결정 (기존 IoT Rule 확장 vs 신규 Rule)
+5. Dashboard Backend/API의 read-only IAM scope 초안 작성
+```
+
+워크스트림 A 측 잔여 항목 (본 환경에서 실행하지 않음):
 
 ```text
 M3 Issue 2:
-1. ECR 저장소 범위 확정
-2. 이미지 이름과 태그 규칙 확정
-3. Spoke K3s pull secret 갱신 방식 확정 (`scripts/ops/refresh-factory-a-ecr-pull-secret.sh`)
-4. 실제 `edge-agent` 이미지 push/pull 검증
-5. GitHub Actions build/push에서 사용할 AWS 권한과 secret 기준 정리
-
-Issue 11:
-1. WAF/Cognito/OIDC는 MVP 이후 운영 보안 강화 백로그로 보류
+- ECR 이미지 push/pull 검증, Spoke K3s pull secret 갱신, GitHub Actions OIDC 권한
+M3 Issue 3/5/6/7/8, M5, M1 Issue 11(보류) 등은 팀 측에서 진행
 ```
 
 로컬/재생성 후 확인할 명령:
@@ -598,8 +645,10 @@ ApplicationSet aegis-spoke active, 기본 scope envs/factory-a/values.yaml
 Application aegis-spoke-factory-a targets factory-a / aegis-spoke-system
 ArgoCD sync 완료: aegis-spoke-factory-a Synced + Healthy
 factory-a K3s smoke workload: aegis-spoke-system/aegis-spoke-smoke Deployment 1/1, Pod Running, Service ClusterIP
-다음 작업: M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정
-그 다음 작업: M3 Issue 3 - GitHub Actions OIDC build/push workflow 구성
+다음 작업(워크스트림 A, 팀 측): M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정
+그 다음 작업(워크스트림 A, 팀 측): M3 Issue 3 - GitHub Actions OIDC build/push workflow 구성
+본 환경(워크스트림 B) 다음 작업: 1번 Data / Dashboard VPC 진입 준비 (DynamoDB/S3 processed 스키마 결정, infra/data-dashboard skeleton 검토, Lambda data processor 트리거 경로 결정)
+워크스트림 분리 근거: docs/changes/0005-work-split-control-vs-data-dashboard.md, docs/planning/16_data_dashboard_vpc_workplan.md
 ```
 
 ## 갱신 규칙

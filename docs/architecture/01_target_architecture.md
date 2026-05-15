@@ -1,7 +1,12 @@
 # 목표 확장 아키텍처
 
 상태: draft
-기준일: 2026-05-04
+기준일: 2026-05-15
+수정 이력:
+  - 2026-05-15 v0.3  ADR 0011 반영. 1번 VPC NAT GW 제거.
+  - 2026-05-15 v0.2  ADR 0006~0010으로 1번 VPC MVP 토폴로지 확정. Data/Dashboard VPC 섹션 갱신.
+  - 2026-05-14  Lambda data processor 통합 표현
+  - 2026-05-04  초안
 
 ## 목적
 
@@ -118,27 +123,69 @@ aegis/factory-c/workload_status
 aegis/factory-c/heartbeat
 ```
 
-## 목표 Data / Dashboard VPC
+## 목표 Data / Dashboard VPC (MVP 확정)
 
-사용자 대시보드는 Tailscale/VPN 의존 없이 ALB, WAF, Cognito 또는 사내 IdP 인증 뒤에 제공한다.
+ADR 0006~0010으로 토폴로지가 확정됨. 사용자 대시보드는 Tailscale/VPN 의존 없이 Cognito 인증된 정적 SPA + JWT 기반 API로 제공한다.
 
-Dashboard Web/API는 ArgoCD, Tailscale, EKS API 같은 제어 plane에 직접 접근하지 않는다. 데이터 조회는 1번 Data / Dashboard VPC의 DynamoDB LATEST/HISTORY와 S3 processed를 기준으로 한다.
+Dashboard Web/API는 ArgoCD, Tailscale, EKS API 같은 제어 plane에 직접 접근하지 않는다. 데이터 조회는 DynamoDB LATEST/HISTORY와 S3 processed를 기준으로 한다.
 
 ```text
-1번 Data / Dashboard VPC
-    -> ALB
-    -> WAF
-    -> Auth
-    -> Dashboard Web/API
-    -> DynamoDB LATEST/HISTORY
-    -> S3 processed
-    -> Lambda data processor integration
+사용자 흐름:
+  사용자
+    -> Route53 (dashboard.<신규 도메인>, Gabia 구매 후 위임)
+    -> CloudFront (+ WAF, OAC)
+    -> S3 (Vite + React 정적 SPA, 빌드 산출물)
+    브라우저 ─ Cognito Hosted UI 로그인 (OIDC PKCE, MFA TOTP)
+            ├ JWT 발급
+            └ Authorization: Bearer <JWT>로 API 호출
+              -> Route53 (api.<신규 도메인>)
+              -> API Gateway (Cognito Authorizer 검증)
+              -> Dashboard API Lambda (VPC 밖)
+                  -> DynamoDB LATEST/HISTORY (read)
+                  -> S3 processed (read, 장기 이력)
+```
+
+```text
+1번 VPC 자체 (MVP):
+  - VPC + Public/Private subnet 골격만
+  - NAT GW / IGW 없음 (ADR 0011) — Lambda가 VPC 밖, 내부 워크로드 없음
+  - Gateway Endpoint: S3, DynamoDB (무료, 후속 워크로드 대비 권장)
+  - 상시 실행 워크로드 없음
+```
+
+VPC 밖에 두는 자원 (managed/serverless):
+
+```text
+- S3 dashboard-web bucket (정적 SPA 호스팅, OAC, aegis-bucket-data와 분리된 신규 bucket)
+- CloudFront + WAF
+- Cognito User Pool + Hosted UI (관리자 전용, MFA Required)
+- API Gateway + custom domain
+- Lambda Dashboard API
+- Lambda data processor (IoT Rule trigger)
+- DynamoDB aegis-factory-status (LATEST + HISTORY, TTL 24h)
+- S3 aegis-bucket-data (raw/ + processed/, 단일 bucket prefix 분리, ADR 0009)
+- Route53 hosted zone (신규 도메인, Admin UI minsoo-tech.cloud와 분리)
+- ACM (us-east-1: CloudFront, ap-south-1: API GW)
+```
+
+후속 (MVP 외):
+
+```text
+- 1번 VPC Private App Subnet에 컨테이너 워크로드 (필요 시)
+- Replay Builder
+- Near-miss Aggregator
+- AI / Analytics Worker
+- 1번 VPC Private Data Subnet 신규 + RDS / Redis / OpenSearch
 ```
 
 상세 기준:
 
 ```text
-docs/planning/07_dashboard_vpc_extension_plan.md
+docs/planning/15_cloud_architecture_final.md   확정 토폴로지 + 결정 표
+docs/planning/16_data_dashboard_vpc_workplan.md  진입 순서
+docs/planning/07_dashboard_vpc_extension_plan.md 보안 경계와 지연 기준 (그대로 유지)
+docs/specs/data_storage_pipeline.md             저장 모델 / DDB schema
+docs/changes/0006~0011                            결정 ADR
 ```
 
 ## 목표 Hub Namespace
