@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 > Aegis-Pi Risk Twin 작업 시 Claude Code가 따라야 할 핵심 가이드.
-> 기준일: 2026-05-15 / 문서 언어: 한국어 (개조식 우선)
+> 기준일: 2026-05-19 / 문서 언어: 한국어 (개조식 우선)
+> **AI 코딩 에이전트 harness 단일 진입점**: `docs/AI_AGENT_HARNESS.md` (phase별 DoD · 허용/금지 파일 · 검증 명령 · 프롬프트 가이드 포함)
 
 ## 정체성
 
@@ -11,11 +12,12 @@
 
 ## 현재 상태
 
-- 현재 단계: M3 배포 파이프라인 준비
+- 본 환경(워크스트림 B) 현재 단계: **Phase 1 Step 0~3 진입 준비** — 1번 Data / Dashboard VPC 통합 구현 (`docs/planning/16_data_dashboard_vpc_workplan.md`)
+- 워크스트림 A(팀, 다른 환경) 진행 중: M3 Issue 2 — ECR push/pull 검증, Spoke imagePullSecret. **본 환경에서는 수정/실행하지 않는다**
 - 완료: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
-- 진행 중: M3 Issue 2 — ECR 저장소 + 이미지 태그 전략 (`aegis/edge-agent` repo 활성)
 - 보류: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- AWS: 2026-05-08 `destroy-all.sh` 이후 Hub/Foundation/IoT 삭제. 비용 기준은 `docs/ops/15_aws_cost_baseline.md`
+- AWS: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 VPC 는 아직 미배포. 비용 기준은 `docs/ops/15_aws_cost_baseline.md`
+- 시점별 정확한 스냅샷은 항상 `docs/issues/SESSION_STATE.md` 가 우선
 
 ## 디렉터리
 
@@ -103,10 +105,11 @@ scripts/ops/grafana-port-forward.sh
 ## 작업 흐름
 
 1. 시작 전 `docs/issues/SESSION_STATE.md`로 다음 작업 확인
-2. 관련 issue 문서 + `docs/planning/11_delivery_ownership_flow.md` 책임 경계 확인
-3. 작업 후 `git diff --stat`과 검증 결과 기준으로 `GitHub Issue Comment Draft` 갱신
-4. `MASTER_CHECKLIST.md`는 실제 완료 항목만 체크 (마일스톤 완료는 원본 issue Acceptance Criteria 재확인)
-5. 계획 ≠ 실제 구현된 결정은 `docs/changes/`에 신규 `0NNN` 문서 추가
+2. **`docs/AI_AGENT_HARNESS.md` § 5 의 해당 Phase Step DoD 와 § 3.1 의 허용/금지 파일 확인**
+3. 관련 issue 문서 + `docs/planning/11_delivery_ownership_flow.md` 책임 경계 확인
+4. 작업 후 `git diff --stat`과 검증 결과 기준으로 `GitHub Issue Comment Draft` 갱신
+5. `MASTER_CHECKLIST.md`는 실제 완료 항목만 체크 (마일스톤 완료는 원본 issue Acceptance Criteria 재확인)
+6. 계획 ≠ 실제 구현된 결정은 `docs/changes/`에 신규 `0NNN` 문서 추가
 
 ## 문서 작성 규칙
 
@@ -141,14 +144,17 @@ scripts/ops/grafana-port-forward.sh
 
 ## 핵심 참조 문서
 
+- **`docs/AI_AGENT_HARNESS.md` — AI 에이전트용 단일 진입점 (phase별 DoD · 허용/금지 · 검증 · 프롬프트 가이드)**
 - `docs/README.md` — 문서 인덱스
 - `docs/issues/SESSION_STATE.md` — 현재 상태 스냅샷
-- `docs/issues/MASTER_CHECKLIST.md` — M0~M7 진행 추적
+- `docs/issues/MASTER_CHECKLIST.md` — M0~M7 진행 추적 + Phase 1 Step 0~10
 - `docs/planning/00_project_overview.md` — 프로젝트 정의
 - `docs/planning/11_delivery_ownership_flow.md` — 책임 경계
 - `docs/planning/15_cloud_architecture_final.md` — 최종 클라우드 구조
+- `docs/planning/16_data_dashboard_vpc_workplan.md` — 본 환경 Phase 1 Step 0~10 (source of truth)
+- `docs/planning/17_expansion_roadmap.md` — Phase 1~4 확장 트리거
 - `docs/ops/00_quick_start.md` — 빠른 확인
 - `docs/ops/15_aws_cost_baseline.md` — 비용 기준
-- `docs/architecture/00_current_architecture.md` — 현재 구조
-- `docs/specs/iot_data_format.md` · `docs/specs/data_storage_pipeline.md` — 데이터 포맷
-- `docs/changes/README.md` — 변경 기록
+- `docs/architecture/00_current_architecture.md` · `01_target_architecture.md` — 현재 / 목표 구조
+- `docs/specs/iot_data_format.md` · `docs/specs/data_storage_pipeline.md` — 데이터 포맷 / 파이프라인 계약
+- `docs/changes/README.md` — 변경 기록(ADR 0001~0017)

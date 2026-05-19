@@ -1,8 +1,10 @@
 # Aegis-Pi Master Checklist
 
 상태: working tracker
+기준일: 2026-05-19
 기준 문서: `docs/issues/M0_factory-a_safe-edge-baseline.md` ~ `docs/issues/M7_integration-test.md`
 세션 이어받기: `docs/issues/SESSION_STATE.md`
+**AI 에이전트 진입점**: `docs/AI_AGENT_HARNESS.md` — phase별 DoD · 허용/금지 파일 · 검증 명령 · 프롬프트 가이드
 
 ## 사용 방식
 
@@ -12,6 +14,7 @@
 - 마일스톤 완료 판단은 하위 Issue 전부 완료된 뒤 원본 문서의 완료 기준으로 다시 확인한다.
 - 각 issue를 진행하거나 완료하면 원본 issue 섹션의 `GitHub Issue Comment Draft`를 최신 상태로 갱신한다.
 - GitHub issue comment는 해당 draft를 기준으로 작성하되, 민감 정보는 포함하지 않는다.
+- 본 환경(워크스트림 B)에서는 워크스트림 A 영역(M1/M2/M3/M5 의 본 환경 미진행 이슈) 체크 표기를 변경하지 않는다. 합류 지점은 `docs/AI_AGENT_HARNESS.md` § 3 참조.
 
 ---
 
