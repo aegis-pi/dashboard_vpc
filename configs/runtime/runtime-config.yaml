@@ -185,24 +185,24 @@ factories:
         guest_os: ubuntu-server-lts
         network_mode: nat-or-bridged
         instances:
-          - name: factory-c-server
+          - name: factory-c-master
             cpu: 2
             memory_gib: 2
             disk_gib: 20
             role: k3s-server
-          - name: factory-c-agent
+          - name: factory-c-worker
             cpu: 2
             memory_gib: 4
             disk_gib: 40
             role: k3s-agent
       nodes:
-        - name: factory-c-server
+        - name: factory-c-master
           role: control-plane
           labels:
             aegis.factory-id: factory-c
             aegis.environment-type: vm-windows
             aegis.spoke-type: testbed
-        - name: factory-c-agent
+        - name: factory-c-worker
           role: worker
           labels:
             aegis.factory-id: factory-c
@@ -210,7 +210,7 @@ factories:
             aegis.input-module-type: dummy
             aegis.spoke-type: testbed
     workload_placement:
-      preferred_node: factory-c-agent
+      preferred_node: factory-c-worker
       failover_node: null
     telemetry:
       iot_thing_name: AEGIS-IoTThing-factory-c
