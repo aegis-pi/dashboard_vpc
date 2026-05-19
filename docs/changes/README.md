@@ -37,6 +37,7 @@
 | 0015 | Dashboard 실시간 푸시: WebSocket + DynamoDB Streams | accepted | 2026-05-18 | M6, 실시간 통신 |
 | 0016 | LLM 일간 보고서: Amazon Bedrock + EventBridge schedule | accepted | 2026-05-18 | M6, AI/LLM, 보고 자동화 |
 | 0017 | 메타데이터 저장소: RDS PostgreSQL | accepted | 2026-05-19 | M6, 1번 VPC, 관계형 DB, 비용 |
+| 0018 | IoT Topic Rule 확장: factory-a 단일 구독 → factory-c 추가 구독 | accepted | 2026-05-19 | M4 데이터 평면, M5 factory-c, 워크스트림 A↔B 합류 |
 
 ## 파일 형식
 
