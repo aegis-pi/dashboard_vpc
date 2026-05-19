@@ -75,18 +75,49 @@
 - [ ] Issue 7 - [배포/GitHub Actions] 배포 검증 워크플로우 구성
 - [ ] Issue 8 - [검증/ArgoCD] `factory-a` end-to-end 배포 검증
 
+## Phase 1 통합 구현 Step (워크스트림 B, 본 환경)
+
+> 2026-05-18 결정. M4/M6의 원본 Acceptance Criteria는 그대로 유지하되, 본 환경에서의 실제 구현은 Phase 1 Step 0~10을 따른다. 상세는 `docs/planning/16_data_dashboard_vpc_workplan.md`.
+
+기준 문서:
+- `docs/changes/0012~0017` (Phase 1 결정 ADR 6종)
+- `docs/planning/17_expansion_roadmap.md` (Phase 1~4 트리거)
+- `docs/architecture/01_target_architecture.md`
+- `docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio`
+
+- [ ] Step 0 - [도메인] Gabia 신규 도메인 구매 + DNS 전파
+- [ ] Step 1 - [Frontend] Vite + React 마이그레이션, Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
+- [ ] Step 2 - [Terraform] 1번 VPC 골격 (`infra/data-dashboard/`): Public/Private App/Private Data subnet × 2 AZ, IGW, NAT GW × 1, ALB, Route53, ACM, CloudFront, S3 SPA, Cognito
+- [ ] Step 3 - [Terraform] 데이터 저장소: DDB `aegis-factory-status`(Streams), `aegis-daily-report`, S3 prefix, RDS PostgreSQL, ElastiCache Redis, Secrets Manager
+- [ ] Step 4 - [협의] Lambda data processor IoT Rule trigger 방식 워크스트림 A와 합의 (ADR 0018~ 후보) — **합류 지점**
+- [ ] Step 5 - [Lambda] notifier 구현 (DDB Streams → VPC-attach → Redis PUBLISH)
+- [ ] Step 6 - [Backend] FastAPI Dashboard Backend (REST + WebSocket + 4 데이터소스 조합)
+- [ ] Step 7 - [Terraform] ECS Service / ALB / Target Group / Task Role / Listener Rule
+- [ ] Step 8 - [LLM] Lambda report-generator + EventBridge schedule + Bedrock Claude 3 Haiku
+- [ ] Step 9 - [검증] End-to-end (IoT → DDB ≤ 35s, WebSocket push ≤ 2s, Backend p95 < 500ms, 일간 보고서 자동 생성)
+- [ ] Step 10 - [운영] build/destroy 스크립트, runbook, drawio·architecture 문서 최종 갱신, 비용 baseline 실측 재갱신
+
+Phase 1 데모 시연 시나리오:
+
+1. factory-a 실제 센서 변화 → 1~2초 내 대시보드 WebSocket 갱신
+2. 사용자 권한 변경 (RDS PostgreSQL) → Cognito 다음 로그인 시 반영
+3. Bedrock 일간 보고서 자동 생성 (수동 invoke 데모 가능)
+4. build/destroy 사이클로 비용 ~$8~10/월 입증
+
 ## M4. 데이터 플레인 - `factory-a` 단일 Spoke 기준
 
 원본: `docs/issues/M4_data-plane.md`
 
-- [ ] Issue 1 - [데이터/Schema] 표준 입력 스키마 확정
-- [ ] Issue 2 - [데이터/Edge Agent] `factory-a` Edge Agent 수집/변환 로직 구현
-- [ ] Issue 3 - [데이터/Container] `factory-a` Edge Agent 컨테이너화 및 K3s 배포 준비
-- [ ] Issue 4 - [데이터/IoT Core] Edge Agent -> IoT Core 연결 및 수신 확인
-- [ ] Issue 5 - [데이터/S3] IoT Core -> S3 적재 확인 (경로 파티셔닝 포함)
-- [ ] Issue 6 - [데이터/Lambda] IoT Core Lambda data processor 구현
-- [ ] Issue 7 - [데이터/Pipeline] `pipeline_status` Lambda 처리 검증
-- [ ] Issue 8 - [검증/데이터] `factory-a` 데이터 플레인 end-to-end 검증
+> Phase 1 Step 매핑: Issue 1~5는 워크스트림 A 합의 영역(팀). Issue 6~8은 Phase 1 Step 4/9에 해당.
+
+- [ ] Issue 1 - [데이터/Schema] 표준 입력 스키마 확정 (워크스트림 A · 팀 합의)
+- [ ] Issue 2 - [데이터/Edge Agent] `factory-a` Edge Agent 수집/변환 로직 구현 (워크스트림 A · 팀 합의)
+- [ ] Issue 3 - [데이터/Container] `factory-a` Edge Agent 컨테이너화 및 K3s 배포 준비 (워크스트림 A · 팀 합의)
+- [ ] Issue 4 - [데이터/IoT Core] Edge Agent → IoT Core 연결 및 수신 확인 (워크스트림 A · 팀 합의)
+- [ ] Issue 5 - [데이터/S3] IoT Core → S3 적재 확인 (워크스트림 A · 팀 합의)
+- [ ] Issue 6 - [데이터/Lambda] IoT Core Lambda data processor 구현 → **Phase 1 Step 4 합의 + 워크스트림 A 구현**
+- [ ] Issue 7 - [데이터/Pipeline] `pipeline_status` Lambda 처리 검증 (Lambda data processor 내부 단계)
+- [ ] Issue 8 - [검증/데이터] `factory-a` 데이터 플레인 end-to-end 검증 → **Phase 1 Step 9에서 합산 검증**
 
 ## M5. VM Spoke 확장 - `factory-b`, `factory-c`
 
@@ -104,14 +135,18 @@
 
 원본: `docs/issues/M6_risk-twin-dashboard.md`
 
-- [ ] Issue 1 - [Risk/Lambda] Lambda Risk 계산 로직 구현 (가중치 초기안)
+> Phase 1 Step 매핑: Issue 1~4는 Lambda data processor 내부 단계 (워크스트림 A 합의). Issue 5~8은 Phase 1 Step 1/6/8/9에 해당. 메타·권한·알림룰·LLM 보고서는 ADR 0017/0014/0015/0016으로 추가됨.
+
+- [ ] Issue 1 - [Risk/Lambda] Lambda Risk 계산 로직 구현 (가중치 초기안) — Lambda data processor 내부
 - [ ] Issue 2 - [Risk/Config] `runtime-config.yaml` 전역 설정 적용 및 필드 제어 구현
 - [ ] Issue 3 - [Risk/Config] 온도/습도 이상 기준값 초안 적용
 - [ ] Issue 4 - [Risk/Twin] Risk Twin 출력 구조 구현
-- [ ] Issue 5 - [관제/Dashboard] 메인 대시보드 - 공장별 위험도 카드
-- [ ] Issue 6 - [관제/Dashboard] 메인 대시보드 - 센서 현황 + 이상 시스템 목록
-- [ ] Issue 7 - [관제/Dashboard] 메인 대시보드 - 하단 이벤트/상태 변화 로그
-- [ ] Issue 8 - [검증/Risk] 시나리오별 Risk Score 변화 확인
+- [ ] Issue 5 - [관제/Dashboard] 메인 대시보드 - 공장별 위험도 카드 → **Phase 1 Step 1 + 6**
+- [ ] Issue 6 - [관제/Dashboard] 메인 대시보드 - 센서 현황 + 이상 시스템 목록 → **Phase 1 Step 1 + 6 (WebSocket 실시간 갱신)**
+- [ ] Issue 7 - [관제/Dashboard] 메인 대시보드 - 하단 이벤트/상태 변화 로그 → **Phase 1 Step 6**
+- [ ] Issue 8 - [검증/Risk] 시나리오별 Risk Score 변화 확인 → **Phase 1 Step 9**
+- [ ] (Phase 1 추가) RDS PostgreSQL 메타·권한·알림룰 관리 화면 (ADR 0017)
+- [ ] (Phase 1 추가) LLM 일간 보고서 탭 — Bedrock Claude 3 Haiku Markdown 렌더링 (ADR 0016)
 
 ## M7. 통합 검증
 

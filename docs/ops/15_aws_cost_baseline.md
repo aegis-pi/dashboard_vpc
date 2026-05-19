@@ -1,9 +1,11 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-15
+기준일: 2026-05-19
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-19 v0.5  ADR 0017 반영. 1번 VPC 메타 저장소를 Aurora Serverless v2에서 RDS PostgreSQL(db.t4g.micro, gp3 20GiB)로 변경하고 비용 기준 재계산.
+  - 2026-05-18 v0.4  ADR 0012~0016 반영. Phase 1 통합으로 NAT GW × 1 + ALB + ECS Fargate + Aurora Serverless v2 + ElastiCache Redis + Bedrock 항목 신설. 데모 운영 패턴(build/destroy 사이클) 비용 분리.
   - 2026-05-15 v0.3  ADR 0011 반영. 1번 VPC NAT GW 제거 후 고정 비용 ~$0.50/월로 갱신, S3 dashboard-web bucket 항목 추가.
   - 2026-05-15 v0.2  ADR 0006~0010 반영. 1번 Data/Dashboard VPC 예상 비용 섹션 추가 (실제 apply 전 추정).
   - 2026-05-08  Hub destroy 후 baseline
@@ -99,24 +101,46 @@ Admin UI Ingress가 만드는 추가 고정성 비용 추정:
 
 Admin UI Ingress를 끄면 위 비용, 약 `0.0419 USD/hour`를 줄일 수 있다. 실제 LCU와 public IPv4 수는 트래픽, AZ, ALB 동작 상태에 따라 달라질 수 있으므로 `aws elbv2 describe-load-balancers`, Cost Explorer, Public IP Insights로 다시 확인한다.
 
-## 1번 Data/Dashboard VPC 예상 비용 (ADR 0006~0011, apply 전 추정)
+## 1번 Data/Dashboard VPC 예상 비용 (ADR 0006~0017, Phase 1 통합, apply 전 추정)
 
-ADR 0006~0011로 확정된 1번 VPC MVP 토폴로지의 예상 시간/월 비용이다. 실제 apply 후 측정값으로 재갱신한다.
+ADR 0012~0017으로 Phase 1 통합 결정이 반영된 후의 예상 시간/월 비용이다. 실제 apply 후 측정값으로 재갱신한다.
 
-ADR 0011로 NAT Gateway를 만들지 않는다 → 1번 VPC 고정 비용은 Route53 hosted zone만 남는다.
+ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gateway × 1을 단일 AZ로 재도입. 데모 운영 패턴(`build-data-dashboard.sh` / `destroy-data-dashboard.sh` 사이클)으로 미가동 시에는 비용이 ~$2~3/월로 회복된다.
 
-### 고정 시간 비용 (apply 후 켜져 있을 때)
+### 고정 시간 비용 — Phase 1 가동 시 (상시 운영 가정)
 
 | 비용 항목 | 수량 | 단가 | 시간당 | 월 환산 (730h) |
 | --- | ---: | ---: | ---: | ---: |
 | Route53 public hosted zone (신규 도메인) | 1 | `$0.50 / month` | `$0.0007` | `$0.50` |
-| API Gateway custom domain | 1 | 고정 비용 없음 | `$0.0000` | `$0.00` |
 | ACM public certificate | 2 | 무료 (DNS 검증) | `$0.0000` | `$0.00` |
 | Cognito User Pool (관리자 1~5명) | 1 | 50,000 MAU 무료 티어 | `$0.0000` | `$0.00` |
-| **고정 합계** | | | `~$0.0007 / hour` | **`~$0.50 / month`** |
+| NAT Gateway × 1 (단일 AZ, ADR 0012) | 1 | `$0.0560 / hour` | `$0.0560` | `$40.88` |
+| NAT Gateway Elastic IP × 1 | 1 | `$0.0050 / hour` | `$0.0050` | `$3.65` |
+| ALB (HTTPS) | 1 | `$0.0225 / hour` | `$0.0225` | `$16.43` |
+| ALB LCU (최소 1 LCU 가정) | 1 | `$0.0080 / LCU-hour` | `$0.0080` | `$5.84` |
+| Public IPv4 for internet-facing ALB | 2 | `$0.0050 / IP-hour` | `$0.0100` | `$7.30` |
+| ECS Fargate (0.5 vCPU / 1 GB, 1 task 상시) | 1 | `$0.04048/vCPU-h + $0.004445/GB-h` | `$0.0247` | `$18.05` |
+| RDS PostgreSQL `db.t4g.micro` Single-AZ | 1 | `$0.021 / hour` | `$0.0210` | `$15.33` |
+| RDS PostgreSQL gp3 storage (20GiB) | 20 GiB | `$0.131 / GB-month` | `$0.0036` | `$2.62` |
+| ElastiCache Redis (cache.t4g.micro) | 1 | `$0.016 / hour` | `$0.0160` | `$11.68` |
+| Secrets Manager (RDS PostgreSQL + Redis AUTH) | 2 | `$0.40 / secret-month` | `$0.0011` | `$0.80` |
+| **고정 합계 (상시 가동)** | | | `~$0.1686 / hour` | **`~$123.08 / month`** |
 
-> 1번 VPC는 NAT GW 없이 시작 (ADR 0011). Lambda가 VPC 밖이라 외부 egress가 필요한 내부 워크로드가 없음.
-> 후속에 1번 VPC 안에 컨테이너 워크로드가 추가되면 NAT GW 또는 Interface Endpoint 도입을 ADR로 다시 결정.
+> 상시 가동은 ~$125/월이지만, **데모 운영 패턴(build/destroy 사이클)** 으로 실비를 ~$8~10/월 수준으로 낮출 수 있다.
+
+### 데모 운영 패턴 비용 (월 2회 × 8h = 16h/월 가동)
+
+| 비용 항목 | 시간당 | 16h/월 비용 |
+| --- | ---: | ---: |
+| NAT Gateway + EIP | `$0.0610` | `$0.98` |
+| ALB + LCU + Public IPv4 | `$0.0405` | `$0.65` |
+| ECS Fargate (1 task) | `$0.0247` | `$0.40` |
+| RDS PostgreSQL `db.t4g.micro` compute | `$0.0210` | `$0.34` |
+| RDS PostgreSQL gp3 storage (20GiB) | (월정액) | `$2.62` |
+| ElastiCache Redis | `$0.0160` | `$0.26` |
+| Secrets Manager (월정액, destroy로 삭제) | (월정액) | `$0.80` (켜진 동안만 비례) |
+| Route53 + Cognito + ACM | `$0.0007` | `$0.50` |
+| **고정 합계 (데모 운영)** | | **`~$6.55 / month`** |
 
 ### 사용량 기반 비용 (관제 트래픽 규모 가정)
 
@@ -124,37 +148,50 @@ ADR 0011로 NAT Gateway를 만들지 않는다 → 1번 VPC 고정 비용은 Rou
 | --- | ---: | --- | ---: |
 | CloudFront data out | `$0.085 / GB` (1TB 무료 후) | < 5GB/월 (관제 SPA) | `~$0.00` (무료 티어 내) |
 | CloudFront requests | `$0.0075 / 10k HTTPS` | < 100k/월 | `~$0.08` |
-| API Gateway HTTP API requests | `$1.00 / 1M requests` (첫 300M) | ~50k/월 (10초 polling × 5명 × 8h) | `~$0.05` |
-| Lambda invocations | `$0.20 / 1M` (1M 무료) | < 200k/월 | `~$0.00` (무료 티어 내) |
-| Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k GB-sec 무료) | < 100k GB-sec | `~$0.00` |
-| DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3초/20초 주기 = ~120k write/월 | `~$0.15` |
-| DynamoDB on-demand read | `$0.25 / 1M RCU` | dashboard polling 기반 ~200k read/월 | `~$0.05` |
-| DynamoDB storage | `$0.25 / GB-month` | < 1GB (TTL 24h) | `~$0.25` |
-| S3 `aegis-bucket-data` storage (raw + processed) | `$0.025 / GB-month` (Standard) | factory-a 1개월 누적 ~3GB | `~$0.08` |
-| S3 dashboard-web bucket storage (정적 SPA) | `$0.025 / GB-month` (Standard) | < 50MB | `~$0.00` |
+| Lambda data processor invocations | `$0.20 / 1M` (1M 무료) | < 200k/월 | `~$0.00` (무료 티어 내) |
+| Lambda notifier invocations (DDB Streams) | `$0.20 / 1M` | < 200k/월 | `~$0.00` |
+| Lambda report-generator invocations | `$0.20 / 1M` | 3 호출/일 × 30 = 90/월 | `~$0.00` |
+| Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k 무료) | < 100k GB-sec | `~$0.00` |
+| Bedrock Claude 3 Haiku (input) | `$0.00025 / 1k tokens` | 일간 보고서 + 이상 요약 ≈ 60k tokens/월 | `~$0.015` |
+| Bedrock Claude 3 Haiku (output) | `$0.00125 / 1k tokens` | ≈ 15k tokens/월 | `~$0.019` |
+| DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3s/20s 주기 = ~120k write/월 | `~$0.15` |
+| DynamoDB on-demand read | `$0.25 / 1M RCU` | Backend 캐시 hit으로 read 감소 ~50k/월 | `~$0.013` |
+| DynamoDB Streams read | `$0.02 / 100k stream read` | ~120k/월 | `~$0.024` |
+| DynamoDB storage (LATEST + HISTORY + daily-report) | `$0.25 / GB-month` | < 2GB | `~$0.50` |
+| S3 `aegis-bucket-data` storage (raw + processed + reports) | `$0.025 / GB-month` | factory-a 1개월 누적 ~3GB | `~$0.08` |
+| S3 dashboard-web bucket storage | `$0.025 / GB-month` | < 50MB | `~$0.00` |
 | S3 PUT requests | `$0.005 / 1k` | ~120k/월 | `~$0.60` |
 | S3 GET requests | `$0.0004 / 1k` | < 100k/월 | `~$0.04` |
 | Route53 DNS queries | `$0.40 / 1M` (첫 1B) | < 100k/월 | `~$0.04` |
 | X-Ray traces | `$5.00 / 1M traces` (100k 무료) | < 100k/월 | `~$0.00` |
-| **사용량 합계 (factory-a 단독, MVP 가정)** | | | **`~$1.34 / month`** |
+| NAT Gateway data processing (ECR pull + Bedrock + Secrets) | `$0.056 / GB` | < 5GB/월 | `~$0.28` |
+| **사용량 합계 (factory-a 단독)** | | | **`~$1.85 / month`** |
 
 > 외부 도메인 등록비: Gabia `.com` 연 ~₩15,000 / `.kr` 연 ~₩20,000 (별도, AWS 청구서에 포함되지 않음).
 
-### 1번 VPC MVP 합계 (factory-a 단독, 추정)
+### Phase 1 합계 (factory-a 단독, 추정)
 
-```text
-고정 ~$0.50/월 + 사용량 ~$1.34/월 = ~$1.84/월
-```
+| 운영 패턴 | 고정 | 사용량 | 합계 |
+| --- | ---: | ---: | ---: |
+| 상시 가동 (24/7) | ~$123.08/월 | ~$1.85/월 | **`~$124.93 / month`** |
+| 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.85/월 | **`~$8.40 / month`** |
+| destroy 후 (Route53 + S3 SPA + RDS PostgreSQL snapshot만) | ~$2.40/월 | ~$0.10/월 | **`~$2.50 / month`** |
 
-factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write가 메시지 수에 가장 민감 (factory 1개당 +`~$0.75/월` 추정).
+factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write/Bedrock token이 메시지 수에 가장 민감.
+
+> **참고**: ADR 0017 이후 17_expansion_roadmap.md의 Phase 1 비용 추정은 RDS PostgreSQL 기준으로 낮아졌다. 본 표가 실비 산정 기준이다.
 
 ### 절감 옵션 (이미 적용된 것 + 추가 후보)
 
-- ✅ **NAT GW 제거** (ADR 0011 적용). `~$45/월` 절감. 후속에 VPC 내 컨테이너가 필요해지면 재검토.
-- ✅ **항상 켜진 컨테이너 사용 안 함** (ADR 0006/0007). ECS/EKS/EC2 비용 0.
-- **DynamoDB HISTORY TTL 단축**: 24h → 6h로 줄이면 storage 비용 ↓ (이미 매우 작음, 효용 작음)
+- ✅ **데모 운영 패턴 (build/destroy 사이클)**: 상시 ~$125/월 → ~$8~10/월 (90%+ 절감). 핵심 절감 수단
+- ✅ **NAT GW 1개로 제한 (단일 AZ)**: 2 AZ × $45 → 1 × $45 (50% 절감, 가용성은 데모용 한정)
+- ✅ **RDS PostgreSQL Single-AZ**: Multi-AZ 대비 1개 instance만 사용 (Phase 2에서 활성화 검토)
+- ✅ **Redis 단일 노드 (cluster mode 비활성화)**: 비용 ~30% 절감
+- **Fargate Spot 사용**: stateless ECS task이면 ~70% 절감 가능 (Phase 2에서 검토)
+- **VPC Endpoint (Interface) for Bedrock/Secrets/ECR**: NAT data processing 비용 우회. 단, Interface endpoint 자체 ~$7/월/endpoint → 손익분기 확인 후 도입
+- **DynamoDB HISTORY TTL 단축**: 24h → 6h로 줄이면 storage 비용 ↓ (이미 작음, 효용 작음)
 - **CloudFront 최소 TTL 상향**: SPA 빌드 산출물 immutable hash naming + 1년 캐시 → CloudFront 요청 ↓
-- **API Gateway → Lambda Function URL**: 인증/throttling 직접 구현 부담 있음. MVP에선 권장 안 함
+- **Bedrock 모델 다운그레이드**: Haiku → Titan Lite (~50% 절감, 단 한국어 품질 검증 필요)
 
 ## 사용량 기반 추가 비용
 
@@ -239,13 +276,17 @@ scripts/destroy/destroy-hub.sh
 
 - `infra/hub`에 AWS 리소스가 추가, 삭제, 크기 변경됨
 - `infra/foundation`에 AMP, ECR, S3 lifecycle, IoT Rule, DynamoDB, KMS 같은 리소스가 추가됨
+- `infra/data-dashboard/`에 ECS, RDS PostgreSQL, Redis, NAT, ALB, Lambda 같은 리소스가 추가·변경됨
 - `docs/issues/` 또는 `docs/planning/`에 새 상시 운영 AWS 컴포넌트가 추가됨
-- NAT Gateway 수, node instance type, node desired size, EBS 크기, EKS Kubernetes support tier가 바뀜
+- NAT Gateway 수, node/task/DB instance type, RDS allocated storage, EKS Kubernetes support tier가 바뀜
 - Dashboard VPC, ALB, WAF, Cognito, CloudFront, Route53 같은 외부 접근 경로가 추가됨
-- API Gateway, Lambda(invocation/GB-sec), DynamoDB(read/write/storage), X-Ray 사용량이 baseline 추정과 크게 달라짐 (ADR 0007/0008/0009 영역)
+- ECS task desired_count, Fargate Spot 도입 여부, RDS PostgreSQL Multi-AZ 활성화 여부가 바뀜
+- Bedrock 모델 변경 (Haiku → Sonnet 등) 또는 일간 보고서 빈도가 늘어남
+- API Gateway, Lambda(invocation/GB-sec), DynamoDB(read/write/storage), DynamoDB Streams, X-Ray 사용량이 baseline 추정과 크게 달라짐 (ADR 0007/0008/0009/0012~0017 영역)
 - Prometheus/AMP/Grafana/CloudWatch Logs처럼 관측 계층의 수집량 또는 저장량 기준이 바뀜
 - Prometheus Agent scrape job, scrape interval, annotated pod 수집 대상이 늘어남
 - Grafana dashboard 수, refresh interval, Explore 사용량, datasource 수가 늘어남
+- Phase 2 진입 (Timestream, Kinesis, OpenSearch, Multi-AZ) — `docs/planning/17_expansion_roadmap.md` 트리거 충족
 
 비용 갱신 시 기록할 내용:
 
@@ -259,7 +300,7 @@ scripts/destroy/destroy-hub.sh
 
 ## 가격 출처
 
-2026-05-06 기준 AWS Pricing API와 공식 가격 문서를 함께 확인했고, 현재 리소스 상태는 2026-05-08 destroy 검증 결과로 갱신했다.
+2026-05-19 기준 AWS Price List API와 공식 가격 문서를 함께 확인했고, 현재 리소스 상태는 2026-05-08 destroy 검증 결과로 갱신했다.
 
 - Amazon EKS pricing: https://aws.amazon.com/eks/pricing/
 - Amazon EC2 On-Demand pricing: https://aws.amazon.com/ec2/pricing/on-demand/
@@ -271,3 +312,10 @@ scripts/destroy/destroy-hub.sh
 - Elastic Load Balancing pricing: https://aws.amazon.com/elasticloadbalancing/pricing/
 - Amazon Route53 pricing: https://aws.amazon.com/route53/pricing/
 - AWS Certificate Manager pricing: https://aws.amazon.com/certificate-manager/pricing/
+- Amazon ECS Fargate pricing: https://aws.amazon.com/fargate/pricing/
+- Amazon RDS for PostgreSQL pricing: https://aws.amazon.com/rds/postgresql/pricing/
+- Amazon RDS DB instance storage: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html
+- Amazon ElastiCache pricing: https://aws.amazon.com/elasticache/pricing/
+- Amazon Bedrock pricing: https://aws.amazon.com/bedrock/pricing/
+- AWS Lambda pricing: https://aws.amazon.com/lambda/pricing/
+- Amazon DynamoDB pricing: https://aws.amazon.com/dynamodb/pricing/

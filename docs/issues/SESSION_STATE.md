@@ -1,7 +1,7 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-15
+기준일: 2026-05-19
 
 ## 목적
 
@@ -56,44 +56,92 @@
 ```text
 워크스트림 A (팀, 다른 환경)
   - 2번 Control / Management VPC (EKS Hub, ArgoCD, Tailscale, Prometheus, Grafana, Admin UI)
+  - Lambda data processor (IoT Rule trigger, 팀 합의 영역)
+  - DynamoDB / S3 raw/processed 스키마 (팀 합의 영역)
   - M1, M2, M3, M5
   - M3 Issue 2/3/5/6/7/8 마무리는 팀 측에서 진행
 
 워크스트림 B (이 환경: /home/jongwon/personal_project/Aegis-pi)
   - 1번 Data / Dashboard VPC
-  - M4 데이터 플레인, M6 Risk Twin / Dashboard
+  - M4 데이터 플레인 (소비 측), M6 Risk Twin / Dashboard
   - 본 환경에서는 워크스트림 A 리소스(infra/hub, infra/foundation, Admin UI, ArgoCD ApplicationSet 등)를 신규 변경하지 않는다
+```
+
+## 2026-05-18 Phase 1 통합 결정
+
+워크스트림 B의 구현 목표를 Phase 1으로 통합 확정. 초안의 Phase 1 MVP(서버리스 최소 구성)와 Phase 1.5(컨테이너 확장)를 하나로 합쳤다.
+
+```text
+Phase 1 (확정 배포 목표)
+  + ECS Fargate Dashboard Backend (FastAPI)      ADR 0012 — ADR 0007 Dashboard API 부분 supersede
+  + RDS PostgreSQL                              ADR 0017
+  + ElastiCache Redis (캐시 + Pub/Sub)            ADR 0014
+  + WebSocket 실시간 (DDB Streams + notifier)     ADR 0015
+  + Bedrock Claude 3 Haiku 일간 보고서            ADR 0016
+  + 1번 VPC Public/Private App/Private Data 3-tier + NAT GW × 1 (ADR 0011 supersede)
+  + CloudFront + S3 SPA + Cognito (변경 없음)
+
+데모 운영 패턴 (build/destroy 사이클): 월 ~$8~10, destroy 후 ~$2~3
+상시 가동 시: 월 ~$125
 ```
 
 근거 문서:
 
 - `docs/changes/0005-work-split-control-vs-data-dashboard.md`
-- `docs/planning/16_data_dashboard_vpc_workplan.md`
-- `docs/planning/15_cloud_architecture_final.md`의 `2026-05-15 워크스트림 분리` 섹션
+- `docs/changes/0012-introduce-container-backend-for-dashboard.md`
+- `docs/changes/0013-aurora-serverless-for-metadata.md` (superseded)
+- `docs/changes/0017-rds-postgresql-for-metadata.md`
+- `docs/changes/0014-redis-for-realtime-cache.md`
+- `docs/changes/0015-websocket-for-dashboard-realtime.md`
+- `docs/changes/0016-bedrock-for-llm-report.md`
+- `docs/planning/16_data_dashboard_vpc_workplan.md` (Step 0~10 진입 순서)
+- `docs/planning/17_expansion_roadmap.md` (Phase 1~4 트리거 표)
+- `docs/architecture/01_target_architecture.md` (Phase 1 토폴로지)
+- `docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio`
+- `docs/ops/15_aws_cost_baseline.md` (Phase 1 비용)
 
-현재 바로 이어서 할 이슈 (본 환경):
+현재 바로 이어서 할 작업 (본 환경, Phase 1 Step 0~3):
 
 ```text
-M4 Issue 1 - [데이터/Schema] 표준 입력 스키마 확정 준비
-  + docs/specs/data_storage_pipeline.md 재확인
-  + S3 processed prefix와 DynamoDB LATEST/HISTORY 스키마 결정 사전 작업
+Step 0 - 외부 사전 작업 (병행 가능)
+  + Gabia 도메인 구매 + DNS 전파 시간 확보
+
+Step 1 - Frontend 마이그레이션 (병행 가능)
+  + Aegis-pi/Aegis-pi/ prototype을 Vite + React로 마이그레이션
+  + Cognito Hosted UI 연동
+  + WebSocket client 추가
+  + 보고서 탭 react-markdown 렌더링
+
+Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/)
+  + Public/Private App/Private Data subnet × 2 AZ
+  + Internet Gateway + NAT Gateway × 1 (단일 AZ)
+  + ALB + ACM + 보안그룹 5종
+  + Route53 hosted zone + CloudFront + S3 SPA + Cognito
+
+Step 3 - Terraform 데이터 저장소
+  + DynamoDB aegis-factory-status (Streams 활성화) + aegis-daily-report
+  + RDS PostgreSQL + Secrets Manager
+  + ElastiCache Redis (단일 노드, AUTH, transit_encryption)
 ```
 
 다음 세션 최우선 실행 순서 (본 환경):
 
 ```text
-1. 1번 VPC Terraform skeleton 설계 검토
-   - infra/data-dashboard/ root 분리 가능성 검토 (state 분리)
-   - VPC/Subnet/NAT GW/Route table 네이밍 결정 (AEGIS-Data-* 후보)
-   - 비용 영향 사전 산정 후 docs/ops/15_aws_cost_baseline.md 반영 예정 항목 정리
+1. Step 0/1을 병행 시작
+   - Gabia에서 신규 도메인 구매
+   - Frontend Vite + React 마이그레이션 (스타일은 그대로, 구조만 모듈화)
 
-2. DynamoDB / S3 processed 스키마 ADR 작성
-   - aegis-bucket-data와 별 bucket을 둘지, 동일 bucket의 별 prefix를 쓸지 결정
-   - LATEST/HISTORY PK/SK, GSI, TTL 결정
+2. Step 2 Terraform skeleton 생성
+   - infra/data-dashboard/ root 분리 (state 별도)
+   - VPC/Subnet/NAT/ALB 단가 영향 docs/ops/15_aws_cost_baseline.md 확인
 
-3. Lambda data processor 설계 초안
-   - IoT Rule -> Lambda 트리거 경로 결정 (기존 Rule 확장 vs 신규 Rule)
-   - 처리 단계(normalizer/risk score/pipeline status aggregator)를 Lambda 내부 함수로 통합
+3. Step 4 (Lambda data processor 협의) — 워크스트림 A와 합류 지점
+   - IoT Rule trigger 방식 확정 (기존 Rule 확장 vs 신규 Rule)
+   - 결정 즉시 ADR로 기록 (docs/changes/0018~)
+
+4. Step 6 Backend (FastAPI) 골격 구현 — 로컬 docker-compose로 우선 확인
+   - routers/factories.py, routers/reports.py, routers/ws.py
+   - Cognito JWT 앱 레벨 검증, RDS PostgreSQL SQLAlchemy async + asyncpg, Redis asyncio
 ```
 
 워크스트림 A 측의 다음 작업 (참고용, 본 환경에서 실행하지 않음):
@@ -628,27 +676,40 @@ a65216f docs: record mentoring-based MVP and architecture updates
 현재 세션 정리 내용:
 
 ```text
-2026-05-15 세션 저장 기준
-Hub/Foundation/IoT/Admin UI 재생성 완료
-scripts/build/build-all.sh --admin-ui는 Route53/ACM/NS 준비까지만 수행하도록 변경
-Gabia NS 위임 후 scripts/build/build-admin-ui-after-ns.sh로 ACM ISSUED 대기와 Admin UI Ingress 활성화 완료
-Hub EKS AEGIS-EKS active, node 2 Ready
-ArgoCD/Grafana/Prometheus Agent/AWS Load Balancer Controller/Tailscale verify 통과
-Admin UI HTTPS endpoint verify 통과: https://argocd.minsoo-tech.cloud, https://grafana.minsoo-tech.cloud
-Hub UI credential 파일 생성: secret/hub-ui-credentials.txt, mode 0600
-Foundation ECR repository active: 611058323802.dkr.ecr.ap-south-1.amazonaws.com/aegis/edge-agent
-factory-a IoT Thing/Policy/certificate active, K3s Secret ai-apps/aws-iot-factory-a-cert DATA=4
+2026-05-18 세션 저장 기준 (Phase 1 통합 결정)
+Phase 1 통합 확정: 초안 Phase 1 MVP + Phase 1.5(컨테이너 확장)를 하나의 Phase 1으로 통합
+ADR 0012~0017 작성 완료: ECS Fargate Backend / RDS PostgreSQL / Redis / WebSocket / Bedrock
+ADR 0007 Dashboard API 부분 superseded by 0012, ADR 0011 superseded by 0012
+신규 문서:
+  docs/changes/0012~0017 (6개)
+  docs/planning/17_expansion_roadmap.md (Phase 1~4 트리거 표 + 비용 곡선)
+  docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio (Phase 1 시각화 source of truth)
+갱신 문서:
+  docs/changes/README.md, docs/changes/0007, docs/changes/0011
+  docs/architecture/01_target_architecture.md, docs/architecture/02_cloud_expansion_drawio_guide.md
+  docs/architecture/README.md
+  docs/planning/16_data_dashboard_vpc_workplan.md (Step 0~10 구현 순서)
+  docs/ops/15_aws_cost_baseline.md (Phase 1 비용 + 데모 운영 패턴)
+
+운영 패턴 확정: 데모 직전 build-data-dashboard.sh / 직후 destroy-data-dashboard.sh
+  데모 운영 ~$8~10/월, 상시 운영 ~$125/월, destroy 후 ~$2~3/월
+
+본 환경(워크스트림 B) 다음 작업: Phase 1 Step 0~1 시작
+  - Gabia 도메인 구매 + Frontend Vite + React 마이그레이션 (병행)
+  - infra/data-dashboard/ Terraform skeleton (Step 2)
+  - 그 후 Step 3~10 순차 진행
+워크스트림 A(팀) 합류 지점: Step 4 Lambda data processor IoT Rule trigger 협의 (ADR로 합의 결과 기록)
+
+워크스트림 A 잔여 (본 환경 실행 안 함):
+  M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정
+  M3 Issue 3 - GitHub Actions OIDC build/push workflow 구성
+
+[이전 컨텍스트 유지]
+Hub/Foundation/IoT/Admin UI 재생성 완료 (2026-05-15)
+Hub EKS AEGIS-EKS active, node 2 Ready (워크스트림 A 영역, 본 환경 변경 없음)
+ECR aegis/edge-agent active, factory-a IoT Thing/Policy active
 factory-a K3s master/worker1/worker2 Ready
-M3 Issue 4 완료: AEGIS Spoke ApplicationSet Ansible bootstrap/verify 추가
-GitOps repo URL: https://github.com/aegis-pi/aegis-pi-gitops.git
-ApplicationSet aegis-spoke active, 기본 scope envs/factory-a/values.yaml
-Application aegis-spoke-factory-a targets factory-a / aegis-spoke-system
-ArgoCD sync 완료: aegis-spoke-factory-a Synced + Healthy
-factory-a K3s smoke workload: aegis-spoke-system/aegis-spoke-smoke Deployment 1/1, Pod Running, Service ClusterIP
-다음 작업(워크스트림 A, 팀 측): M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정
-그 다음 작업(워크스트림 A, 팀 측): M3 Issue 3 - GitHub Actions OIDC build/push workflow 구성
-본 환경(워크스트림 B) 다음 작업: 1번 Data / Dashboard VPC 진입 준비 (DynamoDB/S3 processed 스키마 결정, infra/data-dashboard skeleton 검토, Lambda data processor 트리거 경로 결정)
-워크스트림 분리 근거: docs/changes/0005-work-split-control-vs-data-dashboard.md, docs/planning/16_data_dashboard_vpc_workplan.md
+ApplicationSet aegis-spoke active, Application aegis-spoke-factory-a Synced + Healthy
 ```
 
 ## 갱신 규칙
