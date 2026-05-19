@@ -1,8 +1,10 @@
 # 0007. Dashboard API Runtime: Lambda + API Gateway, Lambda는 VPC 밖
 
-상태: accepted
+상태: **Dashboard API 부분 superseded by ADR 0012** / Lambda data processor 부분은 accepted 유지
 결정일: 2026-05-15
 관련 범위: M6 Risk Twin/Dashboard, 1번 Data/Dashboard VPC, Lambda data processor 배치
+
+> 2026-05-18 갱신: Phase 1.5(포트폴리오 확장 단계)를 Phase 1으로 통합하면서, Dashboard API 런타임은 ECS Fargate 컨테이너로 변경됨 (ADR 0012). Lambda data processor (IoT Rule trigger) 부분은 본 ADR 결정을 그대로 유지하고 팀 합의 영역으로 변경하지 않는다.
 
 ## 기존 계획
 

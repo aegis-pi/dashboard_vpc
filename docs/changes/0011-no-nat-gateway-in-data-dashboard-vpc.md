@@ -1,8 +1,10 @@
 # 0011. 1번 Data/Dashboard VPC NAT Gateway 제거 (MVP)
 
-상태: accepted
+상태: **superseded by ADR 0012**
 결정일: 2026-05-15
 관련 범위: M4/M6, 1번 Data/Dashboard VPC, 비용/네트워크
+
+> 2026-05-18 갱신: Phase 1.5(포트폴리오 확장 단계)를 Phase 1으로 통합하면서, ECS Fargate Backend·RDS PostgreSQL·Redis가 1번 VPC 안에 들어가게 됨. 이에 따라 NAT Gateway × 1개를 단일 AZ로 재도입한다 (ADR 0012). 데모 운영 패턴(build/destroy 사이클)으로 미가동 시간에는 NAT GW도 함께 제거되어 본 ADR의 "NAT GW 없음" 비용 상태가 회복된다.
 
 ## 기존 계획
 
