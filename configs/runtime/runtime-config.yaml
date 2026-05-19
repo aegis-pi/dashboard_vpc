@@ -178,25 +178,39 @@ factories:
     input_module_type: dummy
     cluster:
       platform: k3s
-      topology: single-node
+      topology: server-agent
       vm:
         host: windows
         tool: VirtualBox
         guest_os: ubuntu-server-lts
-        cpu: 2
-        memory_gib: 4
-        disk_gib: 40
         network_mode: nat-or-bridged
+        instances:
+          - name: factory-c-server
+            cpu: 2
+            memory_gib: 2
+            disk_gib: 20
+            role: k3s-server
+          - name: factory-c-agent
+            cpu: 2
+            memory_gib: 4
+            disk_gib: 40
+            role: k3s-agent
       nodes:
-        - name: factory-c
-          role: single-node
+        - name: factory-c-server
+          role: control-plane
+          labels:
+            aegis.factory-id: factory-c
+            aegis.environment-type: vm-windows
+            aegis.spoke-type: testbed
+        - name: factory-c-agent
+          role: worker
           labels:
             aegis.factory-id: factory-c
             aegis.environment-type: vm-windows
             aegis.input-module-type: dummy
             aegis.spoke-type: testbed
     workload_placement:
-      preferred_node: factory-c
+      preferred_node: factory-c-agent
       failover_node: null
     telemetry:
       iot_thing_name: AEGIS-IoTThing-factory-c
