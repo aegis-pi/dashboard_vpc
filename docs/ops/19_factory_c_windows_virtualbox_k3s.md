@@ -7,7 +7,7 @@
 
 | 날짜 | 버전 | 요약 |
 | --- | --- | --- |
-| 2026-05-19 | v5 | 노드/VM/변수 호칭을 master/worker 로 통일. `factory-c-server` → `factory-c-master`, `factory-c-agent` → `factory-c-worker`, `TS_IP_SERVER` → `TS_IP_MASTER`, `TS_IP_AGENT` → `TS_IP_WORKER`. K3s 자체 용어 (`INSTALL_K3S_EXEC="server"`, `k3s.service`, `k3s-agent.service`, `K3S_URL/K3S_TOKEN`) 는 K3s 정의 그대로 유지. ADR 0019 와 `configs/runtime/runtime-config.yaml` 의 노드명도 함께 정렬 |
+| 2026-05-19 | v5 | 노드/VM/변수 호칭을 master/worker 로 통일. `factory-c-server` → `factory-c-master`, `factory-c-agent` → `factory-c-worker`, `TS_IP_SERVER` → `TS_IP_MASTER`, `TS_IP_AGENT` → `TS_IP_WORKER`. K3s 자체 용어 (`INSTALL_K3S_EXEC="server"`, `k3s.service`, `k3s-agent.service`, `K3S_URL/K3S_TOKEN`) 와 yaml 의 `topology: server-agent` · `role: k3s-server/k3s-agent` 는 K3s 정의 그대로 유지. ADR 0019 (파일명 `0019-factory-c-master-worker-cluster.md`), `configs/runtime/runtime-config.yaml` factory-c 블록, `docs/changes/README.md` 인덱스도 동시 정렬 완료 |
 | 2026-05-19 | v4 | 토폴로지 single-node → **server + agent 2-VM cluster** 전면 반영 (ADR 0019). VM 사이즈 분리 (server 2 vCPU/2 GiB · agent 2 vCPU/4 GiB), Tailscale 2 노드 join, K3s server 토큰 추출 → agent join, 노드 label 분리, dummy publisher 위치 = worker VM, `infra_state.payload.nodes` 배열 2개, Windows Task Scheduler 2개 작업 (60s 지연), 재부팅 검증에 두 노드 Ready 확인 추가 |
 | 2026-05-19 | v3 | factory-a 데이터 형상 참고 절차, IoT Rule factory-c 확장 (ADR 0018) 흡수, 가데이터 자동 발행 루프 (systemd `aegis-dummy-publisher`) 추가, Step 11~16 재번호, S3 적재 검증 기준을 "채워짐" 으로 갱신, Edge Agent 전환 시 dummy publisher 중단 절차 명시 |
 | 2026-05-19 | v2 | PC 분리 (Computer 1 작업 PC / Computer 3 상시 운영 PC), 각 단계 실행 위치 명시, MFA OTP 인자 / kubectl PATH / ArgoCD context rename / Windows 무인 운영 자동 시작 / S3 적재 빈 결과 정상 처리 보강 |

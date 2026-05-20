@@ -117,7 +117,7 @@ cluster-level 자원은 변동 없음:
 - `configs/runtime/runtime-config.yaml` factory-c 블록 (nodes 배열 2개, preferred_node 갱신)
 - `docs/ops/19_factory_c_windows_virtualbox_k3s.md` 전반 (v4)
 - `docs/changes/README.md` 인덱스
-- (follow-up) `docs/specs/iot_data_format.md` 의 `infra_state.payload.nodes` 예시에 server+agent 사례 추가 검토
+- (follow-up) `docs/specs/iot_data_format.md` 의 `infra_state.payload.nodes` 예시에 master+worker 사례 추가 검토
 - (follow-up) `docs/issues/M5_vm-spoke-expansion.md` factory-c 항목
 
 ## 검증
