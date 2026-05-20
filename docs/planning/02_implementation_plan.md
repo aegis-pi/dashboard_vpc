@@ -1,7 +1,10 @@
 # 구현 전략 및 단계 계획
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-20
+
+수정 이력:
+- 2026-05-20 v0.4  2026-05-15 rebuild, M3 Issue 1/4 완료, 워크스트림 B Phase 1 Step 0~3 진입 준비 상태 반영.
 
 ## 목적
 
@@ -12,13 +15,14 @@
 - Phase 0 문서 기준선 정리는 완료 상태로 유지 보수 중이다.
 - Phase 1 M0 `factory-a` Safe-Edge 기준선은 구축 및 실측 검증까지 완료됐다.
 - Phase 2 M1은 AWS MFA/Terraform 접근, Hub EKS/VPC, Hub namespace, Hub ArgoCD, foundation S3/AMP, `factory-a` IoT Thing/Policy/K3s Secret, IoT Rule -> S3 raw 적재, IRSA S3 권한, Hub Prometheus Agent 설치, AMP remote_write 수신, Grafana AMP datasource query, AWS Load Balancer Controller, Admin UI HTTPS Ingress 검증까지 진행했다.
-- Hub AWS 리소스와 foundation S3/AMP/Admin UI는 2026-05-06~2026-05-07 `build-all --admin-ui`와 `build-hub`로 재생성/검증했고, 2026-05-08 비용 정리를 위해 `destroy-all.sh`로 삭제했다.
+- Hub AWS 리소스와 foundation S3/AMP/Admin UI는 2026-05-06~2026-05-07 `build-all --admin-ui`와 `build-hub`로 재생성/검증했고, 2026-05-15 rebuild 후 활성 상태다.
 - M1 Issue 12에서 `configs/runtime/runtime-config.yaml`과 VM dummy data 추천값을 작성했다.
 - M2 Issue 1~6에서 Tailnet/tag/Auth Key 정책 수립, `factory-a-master` Tailscale 참여, EKS Hub Tailscale Operator/egress 구성, `factory-a` kubeconfig/ArgoCD cluster 등록, `factory-a-podinfo-smoke` Sync/Healthy, Tailscale egress 장애/복구 검증을 완료했다.
-- 현재 다음 단계는 M3 Issue 2 ECR 저장소 구성 및 이미지 태그 전략이다.
+- 워크스트림 A의 현재 다음 단계는 M3 Issue 2 ECR image push/pull 검증과 Spoke imagePullSecret 방식 확정이다. 본 환경에서는 워크스트림 A 자산을 수정/실행하지 않는다.
+- 본 환경의 현재 다음 단계는 1번 Data/Dashboard VPC Phase 1 Step 0~3 진입 준비다.
 - `docs/issues/` 하위 마일스톤 문서를 기준으로 구현 순서를 M0~M7로 관리한다.
 - 구현 책임 경계는 `docs/planning/11_delivery_ownership_flow.md`를 source of truth로 삼는다.
-- 관리자 대시보드는 Tailscale 의존을 줄이기 위해 `docs/planning/07_dashboard_vpc_extension_plan.md`의 Dashboard VPC 방향을 따른다.
+- 사용자 대시보드는 Tailscale 의존을 줄이기 위해 `docs/planning/16_data_dashboard_vpc_workplan.md`와 `docs/planning/17_expansion_roadmap.md`의 Phase 1 통합 목표를 따른다.
 - AWS 인프라 작업 전 로컬 AWS CLI MFA 및 Terraform 접근 설정은 `docs/planning/08_aws_cli_mfa_terraform_access.md`를 따른다.
 - AWS 리소스 비용 기준은 `docs/ops/15_aws_cost_baseline.md`를 따른다.
 

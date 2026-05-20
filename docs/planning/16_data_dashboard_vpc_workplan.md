@@ -45,15 +45,18 @@
 
 | 영역 | 도구 | 본 환경 책임 여부 |
 | --- | --- | --- |
-| Data/Dashboard VPC 인프라 (VPC/Subnet 골격, NAT GW 없음 ADR 0011) | Terraform | 본 환경 |
+| Data/Dashboard VPC 인프라 (Public/Private App/Private Data 3-tier, NAT GW × 1, ALB, Gateway Endpoint) | Terraform | 본 환경 |
 | CloudFront + WAF + S3 dashboard-web bucket (정적 SPA 호스팅) | Terraform | 본 환경 |
-| API Gateway (custom domain + Cognito Authorizer) | Terraform | 본 환경 |
+| ALB + ECS Fargate Dashboard Backend (FastAPI) | Terraform + 코드 | 본 환경 |
 | Route53 hosted zone (신규 도메인) + ACM × 2 (us-east-1, ap-south-1) | Terraform | 본 환경 |
 | Cognito User Pool + App Client + Hosted UI (관리자 전용, MFA Required) | Terraform | 본 환경 (MVP 범위, ADR 0008) |
 | Lambda data processor (코드/패키지/IAM/IoT Rule 라우팅) — VPC 밖 | Terraform + 코드 | 본 환경 |
-| Lambda Dashboard API — VPC 밖 | Terraform + 코드 | 본 환경 |
+| Lambda notifier / Lambda report-generator | Terraform + 코드 | 본 환경 |
 | DynamoDB `aegis-factory-status` (LATEST + HISTORY, TTL 24h) | Terraform | 본 환경 |
+| DynamoDB `aegis-daily-report` | Terraform | 본 환경 |
 | S3 `aegis-bucket-data/processed/` prefix (단일 bucket 공유, ADR 0009) | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
+| S3 `aegis-bucket-data/reports/` prefix | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
+| RDS PostgreSQL / ElastiCache Redis / Secrets Manager | Terraform | 본 환경 |
 | Dashboard Web 코드 (Vite + React 정적 SPA) | 코드 | 본 환경 |
 | EKS Hub / ArgoCD / Tailscale / Admin UI | Terraform/Ansible | **본 환경 변경 금지 (워크스트림 A)** |
 | `aegis/edge-agent` ECR repository | Terraform | **본 환경 변경 금지 (워크스트림 A)** |

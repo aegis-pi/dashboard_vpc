@@ -1,7 +1,11 @@
 # 현재 구조 요약
 
 상태: source of truth
-기준일: 2026-05-08
+기준일: 2026-05-20
+
+수정 이력:
+- 2026-05-20 v0.3  2026-05-15 rebuild 이후 Hub/Foundation/IoT/Admin UI 활성 상태와 워크스트림 B Phase 1 진입 준비 상태 반영.
+- 2026-05-08 v0.2  destroy-all 이후 비용 정리 상태 반영.
 
 ## 목적
 
@@ -9,11 +13,11 @@
 
 ## 현재 상태
 
-- 현재 운영 중인 구현 범위는 `factory-a` 단일 운영형 Spoke다. M1 Hub EKS/ArgoCD/Prometheus Agent/Grafana/Admin UI HTTPS 기준선은 검증 후 비용 정리를 위해 삭제했다.
-- AWS Hub는 M1 Issue 0~10에서 EKS/VPC/namespace/ArgoCD bootstrap, foundation S3/AMP/IoT Rule, IoT Thing/certificate/policy/K3s Secret, IRSA S3/AMP 권한, Prometheus Agent remote_write 수신, Grafana AMP datasource query, AWS Load Balancer Controller, Route53/ACM, Admin UI HTTPS Ingress를 검증했고 2026-05-08 `destroy-all.sh`로 삭제했다.
+- 현재 운영 중인 구현 범위는 `factory-a` 운영형 Spoke와 2026-05-15 rebuild 후 활성화된 Hub/Foundation/IoT/Admin UI 기준선이다.
+- AWS Hub는 M1 Issue 0~10에서 EKS/VPC/namespace/ArgoCD bootstrap, foundation S3/AMP/IoT Rule, IoT Thing/certificate/policy/K3s Secret, IRSA S3/AMP 권한, Prometheus Agent remote_write 수신, Grafana AMP datasource query, AWS Load Balancer Controller, Route53/ACM, Admin UI HTTPS Ingress를 검증했고 2026-05-15 rebuild 후 활성 상태다.
 - M1 Issue 4에서 foundation S3 data bucket `aegis-bucket-data`를 생성했고, M1 Issue 5에서 IoT Thing/certificate/policy 및 K3s Secret 등록, IoT Rule -> S3 raw 적재 검증을 완료했다.
 - 후속 구현 책임 경계는 Terraform = 인프라, Ansible = bootstrap/설정/소프트웨어, GitHub Actions = CI, GitHub+ArgoCD = CD로 고정한다.
-- `factory-b`, `factory-c`, ECR, GitHub Actions, Dashboard VPC는 아직 구축 전이다. Tailscale Hub-Spoke 경로는 M2에서 검증했고 Hub destroy와 함께 EKS 내부 리소스는 삭제됐다.
+- `factory-b`, `factory-c`, GitHub Actions, 1번 Data/Dashboard VPC는 아직 구축 전이다. ECR `aegis/edge-agent` repository는 활성 상태이고, M3 Issue 2의 image push/pull 검증은 워크스트림 A에서 진행 중이다.
 - 이 문서는 현재 동작 중인 로컬 기준선과 rebuild 가능한 Hub 기준선을 함께 기록한다.
 
 ## 물리 / 클러스터 구조
@@ -86,17 +90,17 @@ safe-edge-ai-apps
 
 ## 현재 Hub 상태
 
-M1 Hub 기준선은 Terraform과 Ansible로 생성/검증했으며 2026-05-08 비용 정리를 위해 삭제했다.
+M1 Hub 기준선은 Terraform과 Ansible로 생성/검증했으며 2026-05-15 rebuild 이후 Hub/Foundation/IoT/Admin UI가 활성 상태다.
 
 ```text
-AWS actual state: Hub EKS, ArgoCD, Prometheus Agent, Grafana, AWS Load Balancer Controller, Admin UI ALB, foundation S3/AMP/IoT deleted
-EKS: AEGIS-EKS deleted
+AWS actual state: Hub EKS, ArgoCD, Prometheus Agent, Grafana, AWS Load Balancer Controller, Admin UI ALB, foundation S3/AMP/IoT active
+EKS: AEGIS-EKS active
 VPC CIDR: 10.0.0.0/16 target on rebuild
 AZ: ap-south-1a, ap-south-1c
-Hub namespaces: recreated by Ansible bootstrap
-Prometheus Agent: observability/prometheus-agent remote_writes to AMP after rebuild
-Grafana: observability/grafana queries AMP through SigV4 + IRSA after rebuild
-Admin UI: https://argocd.minsoo-tech.cloud and https://grafana.minsoo-tech.cloud through shared Public ALB after rebuild and DNS/ACM readiness
+Hub namespaces: managed by Ansible bootstrap
+Prometheus Agent: observability/prometheus-agent remote_writes to AMP
+Grafana: observability/grafana queries AMP through SigV4 + IRSA
+Admin UI: https://argocd.minsoo-tech.cloud and https://grafana.minsoo-tech.cloud through shared Public ALB
 ```
 
 Terraform root:

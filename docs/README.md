@@ -1,7 +1,7 @@
 # Aegis-Pi Docs
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-20
 
 ## 목적
 
@@ -9,12 +9,12 @@
 
 ## 현재 상태
 
-- 현재 완료된 구현 범위는 `factory-a` Safe-Edge 기준선, M1 Hub Issue 0~10/12, M2 Issue 1~6이다.
+- 현재 완료된 구현 범위는 `factory-a` Safe-Edge 기준선, M1 Hub Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4이다.
 - `factory-a`는 Raspberry Pi 3-node K3s 기반 운영형 Spoke다.
 - 2026-04-30 기준 AI snapshot은 node-local hostPath를 사용하며, AI 추론 결과는 InfluxDB PVC를 통해 Longhorn에 저장한다.
 - 2026-04-30 기준 LAN 제거 및 `k3s-agent` 중지 failover/failback 재검증을 완료했다.
-- 2026-05-07 `build-hub`는 AWS Hub EKS/VPC/NAT/EIP, ArgoCD, Prometheus Agent, Grafana, AWS Load Balancer Controller, Admin UI, Hub Tailscale Operator/egress/UI/cluster Secret 복구를 자동화한다.
-- 2026-05-08 `destroy-all.sh`로 K3s IoT Secret, IoT, Hub, foundation을 삭제했고, 현재 active AEGIS AWS fixed-cost resource는 0개다.
+- 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI가 활성 상태다. 1번 Data/Dashboard VPC는 아직 미배포다.
+- `build-hub`는 AWS Hub EKS/VPC/NAT/EIP, ArgoCD, Prometheus Agent, Grafana, AWS Load Balancer Controller, Admin UI, Hub Tailscale Operator/egress/UI/cluster Secret 복구를 자동화한다.
 - M1 Issue 5에서 IoT Rule -> S3 raw 적재와 M1 검증용 `risk/risk-normalizer` IRSA S3 권한 검증을 완료했다. 최신 데이터 처리 방향은 Lambda data processor와 DynamoDB/S3 processed다.
 - M1 Issue 6에서 AMP Workspace와 `observability/prometheus-agent` IRSA remote_write 권한 검증을 완료했다.
 - M1 Issue 7에서 Hub Prometheus Agent를 설치하고 AMP Query API로 `up{cluster="AEGIS-EKS"}` 수신을 검증했다.
@@ -28,12 +28,13 @@
 - M2 Issue 4/5에서 `tls-server-name: 10.10.10.10` 기반 `factory-a` kubeconfig와 ArgoCD cluster 등록을 완료했고, cluster status `Successful`을 확인했다.
 - M2 Issue 6에서 `factory-a-podinfo-smoke` Application을 `factory-a`에 Sync해 `Synced` + `Healthy`, Pod 2개 `Running`을 확인했고, Tailscale egress Service 삭제 시 sync failure 및 재생성 후 복구를 검증했다.
 - M3 Issue 1에서 `aegis-pi-gitops` GitOps 저장소 구조, `aegis-spoke` Helm chart, 공장별 values, ApplicationSet skeleton, manifest validation workflow를 완료했다.
-- 다음 작업은 M3 Issue 2 ECR 저장소 구성 및 이미지 태그 전략이다. EKS API endpoint CIDR 축소와 M1 Issue 11 운영 보안 강화는 MVP 이후/설계 마무리 후 재검토로 보류했다.
-- `factory-b`, `factory-c`, GitHub Actions build/deploy CI는 후속 단계다.
+- 워크스트림 A는 M3 Issue 2 ECR push/pull 검증을 진행 중이며, 본 환경에서는 수정/실행하지 않는다.
+- 본 환경의 기본 작업 범위는 1번 Data/Dashboard VPC Phase 1 Step 0~3 진입 준비다.
+- `factory-b`, `factory-c`, GitHub Actions build/deploy CI는 워크스트림 A/후속 단계다.
 - 현재 운영 source of truth는 `docs/ops/` 문서다.
 - 마일스톤 추적은 `docs/issues/` 문서를 따른다.
 - 계획과 실제 구현이 달라진 결정은 `docs/changes/`에서 추적한다.
-- 후속 관리자 대시보드는 `planning/07_dashboard_vpc_extension_plan.md`의 Dashboard VPC 방향을 따른다.
+- 사용자 대시보드는 `planning/16_data_dashboard_vpc_workplan.md`와 `planning/17_expansion_roadmap.md`의 Phase 1 통합 목표를 따른다.
 - AWS CLI MFA 및 Terraform 접근 준비는 `planning/08_aws_cli_mfa_terraform_access.md`를 따른다.
 - 인프라/설정/CI/CD 책임 경계는 `planning/11_delivery_ownership_flow.md`를 따른다.
 - M1 EKS/VPC 설계 결정은 `planning/09_m1_eks_vpc_decision_record.md`를 따른다.
@@ -41,31 +42,27 @@
 
 ## 먼저 읽을 문서
 
-1. `ops/05_factory_a_status.md`
-2. `ops/00_quick_start.md`
-3. `ops/01_safe_edge_bootstrap.md`
-4. `ops/06_argocd_gitops.md`
-5. `ops/07_grafana_dashboard.md`
-6. `ops/08_data_retention.md`
-7. `ops/09_failover_failback_test_results.md`
-8. `ops/10_edge_workload_placement.md`
-9. `ops/11_ansible_test_automation.md`
-10. `ops/12_iot_core_thing_secret_mount.md`
-11. `changes/README.md`
-12. `planning/06_edge_agent_deployment_plan.md`
-13. `planning/07_dashboard_vpc_extension_plan.md`
-14. `planning/08_aws_cli_mfa_terraform_access.md`
-15. `planning/09_m1_eks_vpc_decision_record.md`
-16. `planning/11_delivery_ownership_flow.md`
-17. `ops/13_hub_namespace_baseline.md`
-18. `ops/14_hub_run_commands.md`
-19. `ops/15_aws_cost_baseline.md`
-20. `ops/16_hub_prometheus_amp.md`
-21. `ops/17_hub_grafana_amp.md`
-22. `ops/20_tailscale_hub_spoke_runbook.md`
-23. `ops/21_hub_admin_ui_ingress.md`
-24. `issues/M0_factory-a_safe-edge-baseline.md`
-25. `issues/M1_hub-cloud.md`
+1. `issues/SESSION_STATE.md`
+2. `AI_AGENT_HARNESS.md`
+3. `planning/16_data_dashboard_vpc_workplan.md`
+4. `planning/17_expansion_roadmap.md`
+5. `planning/15_cloud_architecture_final.md`
+6. `ops/15_aws_cost_baseline.md`
+7. `product/02_requirements_definition.md`
+8. `report/03_요구사항정의서.md`
+9. `ops/05_factory_a_status.md`
+10. `ops/00_quick_start.md`
+11. `ops/01_safe_edge_bootstrap.md`
+12. `ops/06_argocd_gitops.md`
+13. `ops/07_grafana_dashboard.md`
+14. `ops/08_data_retention.md`
+15. `ops/09_failover_failback_test_results.md`
+16. `ops/10_edge_workload_placement.md`
+17. `ops/11_ansible_test_automation.md`
+18. `ops/12_iot_core_thing_secret_mount.md`
+19. `changes/README.md`
+20. `planning/11_delivery_ownership_flow.md`
+21. `issues/MASTER_CHECKLIST.md`
 
 ## 문서 구조
 
@@ -141,7 +138,7 @@ Windows operator PC Tailscale IPv4: 100.67.181.8
 ## 현재 Hub 기준
 
 ```text
-AWS actual state: Hub/Foundation/IoT/Admin UI deleted after `scripts/destroy/destroy-all.sh`; AEGIS EKS KMS keys are `PendingDeletion`
+AWS actual state: Hub/Foundation/IoT/Admin UI active after 2026-05-15 rebuild; 1번 Data/Dashboard VPC not deployed
 Hub bootstrap roots:
 - infra/hub: VPC/EKS/node group, Route53/ACM, IRSA
 - scripts/ansible: namespace/LimitRange/ArgoCD/Prometheus Agent/Grafana/AWS Load Balancer Controller/Admin UI Ingress bootstrap
@@ -172,8 +169,7 @@ Delivery flow: Terraform -> Ansible -> GitHub Actions CI -> GitHub/ArgoCD CD
 
 ## 다음 문서 업데이트 우선순위
 
-1. `architecture/00_current_architecture.md`
-2. `architecture/01_target_architecture.md`
-3. `specs/monitoring_dashboard/00_requirements.md`
-4. `demo/01_demo_scenario.md`
-5. `report/00_executive_summary.md`
+1. `apps/dashboard-web/**` 마이그레이션 결과에 맞춘 화면 설계서 갱신
+2. `infra/data-dashboard/**` 생성 후 운영 runbook 신규 작성
+3. `docs/ops/15_aws_cost_baseline.md` 실측 비용 재갱신
+4. `docs/issues/SESSION_STATE.md` 작업 스냅샷 갱신

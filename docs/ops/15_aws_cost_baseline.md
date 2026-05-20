@@ -1,9 +1,10 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-19
+기준일: 2026-05-20
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-20 v0.6  2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 1번 VPC 미배포 상태를 현재 리소스 상태에 반영.
   - 2026-05-19 v0.5  ADR 0017 반영. 1번 VPC 메타 저장소를 Aurora Serverless v2에서 RDS PostgreSQL(db.t4g.micro, gp3 20GiB)로 변경하고 비용 기준 재계산.
   - 2026-05-18 v0.4  ADR 0012~0016 반영. Phase 1 통합으로 NAT GW × 1 + ALB + ECS Fargate + Aurora Serverless v2 + ElastiCache Redis + Bedrock 항목 신설. 데모 운영 패턴(build/destroy 사이클) 비용 분리.
   - 2026-05-15 v0.3  ADR 0011 반영. 1번 VPC NAT GW 제거 후 고정 비용 ~$0.50/월로 갱신, S3 dashboard-web bucket 항목 추가.
@@ -18,33 +19,34 @@
 
 ## 현재 Aegis 리소스 상태
 
-2026-05-08 `scripts/destroy/destroy-all.sh` 실행 후 확인 결과다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다.
+2026-05-15 rebuild 후 세션 스냅샷 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard VPC는 아직 apply 전이며, 예상 비용은 별도 섹션에 둔다.
 
 | 영역 | 리소스 | 수량/크기 | 상태 |
 | --- | --- | ---: | --- |
-| EKS | `AEGIS-EKS` control plane | 0 | deleted |
-| EC2 | `AEGIS-EKS-node` | 0 | previous instances terminated |
-| EBS | EKS node root volume | 0 | deleted/not found |
-| VPC/Subnet | `AEGIS-VPC` and subnets | 0 | deleted |
-| NAT Gateway | `AEGIS-NAT-public-Azone`, `AEGIS-NAT-public-Czone` | 0 | deleted |
-| Public IPv4 | NAT Gateway Elastic IP / ALB public IPv4 | 0 | released with deleted resources |
-| S3 | `aegis-bucket-data` | 0 | bucket deleted |
-| IoT Core | `AEGIS_IoTRule_factory_a_raw_s3` | 0 | deleted with foundation |
-| IoT Core | `AEGIS-IoTThing-factory-a` / `AEGIS-IoTPolicy-factory-a` / certificate | 0 | deleted |
-| AMP | `AEGIS-AMP-hub` | 0 | workspace deleted |
-| EKS workload | `observability/grafana` | 0 | deleted with EKS |
-| EKS workload | `kube-system/aws-load-balancer-controller` | 0 | deleted with EKS |
-| Route53 | public hosted zone `minsoo-tech.cloud` | 0 | deleted |
-| ACM | public certificate for `minsoo-tech.cloud`, `argocd.minsoo-tech.cloud`, `grafana.minsoo-tech.cloud` | 0 | deleted |
-| ALB | `aegis-admin-ui` | 0 | deleted |
-| KMS | AEGIS EKS customer managed keys | 0 active | current and historical keys are `PendingDeletion` |
-| CloudWatch Logs | `/aws/eks/AEGIS-EKS/cluster` | 0 active EKS cluster | log group cost should be rechecked if retained outside Terraform |
+| EKS | `AEGIS-EKS` control plane | 1 | active |
+| EC2 | `AEGIS-EKS-node` managed node group | 2 × `t3.medium` | active |
+| EBS | EKS node root volume | 40 GiB 추정 | active with node group |
+| VPC/Subnet | `AEGIS-VPC` and subnets | 1 VPC / 2 AZ | active |
+| NAT Gateway | Hub NAT Gateway | 2 | active |
+| Public IPv4 | NAT Gateway Elastic IP / Admin UI ALB public IPv4 | active 수량은 AWS 조회로 확인 | active |
+| S3 | `aegis-bucket-data` | 1 bucket | active |
+| IoT Core | `AEGIS_IoTRule_factory_a_raw_s3` | 1 rule | active |
+| IoT Core | `AEGIS-IoTThing-factory-a` / `AEGIS-IoTPolicy-factory-a` / certificate | 1 set | active |
+| AMP | `AEGIS-AMP-hub` | 1 workspace | active |
+| ECR | `aegis/edge-agent` | 1 repo | active, push/pull 검증은 워크스트림 A 진행 중 |
+| EKS workload | `observability/grafana` | 1 release | active |
+| EKS workload | `observability/prometheus-agent` | 1 release | active |
+| EKS workload | `kube-system/aws-load-balancer-controller` | 1 release | active |
+| Route53 | public hosted zone `minsoo-tech.cloud` | 1 zone | active |
+| ACM | public certificate for Admin UI hosts | 1 regional certificate set | active / ISSUED |
+| ALB | `aegis-admin-ui` | 1 | active |
+| Data/Dashboard VPC | 1번 VPC / ALB / ECS / RDS / Redis | 0 | not deployed |
 
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- ECR repository 없음
-- Dashboard VPC 없음
+- 1번 Data/Dashboard VPC 미배포
+- Dashboard Backend용 ECR `aegis/dashboard-backend` 없음
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산
 
@@ -300,7 +302,7 @@ scripts/destroy/destroy-hub.sh
 
 ## 가격 출처
 
-2026-05-19 기준 AWS Price List API와 공식 가격 문서를 함께 확인했고, 현재 리소스 상태는 2026-05-08 destroy 검증 결과로 갱신했다.
+2026-05-19 기준 AWS Price List API와 공식 가격 문서를 함께 확인했고, 현재 리소스 상태는 2026-05-20 세션 스냅샷의 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태로 갱신했다.
 
 - Amazon EKS pricing: https://aws.amazon.com/eks/pricing/
 - Amazon EC2 On-Demand pricing: https://aws.amazon.com/ec2/pricing/on-demand/

@@ -1,7 +1,13 @@
 # Cloud Architecture Final
 
 상태: source of truth
-기준일: 2026-05-09
+기준일: 2026-05-20
+
+수정 이력:
+- 2026-05-20 v0.4  Phase 1 통합 결정(ADR 0012~0017)을 본문에 반영. 1번 VPC의 서버리스 MVP/비어 있는 VPC 표현 제거.
+- 2026-05-15 v0.3  워크스트림 분리와 1번 VPC MVP 토폴로지 반영.
+- 2026-05-14 v0.2  Lambda data processor + DynamoDB/S3 processed 데이터 흐름 반영.
+- 2026-05-09 v0.1  최초 확정 클라우드 아키텍처 정리.
 
 ## 목적
 
@@ -196,43 +202,50 @@ Grafana 관측 대상
 ### Public Subnet
 
 ```text
-Public Subnet
-  - 골격만 (MVP에서 NAT GW / IGW / ALB / EC2 모두 두지 않음)
-  - 외부 진입은 모두 VPC 밖 또는 글로벌 자원이 담당:
-      CloudFront (글로벌, S3 SPA 앞단)
-      WAF (CloudFront 앞단)
-      Route53 (Gabia 신규 도메인 위임)
-      ACM (us-east-1: CloudFront, ap-south-1: API Gateway)
-      API Gateway custom domain
-      Cognito Hosted UI
+Public Subnet (ap-south-1a, ap-south-1c)
+  - Internet Gateway
+  - NAT Gateway × 1 (단일 AZ, 비용 절감)
+  - ALB (HTTPS, ACM)
 ```
 
-> Note: ALB는 MVP에서 1번 VPC에 두지 않는다. SPA는 CloudFront, API는 API Gateway custom domain이 직접 받는다. 후속에 컨테이너 기반 백엔드가 추가되면 ALB 도입을 재검토한다.
-> NAT Gateway도 MVP에서 만들지 않는다 (`docs/changes/0011-no-nat-gateway-in-data-dashboard-vpc.md`). Lambda가 VPC 밖에 있어 1번 VPC 안에서 외부로 나갈 워크로드가 없다.
+ADR 0012 이후 Phase 1은 ECS Fargate Dashboard Backend를 포함하는 통합 배포 목표다. 따라서 ADR 0011의 NAT Gateway 제거 결정과 ADR 0007의 Lambda Dashboard API 결정은 Dashboard API/NAT 영역에 한해 supersede된다. ADR 0007의 Lambda data processor 결정은 계속 유효하다.
 
 ### Private App Subnet
 
 ```text
-Private App Subnet
-  - (MVP에서는 비어 있음)
-  - 후속 단계에서 컨테이너 기반 워크로드가 추가될 경우 사용
+Private App Subnet (ap-south-1a, ap-south-1c)
+  - ECS Fargate Dashboard Backend (FastAPI)
+  - ElastiCache Redis (캐시 + Pub/Sub)
+  - Lambda notifier (DDB Streams trigger, VPC-attach)
 ```
 
-MVP에서 1번 VPC 안에는 상시 실행 워크로드를 두지 않는다.
-
-- Dashboard Web은 정적 SPA로 빌드해 S3 + CloudFront로 제공한다 (`docs/changes/0006-frontend-static-spa-with-vite.md`)
-- Dashboard Backend/API와 Lambda data processor는 모두 VPC 밖 Lambda + API Gateway로 동작한다 (`docs/changes/0007-dashboard-api-runtime-lambda.md`)
-- Replay Builder / Near-miss Aggregator / AI Analytics Worker는 MVP 범위 외 (후속, M7+)
+Dashboard Web은 Vite + React 정적 SPA로 빌드해 S3 + CloudFront로 제공한다. Dashboard Backend/API는 ALB 뒤의 ECS Fargate FastAPI 서비스로 제공한다. Replay Builder / Near-miss Aggregator / AI Analytics Worker는 Phase 1 범위 밖이며, `docs/planning/17_expansion_roadmap.md`의 Phase 3 이후 트리거 기반으로 검토한다.
 
 ### Private Data Subnet
 
 ```text
-Private Data Subnet
-  - MVP에서는 만들지 않음
-  - 후속 RDS / PostgreSQL / Redis / ElastiCache / OpenSearch 추가 시 신규 생성
+Private Data Subnet (ap-south-1a, ap-south-1c)
+  - RDS PostgreSQL (db.t4g.micro, Single-AZ, gp3 20GiB)
 ```
 
-MVP에서 사용하는 DynamoDB와 S3는 VPC 밖 managed service이므로 subnet 안에 두지 않는다. 필요 시 VPC Gateway Endpoint(S3, DynamoDB — 무료)만 추가한다.
+DynamoDB와 S3는 VPC 밖 managed service로 유지한다. 1번 VPC에는 S3/DynamoDB Gateway Endpoint를 두어 ECS/Lambda notifier가 NAT를 거치지 않고 접근할 수 있게 한다.
+
+### VPC 밖 / 글로벌 관리형 서비스
+
+```text
+- S3 dashboard-web bucket (정적 SPA 호스팅, OAC)
+- CloudFront + WAF
+- Route53 hosted zone (Gabia 신규 도메인 위임)
+- ACM (us-east-1: CloudFront, ap-south-1: ALB)
+- Cognito User Pool + Hosted UI
+- Lambda data processor (IoT Rule trigger, 팀 합의 영역)
+- Lambda report-generator (EventBridge schedule)
+- Bedrock Claude 3 Haiku
+- EventBridge Scheduler
+- DynamoDB aegis-factory-status (LATEST + HISTORY + Streams)
+- DynamoDB aegis-daily-report
+- S3 aegis-bucket-data raw/processed/reports prefix
+```
 
 ### 데이터 흐름
 
@@ -244,7 +257,8 @@ factory-a/b/c telemetry
           -> DynamoDB LATEST
           -> DynamoDB HISTORY
           -> S3 processed
-  -> Dashboard Backend/API
+          -> DynamoDB Streams -> Lambda notifier -> Redis Pub/Sub
+  -> ALB -> ECS Fargate Dashboard Backend
   -> Dashboard Web
 ```
 
@@ -257,9 +271,11 @@ Dashboard Web/API
   - 공장별 Risk Score
   - 공장별 latest status
   - 이벤트 목록
-  - near-miss 요약
-  - replay 결과
-  - 센서 / AI / 장비 상태 요약
+  - Fleet / Factory overview
+  - Environment / Infrastructure 추세
+  - Timeline
+  - 센서 / AI / 장비 / workload / pipeline 상태 요약
+  - 일간 Markdown 보고서
 ```
 
 ## 최종 리소스 배치 요약
@@ -303,36 +319,36 @@ Control / Management VPC
   - AWS Load Balancer Controller
 ```
 
-### Data / Dashboard VPC (MVP)
+### Data / Dashboard VPC (Phase 1 통합 목표)
 
 ```text
 Data / Dashboard VPC
-  - VPC + Public/Private subnet 골격만 (MVP에서 모든 subnet 비어 있음)
-  - NAT Gateway 없음 (ADR 0011)
-  - Internet Gateway 없음 (필요 시 후속에 ALB/IGW 함께 추가)
-  - VPC Gateway Endpoint: S3, DynamoDB (무료, 후속 워크로드 대비 권장)
-
-  ※ 1번 VPC 내부 워크로드 없음. 아래는 모두 VPC 밖 또는 글로벌 자원.
+  - Public Subnet × 2 AZ: IGW, NAT Gateway × 1, ALB
+  - Private App Subnet × 2 AZ: ECS Fargate Backend, Redis, Lambda notifier
+  - Private Data Subnet × 2 AZ: RDS PostgreSQL
+  - VPC Gateway Endpoint: S3, DynamoDB
 
 VPC 외부 / 글로벌 (1번 VPC와 한 영역으로 다이어그램 표기)
   - S3 dashboard-web bucket (정적 SPA 호스팅, OAC, `aegis-bucket-data`와 분리된 신규 bucket)
   - CloudFront (+ WAF) → S3 dashboard-web bucket
-  - Lambda Dashboard API + API Gateway (Cognito Authorizer)
   - Lambda data processor (IoT Rule trigger)
+  - Lambda report-generator + EventBridge Scheduler
+  - Bedrock Claude 3 Haiku
   - DynamoDB LATEST/HISTORY (`aegis-factory-status`)
+  - DynamoDB daily report metadata (`aegis-daily-report`)
   - S3 raw / S3 processed (단일 bucket `aegis-bucket-data` + prefix, ADR 0009)
   - Cognito User Pool (관리자 전용, MFA Required)
   - Route53 (신규 도메인) + ACM
 ```
 
-후속 (MVP 외):
+후속 (Phase 2~4):
 
 ```text
-- 1번 VPC Private App Subnet에 컨테이너 기반 워크로드 (필요 시)
-- Replay Builder
-- Near-miss Aggregator
+- Timestream / Kinesis / OpenSearch
+- Multi-AZ RDS PostgreSQL / Redis
+- Replay Builder / Near-miss Aggregator
 - AI / Analytics Worker
-- 1번 VPC Private Data Subnet 신규 + RDS / Redis / OpenSearch
+- Multi-tenant / Compliance 기능
 ```
 
 ## 최종 흐름
@@ -354,8 +370,9 @@ factory-a/b/c
   -> IoT Core
       -> IoT Rule -> S3 raw
       -> Lambda data processor -> DynamoDB LATEST/HISTORY + S3 processed
-  -> Dashboard API
-  -> Dashboard Web
+          -> DynamoDB Streams -> Lambda notifier -> Redis Pub/Sub
+  -> ALB -> ECS Fargate Dashboard Backend
+  -> Dashboard Web (CloudFront + S3 SPA)
 ```
 
 ### 관측 흐름
@@ -385,7 +402,10 @@ Hub EKS / Prometheus Agent / Edge Agent metrics
            DynamoDB LATEST/HISTORY (aegis-factory-status),
            S3 processed (aegis-bucket-data prefix, ADR 0009),
            Dashboard Web (정적 SPA + S3 + CloudFront, ADR 0006),
-           Dashboard API (Lambda + API Gateway, ADR 0007),
+           Dashboard Backend (ECS Fargate + ALB, ADR 0012),
+           RDS PostgreSQL (ADR 0017),
+           ElastiCache Redis + WebSocket (ADR 0014/0015),
+           LLM 일간 보고서 (Bedrock, ADR 0016),
            CloudFront/WAF/Route53/ACM (신규 도메인, ADR 0010),
            Cognito User Pool (관리자 전용, MFA, ADR 0008)
   - source of truth: 본 환경에서 갱신
@@ -410,9 +430,9 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
 - `docs/changes/0005-work-split-control-vs-data-dashboard.md` - 워크스트림 분리 ADR
 - `docs/planning/16_data_dashboard_vpc_workplan.md` - 본 환경(워크스트림 B) 작업 범위와 진입 순서
 
-## 2026-05-15 1번 VPC MVP 토폴로지 확정
+## 2026-05-18 Phase 1 통합 토폴로지 확정
 
-워크스트림 분리 후 1번 Data/Dashboard VPC 세부 구성을 ADR 0006~0010으로 확정했다.
+워크스트림 분리 후 1번 Data/Dashboard VPC의 초기 서버리스 초안을 ADR 0006~0011로 정리했으나, 2026-05-18 Phase 1 통합 결정으로 ECS Fargate Backend, RDS PostgreSQL, Redis, WebSocket, Bedrock 일간 보고서를 Phase 1 배포 목표에 포함했다.
 
 ```text
 사용자 흐름:
@@ -420,11 +440,12 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
         → CloudFront (+ WAF, OAC)
         → S3 (Vite + React 정적 SPA)
         → 브라우저 → Cognito Hosted UI (OIDC PKCE 로그인)
-        → 브라우저 → API Gateway (Authorization: Bearer JWT)
-        → API Gateway Cognito Authorizer 검증
-        → Dashboard API Lambda (VPC 밖)
+        → 브라우저 → ALB (Authorization: Bearer JWT)
+        → ECS Fargate Dashboard Backend (JWT 앱 레벨 검증)
         → DynamoDB LATEST/HISTORY (read)
         → S3 processed (read, 장기 이력)
+        → RDS PostgreSQL (메타·권한 read)
+        → Redis (캐시·Pub/Sub)
 
 데이터 흐름:
   Edge Agent → IoT Core
@@ -433,6 +454,13 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
                         ├ DynamoDB LATEST overwrite
                         ├ DynamoDB HISTORY (TTL 24h)
                         └ S3 processed (aegis-bucket-data/processed/...)
+                           └ DynamoDB Streams → Lambda notifier → Redis → WebSocket
+
+보고서 흐름:
+  EventBridge Scheduler (09:00 KST)
+    → Lambda report-generator
+    → Bedrock Claude 3 Haiku
+    → S3 reports/ + DynamoDB aegis-daily-report
 ```
 
 확정 결정:
@@ -440,12 +468,16 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
 | 항목 | 결정 | ADR |
 | --- | --- | --- |
 | Frontend | Vite + React 정적 SPA, S3 + CloudFront 배포 | 0006 |
-| API 런타임 | Lambda + API Gateway, Lambda는 VPC 밖 | 0007 |
-| 인증 | Cognito User Pool (Self sign-up Disabled, MFA Required) + API Gateway Cognito Authorizer | 0008 |
+| API 런타임 | ECS Fargate Dashboard Backend + ALB. ADR 0007의 Dashboard API 부분 supersede | 0012 |
+| Lambda data processor | IoT Rule trigger Lambda. ADR 0007 중 이 부분은 유효 | 0007 |
+| 인증 | Cognito User Pool (Self sign-up Disabled, MFA Required) + 앱 레벨 JWT 검증 | 0008 |
 | S3 | 단일 bucket `aegis-bucket-data` + raw/processed prefix 분리 | 0009 |
 | 도메인 | Gabia 신규 + Route53 위임, Admin UI(`*.minsoo-tech.cloud`)와 분리 | 0010 |
-| 1번 VPC NAT Gateway | MVP에서 만들지 않음 (Lambda VPC 밖, 내부 워크로드 없음) | 0011 |
-| Replay/Near-miss/AI Worker | MVP 범위 외 (M7+로 미룸) | (이 문서) |
+| 1번 VPC NAT Gateway | ADR 0011 supersede. NAT GW × 1 단일 AZ 재도입 | 0012 |
+| 메타 저장소 | RDS PostgreSQL `db.t4g.micro`, Single-AZ, gp3 20GiB | 0017 |
+| 캐시/실시간 | ElastiCache Redis + DynamoDB Streams + Lambda notifier + WebSocket | 0014/0015 |
+| 일간 보고서 | Bedrock Claude 3 Haiku + EventBridge + Lambda report-generator | 0016 |
+| Replay/Near-miss/AI Worker | Phase 1 범위 외. Phase 3 트리거 기반 검토 | 17 로드맵 |
 
 ## 2026-05-14 수정 방향
 

@@ -1,7 +1,7 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-19
+기준일: 2026-05-20
 
 ## 목적
 
@@ -99,6 +99,8 @@ Phase 1 (확정 배포 목표)
 - `docs/architecture/01_target_architecture.md` (Phase 1 토폴로지)
 - `docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio`
 - `docs/ops/15_aws_cost_baseline.md` (Phase 1 비용)
+- `docs/report/03_요구사항정의서.md` (SRS v1.7)
+- `docs/product/02_requirements_definition.md` (요구사항 추적 기준)
 
 현재 바로 이어서 할 작업 (본 환경, Phase 1 Step 0~3):
 
@@ -624,9 +626,9 @@ scripts/destroy/destroy-all.sh
 
 ## 문서 갱신 상태
 
-M1 Issue 4/5/6/7/8/9/10/12 완료, IoT Rule -> S3 raw 적재, `risk/risk-normalizer` IRSA 검증, AMP Workspace 생성, `observability/prometheus-agent` remote_write 수신 검증, Grafana AMP datasource query 검증, AWS Load Balancer Controller, Admin UI HTTPS Ingress, runtime-config.yaml과 VM dummy data 추천값, M2 Issue 1~6 완료 상태, 2026-05-08 전체 destroy 후 현재 AWS 삭제 상태를 문서에 반영했다.
-AWS 비용 기준은 `docs/ops/15_aws_cost_baseline.md`에 추가했고, AWS 리소스나 상시 운영 경로가 추가될 때 함께 갱신하는 규칙을 `docs/README.md`, `docs/ops/README.md`, `docs/planning/11_delivery_ownership_flow.md`에 반영했다.
-또한 앞으로의 구현 책임 경계를 Terraform, Ansible, GitHub Actions, GitHub+ArgoCD 흐름으로 고정하고 관련 문서를 최신화했다.
+M1 Issue 4/5/6/7/8/9/10/12 완료, M2 Issue 1~6 완료, M3 Issue 1/4 완료, 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태, 워크스트림 B Phase 1 통합 결정(ECS Fargate Backend, RDS PostgreSQL, Redis, WebSocket, Bedrock)을 문서에 반영했다.
+AWS 비용 기준은 `docs/ops/15_aws_cost_baseline.md`에 반영했고, AWS 리소스나 상시 운영 경로가 추가될 때 함께 갱신하는 규칙을 `docs/README.md`, `docs/ops/README.md`, `docs/planning/11_delivery_ownership_flow.md`에 유지한다.
+구현 책임 경계는 Terraform, Ansible, GitHub Actions, GitHub+ArgoCD 흐름으로 고정한다.
 
 - `README.md`
 - `docs/README.md`
