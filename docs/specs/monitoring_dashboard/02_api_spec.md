@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: draft
-기준일: 2026-05-15
+기준일: 2026-05-20
 수정 이력:
+  - 2026-05-20  Phase 1 통합 결정(ADR 0012~0017) 반영. API Gateway/Lambda API 초안을 ALB + ECS Fargate Backend + 앱 레벨 JWT 검증 + WebSocket 기준으로 갱신.
   - 2026-05-15  ADR 0007/0008로 API Gateway + Lambda + Cognito Authorizer 확정. 후속 API 후보를 확정 경로로 갱신.
   - 2026-04-28  초안
 
@@ -40,20 +41,25 @@ SELECT "bending_detected" FROM "ai_detection" WHERE $timeFilter ORDER BY time DE
 SELECT "is_danger" FROM "acoustic_detection" WHERE $timeFilter ORDER BY time DESC LIMIT 10
 ```
 
-## 1번 Data / Dashboard VPC API (확정 경로)
+## 1번 Data / Dashboard VPC API (Phase 1 확정 경로)
 
-ADR 0007/0008로 런타임과 인증이 확정됨. Dashboard API는 Spoke K3s, ArgoCD, Control/Management VPC의 EKS API, Tailscale 관리망을 직접 호출하지 않는다. DynamoDB LATEST/HISTORY와 S3 processed를 조회한다.
+ADR 0012~0017로 Phase 1 API 런타임과 저장소/실시간 경로가 확정됐다. ADR 0007의 Dashboard API Lambda 부분은 supersede됐고, Lambda data processor 부분만 유효하다.
+
+Dashboard Backend는 Spoke K3s, ArgoCD, Control/Management VPC의 EKS API, Tailscale 관리망을 직접 호출하지 않는다. DynamoDB LATEST/HISTORY, S3 processed/reports, RDS PostgreSQL, Redis를 조회한다.
 
 ### 접근 경로
 
 ```text
 브라우저 (정적 SPA)
   -> Route53 (api.<신규 도메인>)
-  -> API Gateway custom domain (TLS/ACM)
-  -> API Gateway Cognito Authorizer (JWT 검증)
-  -> Dashboard API Lambda (VPC 밖)
+  -> ALB (HTTPS/TLS, ACM)
+  -> ECS Fargate Dashboard Backend (FastAPI)
+      -> Cognito JWT 앱 레벨 검증
       -> DynamoDB LATEST/HISTORY (read-only IAM)
       -> S3 processed (read-only IAM, 장기 이력)
+      -> S3 reports (read-only IAM, Markdown 보고서)
+      -> RDS PostgreSQL (사용자·공장·권한 메타데이터)
+      -> Redis (캐시 + Pub/Sub subscribe)
 ```
 
 ### 인증 헤더
@@ -63,10 +69,10 @@ Authorization: Bearer <Cognito Access Token>
 ```
 
 - Cognito Hosted UI에서 OIDC PKCE flow로 발급받은 JWT
-- API Gateway Cognito Authorizer가 서명/만료/audience 자동 검증
-- Lambda는 검증된 claim을 `event.requestContext.authorizer.jwt.claims`로 받음
+- FastAPI backend가 JWKS 기반으로 서명/만료/audience를 앱 레벨에서 검증
+- 사용자-공장 권한은 RDS PostgreSQL의 메타데이터를 기준으로 필터링
 
-### Endpoint 후보 (MVP)
+### REST Endpoint 후보 (Phase 1)
 
 기준 데이터 모델은 `docs/specs/data_storage_pipeline.md`의 DynamoDB schema를 따른다.
 
@@ -78,25 +84,29 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/factories/{factory_id}/factory-history?window=1h` | 환경 그래프 | DDB Query (sk begins_with HISTORY#FACTORY#) |
 | GET | `/factories/{factory_id}/infra-history?window=1h` | 노드 그래프 | DDB Query (sk begins_with HISTORY#INFRA#) |
 | GET | `/factories/{factory_id}/processed/{path}` | 장기 이력 단건 조회 (감사) | S3 GetObject (processed/...) |
+| GET | `/reports?date=YYYY-MM-DD` | 날짜 기준 보고서 목록 | DDB Query (`aegis-daily-report`) |
+| GET | `/reports/{factory_id}?date=YYYY-MM-DD` | 공장별 Markdown 보고서 | DDB GetItem + S3 GetObject (reports/...) |
 
-### API Gateway 정책
+### WebSocket Endpoint 후보 (Phase 1)
 
-- Throttling: account 기본값 외에 usage plan으로 burst/rate 제한
-- Request validation: JSON Schema (path/query parameter)
+| Method | Path | 동작 | 백엔드 경로 |
+| --- | --- | --- | --- |
+| WS | `/ws/factories/{factory_id}` | 공장 상태 변경 push | Redis Pub/Sub `factory:update:<factory_id>` subscribe |
+
+### ALB / Backend 정책
+
+- ALB listener는 HTTPS만 허용하고 HTTP는 redirect
 - CORS: 정적 SPA 도메인(`https://dashboard.<신규 도메인>`)만 Allow-Origin
-- X-Ray tracing: 활성
-
-### Lambda 정책
-
-- Lambda Powertools (구조화 로그, 메트릭, X-Ray)
-- IAM: DDB `Query`/`GetItem` + S3 `GetObject`만 허용 (write 없음)
-- Reserved concurrency 또는 Provisioned concurrency는 후속 결정
+- Backend logging: 구조화 JSON 로그 + CloudWatch Logs
+- Backend IAM: DDB `Query`/`GetItem`, S3 `GetObject`, Secrets Manager read 등 최소 권한
+- ECS service circuit breaker와 `/healthz` health check 사용
 
 ### 목표 반영 지연
 
 ```text
 일반 상태 변화: 10~35초
 장애 판정: 40~60초
+DDB Streams -> WebSocket push: 1~2초
 ```
 
 (`docs/planning/07_dashboard_vpc_extension_plan.md` 기준 그대로)
@@ -104,8 +114,8 @@ Authorization: Bearer <Cognito Access Token>
 ### 명시적으로 다루지 않는 것
 
 - 쓰기 API (관리자가 데이터 수정/이벤트 입력) — MVP 범위 외
-- WebSocket/SSE 푸시 — MVP는 SPA의 polling(10초 refresh)으로 처리
-- Replay/Near-miss API — M7+ 후속 (옵션 a 채택)
+- Replay/Near-miss API — Phase 3 후속
+- Timestream/Kinesis/OpenSearch 조회 API — Phase 2 후속
 
 ## 현재 판단
 

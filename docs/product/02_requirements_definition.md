@@ -1,7 +1,11 @@
 # Requirements Definition Traceability
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-20
+
+수정 이력:
+- 2026-05-20 v0.3  Phase 1 통합 결정(ADR 0012~0017) 반영. Cognito/WAF/WebSocket/Bedrock/RDS/Redis를 후속이 아닌 Phase 1 요구로 재분류.
+- 2026-05-14 v0.2  요구사항 추적표와 수치 기준 정리.
 
 ## 목적
 
@@ -76,7 +80,7 @@
 | DEC-04 | Edge 실행 환경은 K3s를 유지한다 | `factory-a`에서 K3s, ArgoCD, Longhorn, failover/failback 기준선이 검증됐다 | Greengrass를 MVP 메인 런타임으로 도입 | `docs/planning/05_decision_rationale.md` |
 | DEC-05 | Edge Agent가 IoT Core로 MQTT publish한다 | 디바이스 인증, 라우팅, S3 적재를 표준 AWS 경로로 처리한다 | 직접 HTTP API 수신 | `docs/planning/05_decision_rationale.md` |
 | DEC-06 | IoT Core 수신 원본은 S3 raw로 보존한다 | 재처리, 감사, Risk 로직 보정 근거를 남긴다 | Risk Service 직접 처리만 수행 | `docs/planning/05_decision_rationale.md`, `docs/specs/iot_data_format.md` |
-| DEC-07 | Risk 계산은 Lambda data processor로 둔다 | 최근 상태, 이전 상태, 지속 시간, top causes는 DynamoDB LATEST/HISTORY를 상태 저장소로 두고 계산한다 | 별도 장기 실행 Risk 서비스/worker | `docs/planning/05_decision_rationale.md`, `docs/specs/data_storage_pipeline.md` |
+| DEC-07 | Risk 계산은 Lambda data processor로 둔다 | 최근 상태, 이전 상태, 지속 시간, top causes는 DynamoDB LATEST/HISTORY를 상태 저장소로 두고 계산한다 | 별도 장기 실행 Risk 계산 서비스/worker | `docs/planning/05_decision_rationale.md`, `docs/specs/data_storage_pipeline.md` |
 | DEC-08 | 공장 상태와 인프라 상태를 `factory_state`, `infra_state`로 나눈다 | Risk 입력과 운영 헬스 체크의 목적과 주기가 다르다 | 5~6개 source type을 모두 별도 전송 | `docs/specs/iot_data_format.md` |
 | DEC-09 | `factory_state`는 3초 주기로 전송한다 | Risk Score 입력을 준실시간으로 반영한다 | AI 결과 변화 즉시 이벤트 전송 | `docs/specs/iot_data_format.md` |
 | DEC-10 | AI 결과는 최근 window 평균 score로 보낸다 | 모델 오탐에 민감하게 반응하지 않고 Lambda data processor의 Risk 계산 로직이 가중치 계산을 하게 한다 | Edge에서 최종 `0/1` 판정 | `docs/specs/iot_data_format.md`, `docs/specs/monitoring_dashboard/00_requirements.md` |
@@ -93,7 +97,8 @@
 | DEC-21 | InfluxDB는 1일 retention, AI snapshot은 24시간 cleanup을 적용한다 | 로컬 저장소가 무한히 증가하지 않아야 한다 | 로컬 장기 보존 | `docs/ops/08_data_retention.md` |
 | DEC-22 | AWS Hub 비용은 active/destroy 상태를 기준으로 관리한다 | MVP 운영 비용을 설명하고 필요 시 0에 가깝게 낮출 수 있어야 한다 | 상시 리소스 비용 미관리 | `docs/ops/15_aws_cost_baseline.md` |
 | DEC-23 | Tailscale은 MVP Hub-Spoke 제어망으로 유지한다 | Site-to-Site VPN, TGW, Direct Connect, WireGuard보다 MVP 복잡도가 낮다 | 전용망을 즉시 구현 | `docs/planning/12_two_vpc_mvp_architecture_decision.md`, `docs/ops/20_tailscale_hub_spoke_runbook.md` |
-| DEC-24 | WAF/Cognito/OIDC, 장기 분석, 별도 이벤트 파이프라인은 MVP 후속으로 둔다 | MVP 핵심 검증 범위를 데이터 수집, Risk, 관제, 배포에 집중한다 | 모든 운영 자동화와 보안 기능을 MVP에 포함 | `docs/product/00_mvp_scope.md`, `docs/ops/21_hub_admin_ui_ingress.md` |
+| DEC-24 | Phase 1 Dashboard는 Cognito, WAF, ECS Backend, RDS PostgreSQL, Redis, WebSocket, Bedrock 일간 보고서를 포함한다 | 발표/검증용 목표를 서버리스 최소 구성과 컨테이너 확장으로 나누지 않고 하나의 통합 배포 목표로 둔다 | Lambda Dashboard API만으로 Phase 1을 종료 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/planning/17_expansion_roadmap.md`, `docs/changes/0012-introduce-container-backend-for-dashboard.md` |
+| DEC-25 | 장기 분석, Kinesis/Timestream/OpenSearch, Multi-AZ, IdP federation, PrivateLink, 컴플라이언스 기능은 Phase 2~4 트리거 기반 후속으로 둔다 | 현재는 측정값이 필요 기능 도입을 트리거하도록 설계한다 | 모든 고도화 기능을 Phase 1에 포함 | `docs/planning/17_expansion_roadmap.md` |
 
 ## 요구사항 정의
 
@@ -119,6 +124,8 @@
 | Risk 안전 구간 | 0~39 | 정상 상태 공장은 안전으로 분류되어야 한다. | 정상 입력 시 Risk Score 0~39 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
 | Risk 주의 구간 | 40~69 | 위험 징후가 있으나 즉시 위험은 아닌 상태를 구분해야 한다. | 주의 시나리오 입력 후 상태 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
 | Risk 위험 구간 | 70~100 | 즉시 우선 대응이 필요한 공장을 위험으로 분류해야 한다. | 위험 시나리오 입력 후 상태 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
+| WebSocket push | DDB Streams 이후 1~2초 목표 | 상태 변경 후 Dashboard가 폴링만 기다리지 않고 준실시간으로 갱신되어야 한다. | DDB update -> notifier -> Redis -> WebSocket 수신 시간 측정 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/changes/0015-websocket-for-dashboard-realtime.md` |
+| Backend p95 응답 | < 500ms 목표, cache hit < 100ms 목표 | 사용자가 공장 목록/상세를 반복 조회할 때 관제 화면이 지연 없이 반응해야 한다. | k6 또는 artillery 부하 테스트, Redis hit/miss 확인 | `docs/planning/16_data_dashboard_vpc_workplan.md` |
 | AI/Sound 안전 매핑 | 0.0~0.2 | 최근 평균 AI 값이 낮으면 안전으로 표시해야 한다. | Grafana 또는 Dashboard score-label 매핑 확인 | `docs/specs/monitoring_dashboard/00_requirements.md` |
 | AI/Sound 주의 매핑 | 0.3~0.7 | 불확실한 AI 결과는 주의 상태로 표현해야 한다. | Grafana 또는 Dashboard score-label 매핑 확인 | `docs/specs/monitoring_dashboard/00_requirements.md` |
 | AI/Sound 위험 매핑 | 0.8~1.0 | 높은 평균 AI 값은 위험 레이블로 표시해야 한다. | Grafana 또는 Dashboard score-label 매핑 확인 | `docs/specs/monitoring_dashboard/00_requirements.md` |
@@ -134,6 +141,8 @@
 | Hub active 고정 비용 | 약 $0.3606/hour | MVP Hub 운영 비용을 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
 | Hub active 24시간 비용 | 약 $8.65/day | 단기 테스트 운영 비용을 예측할 수 있어야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
 | Hub active 월 비용 | 약 $263.24/730h | 상시 운영 비용 규모를 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
+| Data/Dashboard Phase 1 상시 비용 | 약 $125/month | ECS/RDS/Redis/ALB/NAT 기반 사용자 Dashboard 운영 비용을 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
+| Data/Dashboard 데모 운영 비용 | 약 $8~10/month | build/destroy 사이클로 발표·검증 비용을 낮출 수 있어야 한다. | `build-data-dashboard`/`destroy-data-dashboard` 실행 후 Cost Explorer 확인 | `docs/ops/15_aws_cost_baseline.md`, `docs/planning/16_data_dashboard_vpc_workplan.md` |
 | destroy 이후 고정 비용 | $0.0000/hour | 테스트 종료 후 비용을 제거할 수 있어야 한다. | destroy-all 후 리소스 조회 | `docs/ops/15_aws_cost_baseline.md` |
 
 ### 업무/사용자 요구사항
@@ -156,6 +165,10 @@
 | FR-05 | 수신 원본 데이터는 S3 raw에 저장되어 재처리, 감사, 리포트 입력으로 사용할 수 있어야 한다. | DEC-06 |
 | FR-06 | Dashboard는 DynamoDB LATEST/HISTORY와 S3 processed result를 조회해 공장별 최신 상태, 원인, 로그를 제공해야 한다. | DEC-13, DEC-15 |
 | FR-07 | Hub ArgoCD는 `factory-a/b/c` Spoke의 Edge Agent와 공통 구성요소를 공장별 값으로 배포할 수 있어야 한다. | DEC-02, DEC-17 |
+| FR-08 | Dashboard Backend는 ALB 뒤의 ECS Fargate FastAPI 서비스로 REST 조회와 WebSocket 연결을 제공해야 한다. | DEC-24 |
+| FR-09 | Dashboard는 Cognito로 인증된 사용자에게 권한이 있는 공장만 보여줘야 한다. | DEC-15, DEC-24 |
+| FR-10 | 상태 변경은 DynamoDB Streams, Lambda notifier, Redis Pub/Sub, WebSocket으로 Dashboard에 전달되어야 한다. | DEC-24 |
+| FR-11 | 매일 09:00 KST 기준 공장별 Markdown 일간 보고서를 생성하고 Dashboard에서 열람할 수 있어야 한다. | DEC-24 |
 
 ### 비기능 요구사항
 
@@ -168,6 +181,8 @@
 | NFR-05 | AI 오탐 민감도를 낮추기 위해 순간 `0/1` 이벤트보다 최근 window 평균 score를 사용해야 한다. | 최근 3초 또는 최근 N개 평균 | DEC-10 |
 | NFR-06 | 로컬 저장소는 무한 증가하지 않도록 보존 정책을 가져야 한다. | InfluxDB 1일, AI snapshot 24시간 cleanup | DEC-21 |
 | NFR-07 | 장애 테스트 결과는 데이터 공백, failover/failback 시간, 중복 write 가능성을 측정 가능해야 한다. | 1초/10초 bucket 분석 | DEC-19 |
+| NFR-08 | Dashboard API는 반복 조회 부하를 줄이기 위해 Redis 캐시를 사용할 수 있어야 한다. | Backend p95 < 500ms, cache hit < 100ms 목표 | DEC-24 |
+| NFR-09 | Dashboard 상태 변경 푸시는 폴링 없이 준실시간으로 사용자 화면에 반영되어야 한다. | DDB Streams 이후 WebSocket push 1~2초 목표 | DEC-24 |
 
 ### 아키텍처/제약 요구사항
 
@@ -180,6 +195,8 @@
 | ARC-05 | Control / Management VPC와 Data / Dashboard VPC는 고객 보안과 역할 분리 요구가 있을 때의 목표 구조로 유지한다. | DEC-14 |
 | ARC-06 | 단일 VPC 대안은 가능하지만, MVP 문서화 기준에서는 제어 plane과 사용자 조회 plane의 경계를 분리해 설명해야 한다. | DEC-14, DEC-15 |
 | ARC-07 | Grafana는 운영 관측 도구로 유지하고, 사용자-facing 제품 화면은 Dashboard Web/API로 분리한다. | DEC-16 |
+| ARC-08 | Phase 1 Data/Dashboard VPC는 Public/Private App/Private Data 3-tier 구조로 구성한다. | DEC-24 |
+| ARC-09 | Dashboard 메타데이터와 사용자-공장 권한은 RDS PostgreSQL에 저장한다. | DEC-24 |
 
 ### 보안/접근 제어 요구사항
 
@@ -189,7 +206,8 @@
 | SEC-02 | Dashboard API는 processed/latest 데이터에 대한 조회 권한 중심으로 제한해야 한다. | DEC-13, DEC-15 |
 | SEC-03 | Hub-Spoke 제어망은 MVP에서 Tailscale을 사용하되, Dashboard/Risk 접근망으로 확장하지 않아야 한다. | DEC-23 |
 | SEC-04 | Secret 값, MFA OTP, Access Key, Session Token은 Git과 문서에 기록하지 않아야 한다. | DEC-18 |
-| SEC-05 | WAF/Cognito/OIDC 같은 고급 사용자 인증/보호 기능은 MVP 후속 항목으로 관리한다. | DEC-24 |
+| SEC-05 | Phase 1 Dashboard는 Cognito Hosted UI와 앱 레벨 JWT 검증을 사용한다. | DEC-24 |
+| SEC-06 | CloudFront/ALB 진입점은 HTTPS만 허용하고, CloudFront 앞단 WAF는 Phase 1 기본 보호선으로 둔다. | DEC-24 |
 
 ### 배포/운영 요구사항
 
@@ -209,8 +227,8 @@
 | --- | --- | --- |
 | COST-01 | 새 AWS 상시 리소스가 추가되면 비용 baseline 문서를 함께 갱신해야 한다. | DEC-22 |
 | COST-02 | 장시간 사용하지 않는 Hub 리소스는 destroy 절차로 비용을 낮출 수 있어야 한다. | DEC-22 |
-| COST-03 | MVP는 데이터 수집, Risk Score, 관제, 배포 파이프라인 검증에 집중하고 장기 분석/완전 자동 운영은 후속으로 둔다. | DEC-24 |
-| COST-04 | LLM 기반 리포트는 전체 자동화가 아니라 운영 리포트 초안 생성 수준으로만 후속 검토한다. | DEC-24 |
+| COST-03 | Phase 1 Data/Dashboard는 데모 직전 build, 데모 직후 destroy 패턴으로 비용을 낮출 수 있어야 한다. | DEC-24 |
+| COST-04 | Phase 1은 데이터 수집, Risk Score, 관제, 사용자 권한, 실시간 push, 일간 보고서 검증에 집중하고 장기 분석/완전 자동 운영은 후속으로 둔다. | DEC-24, DEC-25 |
 
 ## 요구사항-설계 추적표
 
@@ -222,12 +240,15 @@
 | FR-04, NFR-05 | Lambda data processor가 평균 score와 센서 요약값을 기반으로 Risk Score를 계산한다. | M6에서 Risk Score 변화가 화면에 반영되는지 확인 | `docs/specs/iot_data_format.md`, `docs/specs/data_storage_pipeline.md` |
 | FR-05 | IoT Rule이 raw JSON을 `raw/{factory_id}/{source_type}/...` 경로에 저장한다. | M4에서 S3 raw object와 partition 확인 | `docs/planning/05_decision_rationale.md`, `docs/specs/iot_data_format.md` |
 | FR-06, NFR-03, NFR-04 | Dashboard Backend/API가 DynamoDB LATEST/HISTORY와 S3 processed result를 조회한다. | M6에서 일반 상태 10~35초, 장애 판정 40~60초 목표 확인 | `docs/specs/data_storage_pipeline.md`, `docs/planning/03_evaluation_plan.md` |
+| FR-08~FR-10, NFR-08~NFR-09 | ALB + ECS Fargate Backend + Redis + WebSocket 경로를 사용한다. | M6에서 `/healthz`, REST 조회, WebSocket handshake, DDB Streams 이후 push 지연 확인 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/changes/0012-introduce-container-backend-for-dashboard.md`, `docs/changes/0015-websocket-for-dashboard-realtime.md` |
+| FR-11 | Lambda report-generator가 Bedrock으로 일간 보고서를 생성하고 S3/DDB에 기록한다. | 수동 invoke와 다음 09:00 KST 자동 트리거 확인 | `docs/changes/0016-bedrock-for-llm-report.md`, `docs/planning/16_data_dashboard_vpc_workplan.md` |
 | ARC-01, OPS-06 | `factory-a` K3s workload는 worker2 preferred, worker1 failover, 조건부 failback을 유지한다. | failover/failback 테스트 결과와 M0 회귀 확인 | `docs/ops/09_failover_failback_test_results.md` |
 | ARC-02, ARC-03 | K3s + Edge Agent + IoT Core 구조를 사용한다. | Edge Agent 배포와 MQTT publish 확인 | `docs/planning/05_decision_rationale.md` |
 | ARC-04 | IoT Core 이후 IoT Rule/S3 raw와 Lambda/DynamoDB/S3 processed/Dashboard 흐름을 사용한다. | M4, M6, M7 통합 검증 | `docs/specs/data_storage_pipeline.md`, `docs/planning/15_cloud_architecture_final.md` |
 | ARC-05, SEC-01 | Dashboard와 Control plane을 네트워크/권한 경계로 분리한다. | M1/M6에서 Dashboard가 ArgoCD/Tailscale/EKS/Spoke API를 직접 조회하지 않음을 확인 | `docs/planning/12_two_vpc_mvp_architecture_decision.md`, `docs/specs/monitoring_dashboard/00_requirements.md` |
 | OPS-01 ~ OPS-05 | Terraform, Ansible, GitHub Actions, ArgoCD 책임 경계를 따른다. | M3에서 push -> ECR -> ArgoCD rollout 확인 | `docs/planning/11_delivery_ownership_flow.md` |
 | COST-01, COST-02 | 비용 baseline과 destroy 절차를 운영 문서에 유지한다. | AWS 리소스 추가 시 비용 문서 갱신 여부 확인 | `docs/ops/15_aws_cost_baseline.md` |
+| COST-03, COST-04 | Data/Dashboard build/destroy 사이클과 Phase 2~4 트리거를 분리한다. | 데모 운영 비용과 상시 운영 비용을 Cost Explorer로 비교 | `docs/ops/15_aws_cost_baseline.md`, `docs/planning/17_expansion_roadmap.md` |
 
 ## 검증 기준
 
@@ -254,10 +275,11 @@
 | 직접 HTTP API 수신 | MVP 제외 | IoT Core 인증/Rules/S3 경로보다 직접 API가 명확히 단순해지는 경우 |
 | 별도 장기 실행 Risk 서비스/worker | MVP 제외 | Lambda 처리 한계, 복잡한 재처리, 별도 스케일링 요구가 확인되는 경우 |
 | 별도 이벤트 전용 파이프라인 | MVP 제외 | 평균 score 기반 Risk로 설명하기 어려운 이벤트 요구가 생기는 경우 |
-| 장기 이력 분석 계층 | MVP 후속 | Risk 보정, 리포트, near-miss 분석이 MVP 이후 주요 가치가 되는 경우 |
-| WAF/Cognito/OIDC 고도화 | MVP 후속 | 외부 사용자 접근과 인증 요구가 실제 운영 요구로 확정되는 경우 |
-| Site-to-Site VPN, TGW, Direct Connect, self-hosted WireGuard | MVP 후속 | Tailscale 운영 한계나 고객 네트워크 정책 요구가 확인되는 경우 |
-| 완전 자동 물리 장애 유발 | MVP 후속 | 정기 무인 장애 리허설이 운영 요구가 되는 경우 |
+| Timestream / 장기 이력 분석 계층 | Phase 2 후속 | DDB HISTORY 비용 > $30/월, 시계열 쿼리 p95 > 1s, 보존 요구 > 7일 |
+| Kinesis / OpenSearch / Multi-AZ | Phase 2 후속 | 메시지율 > 분당 1000건, 로그 검색 주 5회 이상, 상시 운영 결정 |
+| IdP federation / Security Hub / PrivateLink | Phase 4 후속 | 외부 공장/사용자/컴플라이언스 요구가 실제 운영 요구로 확정되는 경우 |
+| Site-to-Site VPN, TGW, Direct Connect, self-hosted WireGuard | Phase 2+ 후속 | Tailscale 운영 한계나 고객 네트워크 정책 요구가 확인되는 경우 |
+| 완전 자동 물리 장애 유발 | Phase 2+ 후속 | 정기 무인 장애 리허설이 운영 요구가 되는 경우 |
 
 ## 갱신 규칙
 
