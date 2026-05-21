@@ -8,6 +8,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# Lambda build artifacts
+apps/**/.build/
+
 # Virtual environments
 .venv/
 venv/
@@ -40,3 +43,5 @@ override.tf.json
 .omx/
 .antigravitycli/
 Aegis-pi/
+aws-mfa-main-guide/
+temp_aegis_pi/
