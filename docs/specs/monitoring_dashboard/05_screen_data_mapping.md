@@ -1,7 +1,7 @@
 # Risk Twin Web Screen Data Mapping
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-20
 
 ## 목적
 
@@ -65,7 +65,7 @@ YYYY-MM-DDTHH:mm:ssZ
 | `updated_at` | string | Y | latest item 최종 갱신 시각 |
 | `last_factory_state_at` | string | Y | 마지막 `factory_state` 반영 시각 |
 | `last_infra_state_at` | string | Y | 마지막 `infra_state` 반영 시각 |
-| `risk.score` | number | Y | 0~100 Risk Score |
+| `risk.score` | number | Y | 0~100 Risk Score. 100은 가장 안전, 0은 가장 위험 |
 | `risk.level` | string | Y | `safe`, `warning`, `danger` |
 | `risk.top_causes[]` | array | Y | 주요 원인 목록 |
 | `factory_state.sensor` | object | Y | 현재 환경 센서 요약 |
@@ -96,7 +96,7 @@ YYYY-MM-DDTHH:mm:ssZ
 │ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
 │ │ factory-a    │ │ factory-b    │ │ factory-c    │          │
 │ │ 위험         │ │ 주의         │ │ 안전         │          │
-│ │ Risk 72.4    │ │ Risk 45.7    │ │ Risk 18.2    │          │
+│ │ Risk 32.4    │ │ Risk 65.7    │ │ Risk 92.2    │          │
 │ │ 원인: 넘어짐 │ │ 원인: 마이크 │ │ 원인: 없음   │          │
 │ │ 노드 3/3     │ │ 노드 1/1     │ │ 노드 1/1     │          │
 │ │ 갱신 6초 전  │ │ 갱신 12초 전 │ │ 갱신 8초 전  │          │
@@ -163,7 +163,7 @@ Scan sk = LATEST
     {
       "factory_id": "factory-a",
       "display_status": "위험",
-      "risk_score": 72.4,
+      "risk_score": 32.4,
       "risk_level": "danger",
       "top_causes": ["fall_score", "temperature_celsius_avg"],
       "node_ready": 3,
@@ -194,7 +194,7 @@ delayed = count(pipeline_status.status != "normal")
 danger first
 warning second
 safe last
-within same level: risk.score desc
+within same level: risk.score asc
 pipeline warning/critical should be highlighted
 ```
 
@@ -217,7 +217,7 @@ pipeline warning/critical should be highlighted
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ factory-a                                  위험   Risk 72.4  │
+│ factory-a                                  위험   Risk 32.4  │
 │ 마지막 갱신 6초 전 | Pipeline normal | 노드 3/3 Ready          │
 ├──────────────────────────────────────────────────────────────┤
 │ 주요 원인                                                     │
@@ -278,7 +278,7 @@ sk = LATEST
   "factory_id": "factory-a",
   "display_status": "위험",
   "risk": {
-    "score": 72.4,
+    "score": 32.4,
     "level": "danger",
     "top_causes": [
       {
@@ -444,7 +444,7 @@ sk BETWEEN HISTORY#FACTORY#{from} AND HISTORY#FACTORY#{to}
     },
     {
       "timestamp": "2026-05-14T12:00:30Z",
-      "risk_score": 72.4,
+      "risk_score": 32.4,
       "risk_level": "danger",
       "top_cause_names": ["fall_score", "temperature_celsius_avg"]
     }
@@ -470,9 +470,9 @@ Risk chart:
 ```text
 x = timestamp
 y = risk_score
-safe range: 0~39
-warning range: 40~69
-danger range: 70~100
+safe range: 85~100
+warning range: 50~84
+danger range: 0~49
 ```
 
 AI chart:
@@ -750,7 +750,7 @@ MVP에서는 별도 event item 없이 history point를 비교해 timeline을 만
 | 이벤트 | 비교 필드 | 생성 조건 |
 | --- | --- | --- |
 | Risk level 변화 | `HISTORY#RISK.risk_level` | 이전 point와 값이 다름 |
-| Risk 급등 | `HISTORY#RISK.risk_score` | 이전 point 대비 +10 이상 |
+| Risk 급락 | `HISTORY#RISK.risk_score` | 이전 point 대비 -10 이하 |
 | 주요 원인 변화 | `HISTORY#RISK.top_cause_names` | 목록이 바뀜 |
 | 온도 상승 | `HISTORY#FACTORY.temperature_celsius_avg` | 이전 point 대비 +5 이상 또는 threshold 초과 |
 | AI score 상승 | `fire_score`, `fall_score`, `bend_score` | 이전 point 대비 +0.3 이상 |
@@ -809,7 +809,7 @@ Severity:
 - [ ] `GET /factories` API 구현
 - [ ] `DynamoDB LATEST` 목록 조회
 - [ ] `risk.level` 기준 summary count 계산
-- [ ] `risk.score` 기준 카드 정렬
+- [ ] `risk.score` 오름차순 기준 카드 정렬
 - [ ] `pipeline_status.status` abnormal 표시
 - [ ] `updated_at` relative time 계산
 

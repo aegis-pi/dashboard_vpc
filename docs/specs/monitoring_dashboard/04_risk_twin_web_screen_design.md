@@ -1,7 +1,7 @@
 # Risk Twin Web Screen Design
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-20
 
 ## 목적
 
@@ -67,7 +67,7 @@ Risk Twin Web은 MVP 기준으로 두 단계 화면을 가진다.
 │ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
 │ │ factory-a    │ │ factory-b    │ │ factory-c    │          │
 │ │ 위험         │ │ 주의         │ │ 안전         │          │
-│ │ Risk 72.4    │ │ Risk 45.7    │ │ Risk 18.2    │          │
+│ │ Risk 32.4    │ │ Risk 65.7    │ │ Risk 92.2    │          │
 │ │ 원인: 넘어짐 │ │ 원인: 마이크 │ │ 원인: 없음   │          │
 │ │ 노드 3/3     │ │ 노드 1/1     │ │ 노드 1/1     │          │
 │ │ 갱신 6초 전  │ │ 갱신 12초 전 │ │ 갱신 8초 전  │          │
@@ -98,7 +98,7 @@ Risk Twin Web은 MVP 기준으로 두 단계 화면을 가진다.
 ```text
 1. risk.level danger
 2. risk.level warning
-3. risk.score 높은 순
+3. risk.score 낮은 순
 4. pipeline_status abnormal
 5. updated_at 최신 순
 ```
@@ -117,7 +117,7 @@ Risk Twin Web은 MVP 기준으로 두 단계 화면을 가진다.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ factory-a                                  위험   Risk 72.4  │
+│ factory-a                                  위험   Risk 32.4  │
 │ 마지막 갱신 6초 전 | Pipeline normal | 노드 3/3 Ready          │
 ├──────────────────────────────────────────────────────────────┤
 │ 주요 원인                                                     │
@@ -153,7 +153,7 @@ Risk Twin Web은 MVP 기준으로 두 단계 화면을 가진다.
 
 목적:
 
-- Risk Score 상승 시점과 환경/AI 값의 관계를 확인한다.
+- Risk Score 하락 시점과 환경/AI 값의 관계를 확인한다.
 - 위험 원인이 순간값인지 지속 추세인지 판단한다.
 - 온도, 습도, 기압, AI score 변화 방향을 확인한다.
 

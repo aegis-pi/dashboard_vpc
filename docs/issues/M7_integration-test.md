@@ -1,5 +1,8 @@
 # M7. 통합 검증
 
+수정 이력:
+- 2026-05-20 v0.2  Risk Score 기준을 안전점수 방식(100=가장 안전, 0=가장 위험)으로 정정.
+
 > **마일스톤 목표**: 3개 Spoke + Hub 전체를 연결하여 시나리오별 end-to-end 검증을 완료하고,  
 > `docs/ops/03_test_checklist.md`의 모든 보정 항목을 마무리하여 `docs/`와 `configs/` 기준 문서를 실제 구현 상태와 일치시킨다.  
 > M0~M6 전체 완료 후 진행한다.
@@ -271,9 +274,9 @@ Hub 배포 및 데이터 플레인 파이프라인이 VM 환경에서도 정상 
 ### ✅ 완료 조건 (Definition of Done)
 
 - [ ] `factory-b` 시나리오 검증
-  - `normal` → `warning` 전환: Risk Score 40~69 진입 확인
-  - `warning` → `danger` 전환: Risk Score 70 이상 확인
-  - `danger` → `normal` 복구: Score 감소 및 관제 화면 정상화 확인
+  - `normal` → `warning` 전환: Risk Score 50~84 진입 확인
+  - `warning` → `danger` 전환: Risk Score 49 이하 진입 확인
+  - `danger` → `normal` 복구: Score 상승 및 관제 화면 정상화 확인
 - [ ] `factory-c` 동일 시나리오 반복 검증
 - [ ] 시스템 상태 변화 시나리오
   - Edge Agent 파드 강제 종료 → `edge_agent_down` 판정 → 관제 반영

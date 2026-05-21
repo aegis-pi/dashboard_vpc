@@ -1,7 +1,7 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-20
 
 ## 목적
 
@@ -173,7 +173,7 @@ Dashboard 사용처:
   "last_factory_state_at": "2026-05-14T12:00:06Z",
   "last_infra_state_at": "2026-05-14T12:00:20Z",
   "risk": {
-    "score": 72.4,
+    "score": 32.4,
     "level": "danger",
     "top_causes": [
       {
@@ -311,7 +311,7 @@ sk = HISTORY#RISK#2026-05-14T12:00:30Z
   "timestamp": "2026-05-14T12:00:30Z",
   "bucket_seconds": 30,
   "source": "last_value",
-  "risk_score": 72.4,
+  "risk_score": 32.4,
   "risk_level": "danger",
   "top_cause_names": ["fall_score", "temperature_celsius_avg"],
   "ttl": 1760000000

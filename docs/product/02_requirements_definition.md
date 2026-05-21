@@ -4,6 +4,7 @@
 기준일: 2026-05-20
 
 수정 이력:
+- 2026-05-20 v0.4  Risk Score 의미를 안전점수 기준(100=가장 안전, 0=가장 위험)으로 정정.
 - 2026-05-20 v0.3  Phase 1 통합 결정(ADR 0012~0017) 반영. Cognito/WAF/WebSocket/Bedrock/RDS/Redis를 후속이 아닌 Phase 1 요구로 재분류.
 - 2026-05-14 v0.2  요구사항 추적표와 수치 기준 정리.
 
@@ -120,10 +121,10 @@
 | `factory_state` payload 크기 | 약 0.6 KB | 3초 주기 전송이 IoT Core/S3 병목을 만들 가능성이 낮아야 한다. | compact JSON 기준 실제 payload 크기 측정 | `docs/specs/iot_data_format.md` |
 | `infra_state` payload 크기 | 약 1.6 KB | 20초 주기 상태 전송이 운영 부담 대비 충분한 헬스 체크 정보를 제공해야 한다. | compact JSON 기준 실제 payload 크기 측정 | `docs/specs/iot_data_format.md` |
 | 공장 1개 일일 raw payload | 약 25 MB/day | S3 raw 보존과 재처리 비용이 MVP 규모에서 감당 가능해야 한다. | M4/M7에서 실제 S3 object 크기 합산 | `docs/specs/iot_data_format.md` |
-| Risk Score 범위 | 0~100 | 공장 위험도를 단일 점수로 비교할 수 있어야 한다. | 정상/주의/위험 시나리오별 score 산출 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
-| Risk 안전 구간 | 0~39 | 정상 상태 공장은 안전으로 분류되어야 한다. | 정상 입력 시 Risk Score 0~39 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
-| Risk 주의 구간 | 40~69 | 위험 징후가 있으나 즉시 위험은 아닌 상태를 구분해야 한다. | 주의 시나리오 입력 후 상태 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
-| Risk 위험 구간 | 70~100 | 즉시 우선 대응이 필요한 공장을 위험으로 분류해야 한다. | 위험 시나리오 입력 후 상태 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
+| Risk Score 범위 | 0~100 | 공장 안전도를 단일 점수로 비교할 수 있어야 한다. 100은 가장 안전, 0은 가장 위험으로 해석한다. | 정상/주의/위험 시나리오별 score 산출 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
+| Risk 안전 구간 | 85~100 | 정상 상태 공장은 안전으로 분류되어야 한다. | 정상 입력 시 Risk Score 85~100 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
+| Risk 주의 구간 | 50~84 | 위험 징후가 있으나 즉시 위험은 아닌 상태를 구분해야 한다. | 주의 시나리오 입력 후 상태 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
+| Risk 위험 구간 | 0~49 | 즉시 우선 대응이 필요한 공장을 위험으로 분류해야 한다. | 위험 시나리오 입력 후 상태 확인 | `docs/issues/M6_risk-twin-dashboard.md` |
 | WebSocket push | DDB Streams 이후 1~2초 목표 | 상태 변경 후 Dashboard가 폴링만 기다리지 않고 준실시간으로 갱신되어야 한다. | DDB update -> notifier -> Redis -> WebSocket 수신 시간 측정 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/changes/0015-websocket-for-dashboard-realtime.md` |
 | Backend p95 응답 | < 500ms 목표, cache hit < 100ms 목표 | 사용자가 공장 목록/상세를 반복 조회할 때 관제 화면이 지연 없이 반응해야 한다. | k6 또는 artillery 부하 테스트, Redis hit/miss 확인 | `docs/planning/16_data_dashboard_vpc_workplan.md` |
 | AI/Sound 안전 매핑 | 0.0~0.2 | 최근 평균 AI 값이 낮으면 안전으로 표시해야 한다. | Grafana 또는 Dashboard score-label 매핑 확인 | `docs/specs/monitoring_dashboard/00_requirements.md` |
