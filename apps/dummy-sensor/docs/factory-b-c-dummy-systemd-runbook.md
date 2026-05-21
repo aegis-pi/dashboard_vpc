@@ -71,55 +71,24 @@ AWS IoT Rule
 | pressure baseline/jitter | `1013.5 ± 1.5` | `1012.0 ± 2.0` |
 | anomaly probability | `0.03` | `0.06` |
 | abnormal_sound label | `brief lab impact` | `intermittent vibration` |
-| sequence file | `/var/lib/aegis/factory-b-publish-sequence` | `/var/lib/aegis/factory-c-publish-sequence` |
-| infra_state 기본 모드 | 실제 K3s 조회 | 실제 K3s 조회 |
+| infra_state 데이터 소스 | 합성 (Factory A 형식 모방) | 합성 (Factory A 형식 모방) |
 
 이 차이 때문에 Dashboard나 S3 raw에서 두 testbed가 같은 데이터를 반복 송신하는 것처럼 보이지 않는다.
 
-## infra_state 실제 조회 기준
+## infra_state는 전부 합성
 
-generator는 `AEGIS_CLUSTER_STATE_MODE=auto` 기본값에서 아래 순서로 실제 K3s 상태를 읽는다.
+generator는 K3s API/`kubectl`을 호출하지 않는다. `nodes`, `workloads`, `heartbeat`, `devices`를 전부 코드 내 합성값으로 채운다.
 
-1. K3s Pod 안에서 실행 중이면 ServiceAccount token으로 Kubernetes API 조회
-2. VM systemd 실행이면 `kubectl` CLI로 조회
-3. 조회 실패 시에만 synthetic fallback 사용
+| 필드 | 동작 |
+| --- | --- |
+| `heartbeat` | `agent_status="alive"`, `last_spool_write_at=null`, `last_spool_write_status="unknown"` (Factory A 실파일과 동일한 3필드) |
+| `nodes[].cpu/memory/disk_usage_percent` | jitter된 합성 숫자 — Factory A는 `null`이지만 데모 시연을 위해 의도적으로 숫자로 보냄 |
+| `nodes[].network_reachability` | `"unknown"` 고정 |
+| `nodes[].ready` | `true` 고정 |
+| `workloads` | factory-b: `[dummy-data-generator, edge-iot-publisher]` / factory-c: 같음 (worker 노드에 배치) |
+| `devices` | `bme280`, `camera`, `microphone` 모두 `available: false`, `last_seen_at: null` (VM에 센서 없음) |
 
-systemd 방식에서는 VM에 `kubectl`이 동작해야 한다.
-
-Factory B는 단일 노드 server VM이므로 일반적으로 아래 kubeconfig가 이미 있다.
-
-```bash
-kubectl get nodes -o wide
-kubectl get pods -A
-```
-
-Factory C는 publisher가 worker VM에서 실행되므로 worker VM에 `kubectl`과 kubeconfig를 준비해야 한다. K3s agent VM에 `kubectl` 명령이 없다면 먼저 symlink를 만든다.
-
-```bash
-# factory-c-worker VM
-sudo ln -sf /usr/local/bin/k3s /usr/local/bin/kubectl
-kubectl version --client=true
-```
-
-가장 단순한 kubeconfig 준비 방식은 master VM의 `/etc/rancher/k3s/k3s.yaml`을 worker VM으로 안전하게 복사하고 server 주소를 master Tailscale IP 또는 reachable IP로 바꾸는 것이다.
-
-```bash
-# factory-c-worker VM 예시
-mkdir -p ~/.kube
-chmod 700 ~/.kube
-# master VM에서 받은 kubeconfig를 ~/.kube/config 로 둔다
-chmod 600 ~/.kube/config
-kubectl get nodes -o wide
-kubectl get pods -A
-```
-
-systemd에서 특정 kubeconfig를 쓰려면 env 파일에 추가한다.
-
-```bash
-KUBECONFIG=/home/<vm-ssh-user>/.kube/config
-```
-
-조회에 성공하면 `infra_state.payload.heartbeat.cluster_state_source` 값이 `kubernetes`가 된다. 실패해서 fallback하면 `synthetic`이 된다.
+VM에 `kubectl`이나 kubeconfig 설정은 필요 없다.
 
 ## 공통 배치 순서
 
@@ -130,7 +99,6 @@ Factory B:
 ```bash
 scp apps/dummy-sensor/factory_b_dummy_generator.py \
     apps/dummy-sensor/factory_b_iot_publisher.py \
-    apps/dummy-sensor/k8s_state.py \
     <vm-ssh-user>@<factory-b-ip>:/tmp/
 ```
 
@@ -139,7 +107,6 @@ Factory C:
 ```bash
 scp apps/dummy-sensor/factory_c_dummy_generator.py \
     apps/dummy-sensor/factory_c_iot_publisher.py \
-    apps/dummy-sensor/k8s_state.py \
     <vm-ssh-user>@${TS_IP_WORKER}:/tmp/
 ```
 
@@ -149,17 +116,13 @@ scp apps/dummy-sensor/factory_c_dummy_generator.py \
 
 ```bash
 sudo mkdir -p /opt/aegis/dummy-sensor /etc/aegis /var/lib/aegis/outbox
-sudo cp /tmp/factory_b_dummy_generator.py /tmp/factory_b_iot_publisher.py /tmp/k8s_state.py /opt/aegis/dummy-sensor/
+sudo cp /tmp/factory_b_dummy_generator.py /tmp/factory_b_iot_publisher.py /opt/aegis/dummy-sensor/
 sudo chmod 755 /opt/aegis/dummy-sensor/*.py
-
-K3S_VER="$(/usr/local/bin/k3s --version | awk '/k3s version/ {print $3}')"
 
 sudo tee /etc/aegis/factory-b-dummy.env >/dev/null <<EOF
 AEGIS_OUTBOX_DIR=/var/lib/aegis/outbox
 AEGIS_IOT_DIR=/etc/aegis/iot/factory-b
 AEGIS_IOT_CLIENT_ID=AEGIS-IoTThing-factory-b
-AEGIS_K3S_VERSION=${K3S_VER}
-AEGIS_CLUSTER_STATE_MODE=auto
 EOF
 
 sudo chmod 600 /etc/aegis/factory-b-dummy.env
@@ -171,17 +134,13 @@ sudo chmod 600 /etc/aegis/factory-b-dummy.env
 
 ```bash
 sudo mkdir -p /opt/aegis/dummy-sensor /etc/aegis /var/lib/aegis/outbox
-sudo cp /tmp/factory_c_dummy_generator.py /tmp/factory_c_iot_publisher.py /tmp/k8s_state.py /opt/aegis/dummy-sensor/
+sudo cp /tmp/factory_c_dummy_generator.py /tmp/factory_c_iot_publisher.py /opt/aegis/dummy-sensor/
 sudo chmod 755 /opt/aegis/dummy-sensor/*.py
-
-K3S_VER="$(/usr/local/bin/k3s --version | awk '/k3s version/ {print $3}')"
 
 sudo tee /etc/aegis/factory-c-dummy.env >/dev/null <<EOF
 AEGIS_OUTBOX_DIR=/var/lib/aegis/outbox
 AEGIS_IOT_DIR=/etc/aegis/iot/factory-c
 AEGIS_IOT_CLIENT_ID=AEGIS-IoTThing-factory-c
-AEGIS_K3S_VERSION=${K3S_VER}
-AEGIS_CLUSTER_STATE_MODE=auto
 EOF
 
 sudo chmod 600 /etc/aegis/factory-c-dummy.env
@@ -220,19 +179,19 @@ published /var/lib/aegis/outbox/...factory_state...json -> aegis/<factory-id>/fa
 published /var/lib/aegis/outbox/...infra_state...json -> aegis/<factory-id>/infra_state
 ```
 
-`infra_state`가 실제 K3s를 읽는지 확인:
+`infra_state` 합성 페이로드 확인:
 
 ```bash
 sudo env $(cat /etc/aegis/factory-b-dummy.env | xargs) \
   /usr/bin/python3 /opt/aegis/dummy-sensor/factory_b_dummy_generator.py --once infra_state --no-write --pretty \
-  | jq '.payload.heartbeat.cluster_state_source, .payload.nodes, .payload.workloads'
+  | jq '.payload.heartbeat, .payload.nodes, .payload.workloads'
 
 sudo env $(cat /etc/aegis/factory-c-dummy.env | xargs) \
   /usr/bin/python3 /opt/aegis/dummy-sensor/factory_c_dummy_generator.py --once infra_state --no-write --pretty \
-  | jq '.payload.heartbeat.cluster_state_source, .payload.nodes, .payload.workloads'
+  | jq '.payload.heartbeat, .payload.nodes, .payload.workloads'
 ```
 
-정상 기준은 `"kubernetes"`다. `"synthetic"`이면 `kubectl get nodes -o json`이 해당 VM에서 성공하는지 먼저 확인한다.
+`heartbeat` 키가 `agent_status`, `last_spool_write_at`, `last_spool_write_status` 3개만 있고, 노드 배열이 각각 `[factory-b]`/`[factory-c-master, factory-c-worker]`, `network_reachability="unknown"`이면 정상이다.
 
 ## systemd 등록
 

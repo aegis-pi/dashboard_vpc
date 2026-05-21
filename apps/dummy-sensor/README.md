@@ -25,7 +25,7 @@ factory_b_iot_publisher.py / factory_c_iot_publisher.py
 | source type | 기본 주기 | 내용 |
 | --- | --- | --- |
 | `factory_state` | 3초 | factory별 profile 기반 센서/AI 가데이터 |
-| `infra_state` | 20초 | factory별 K3s node/workload 상태 |
+| `infra_state` | 20초 | factory별 합성 node/workload 상태 |
 
 Factory별 프로파일:
 
@@ -35,6 +35,8 @@ Factory별 프로파일:
 | `factory-c` | Windows VirtualBox | `noisy-vm` | 2-node `factory-c-master`/`factory-c-worker` | 높은 anomaly 확률, 높은 온습도 jitter |
 
 공통 envelope는 Factory A 구현과 맞춰 `data_plane_instance_id`를 포함한다.
+
+`infra_state`는 실제 K3s 상태를 조회하지 않고 전부 합성값으로 채운다. `heartbeat`는 Factory A 실파일과 동일하게 `agent_status`, `last_spool_write_at`, `last_spool_write_status` 3필드만 보낸다. `nodes[].network_reachability`는 `"unknown"`으로 고정. `nodes[].cpu/memory/disk_usage_percent`는 jitter된 합성 숫자(데모용)이며 Factory A 실파일의 `null`과는 의도적으로 다르다.
 
 ## Local Preview
 
@@ -94,8 +96,6 @@ private.pem.key
 | `AEGIS_IOT_KEY_FILE` | `AEGIS_IOT_DIR/private.pem.key` |
 | `AEGIS_IOT_CLIENT_ID` | `AEGIS-IoTThing-factory-b` 또는 `AEGIS-IoTThing-factory-c` |
 | `AEGIS_OUTBOX_DIR` | `/var/lib/aegis/outbox` |
-| `AEGIS_CLUSTER_STATE_MODE` | `auto` (`infra_state`에서 실제 K3s 조회, 실패 시 fallback) |
-| `KUBECONFIG` | 선택. systemd 실행 시 특정 kubeconfig를 지정할 때 사용 |
 
 ## Factory B VM systemd 예시
 
@@ -103,16 +103,13 @@ private.pem.key
 
 ```bash
 sudo mkdir -p /opt/aegis/dummy-sensor /var/lib/aegis/outbox /etc/aegis
-sudo cp factory_b_dummy_generator.py factory_b_iot_publisher.py k8s_state.py /opt/aegis/dummy-sensor/
+sudo cp factory_b_dummy_generator.py factory_b_iot_publisher.py /opt/aegis/dummy-sensor/
 sudo chmod 755 /opt/aegis/dummy-sensor/*.py
 
-K3S_VER="$(/usr/local/bin/k3s --version | awk '/k3s version/ {print $3}')"
 sudo tee /etc/aegis/factory-b-dummy.env >/dev/null <<EOF
 AEGIS_OUTBOX_DIR=/var/lib/aegis/outbox
 AEGIS_IOT_DIR=/etc/aegis/iot/factory-b
 AEGIS_IOT_CLIENT_ID=AEGIS-IoTThing-factory-b
-AEGIS_K3S_VERSION=${K3S_VER}
-AEGIS_CLUSTER_STATE_MODE=auto
 EOF
 sudo chmod 600 /etc/aegis/factory-b-dummy.env
 ```
@@ -161,16 +158,13 @@ WantedBy=multi-user.target
 
 ```bash
 sudo mkdir -p /opt/aegis/dummy-sensor /var/lib/aegis/outbox /etc/aegis
-sudo cp factory_c_dummy_generator.py factory_c_iot_publisher.py k8s_state.py /opt/aegis/dummy-sensor/
+sudo cp factory_c_dummy_generator.py factory_c_iot_publisher.py /opt/aegis/dummy-sensor/
 sudo chmod 755 /opt/aegis/dummy-sensor/*.py
 
-K3S_VER="$(/usr/local/bin/k3s --version | awk '/k3s version/ {print $3}')"
 sudo tee /etc/aegis/factory-c-dummy.env >/dev/null <<EOF
 AEGIS_OUTBOX_DIR=/var/lib/aegis/outbox
 AEGIS_IOT_DIR=/etc/aegis/iot/factory-c
 AEGIS_IOT_CLIENT_ID=AEGIS-IoTThing-factory-c
-AEGIS_K3S_VERSION=${K3S_VER}
-AEGIS_CLUSTER_STATE_MODE=auto
 EOF
 sudo chmod 600 /etc/aegis/factory-c-dummy.env
 ```

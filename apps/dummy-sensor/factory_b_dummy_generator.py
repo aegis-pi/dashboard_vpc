@@ -15,8 +15,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from k8s_state import KubernetesStateReader, build_node_payloads, build_workload_payloads
-
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -43,7 +41,6 @@ class FactoryBDummyGenerator:
         self.environment_type = os.getenv("AEGIS_ENVIRONMENT_TYPE", "vm-mac")
         self.input_module_type = os.getenv("AEGIS_INPUT_MODULE_TYPE", "dummy")
         self.node_id = os.getenv("AEGIS_NODE_ID", "factory-b")
-        self.kubernetes_version = os.getenv("AEGIS_K3S_VERSION", "unknown")
         self.data_plane_instance_id = os.getenv(
             "AEGIS_DATA_PLANE_INSTANCE_ID",
             f"factory-b-dummy-generator-{socket.gethostname()}",
@@ -51,8 +48,6 @@ class FactoryBDummyGenerator:
         self.window_seconds = env_int("AEGIS_FACTORY_STATE_WINDOW_SECONDS", 3)
         self.factory_state_interval_seconds = env_int("AEGIS_FACTORY_STATE_INTERVAL_SECONDS", 3)
         self.infra_state_interval_seconds = env_int("AEGIS_INFRA_STATE_INTERVAL_SECONDS", 20)
-        self.sequence_file = Path(os.getenv("AEGIS_SEQUENCE_FILE", "/var/lib/aegis/factory-b-publish-sequence"))
-        self.k8s = KubernetesStateReader(timeout_seconds=env_float("AEGIS_K8S_TIMEOUT_SECONDS", 5.0))
 
         self.temperature_baseline = env_float("AEGIS_DUMMY_TEMPERATURE_BASELINE", 24.5)
         self.temperature_jitter = env_float("AEGIS_DUMMY_TEMPERATURE_JITTER", 3.0)
@@ -93,8 +88,7 @@ class FactoryBDummyGenerator:
     def infra_state(self) -> dict[str, Any]:
         source_timestamp = utc_now()
         timestamp = format_utc(source_timestamp)
-        sequence = self._next_sequence()
-        nodes, workloads, source = self._cluster_state()
+        nodes, workloads = self._cluster_state()
         ready_nodes = sum(1 for item in nodes if item["ready"])
         running_workloads = sum(1 for item in workloads if item["status"] == "Running" and item["ready"])
 
@@ -106,11 +100,8 @@ class FactoryBDummyGenerator:
             payload={
                 "heartbeat": {
                     "agent_status": "alive",
-                    "last_spool_write_status": "unknown",
                     "last_spool_write_at": None,
-                    "publish_sequence": sequence,
-                    "kubernetes_version": self.kubernetes_version,
-                    "cluster_state_source": source,
+                    "last_spool_write_status": "unknown",
                 },
                 "node_summary": {
                     "total": len(nodes),
@@ -218,7 +209,7 @@ class FactoryBDummyGenerator:
             "cpu_usage_percent": self._jitter(7.0, 2.0),
             "memory_usage_percent": self._jitter(32.0, 4.0),
             "disk_usage_percent": self._jitter(24.0, 2.0),
-            "network_reachability": "ok",
+            "network_reachability": "unknown",
         }
 
     def _workload(self, namespace: str, name: str) -> dict[str, Any]:
@@ -231,32 +222,11 @@ class FactoryBDummyGenerator:
             "node_id": self.node_id,
         }
 
-    def _cluster_state(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
-        if os.getenv("AEGIS_CLUSTER_STATE_MODE", "auto") != "synthetic":
-            try:
-                nodes = build_node_payloads(self.k8s.nodes(), role_overrides={self.node_id: "single-node"})
-                workloads = build_workload_payloads(self.k8s)
-                if nodes:
-                    return nodes, workloads, "kubernetes"
-            except Exception as exc:
-                print(f"falling back to synthetic cluster state: {exc}", file=sys.stderr, flush=True)
+    def _cluster_state(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         return [self._node(self.node_id)], [
             self._workload("ai-apps", "dummy-data-generator"),
             self._workload("ai-apps", "edge-iot-publisher"),
-        ], "synthetic"
-
-    def _next_sequence(self) -> int:
-        try:
-            current = int(self.sequence_file.read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
-            current = 0
-        current += 1
-        try:
-            self.sequence_file.parent.mkdir(parents=True, exist_ok=True)
-            self.sequence_file.write_text(f"{current}\n", encoding="utf-8")
-        except OSError:
-            pass
-        return current
+        ]
 
 
 def build_messages(generator: FactoryBDummyGenerator, mode: str) -> list[dict[str, Any]]:
