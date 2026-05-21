@@ -219,8 +219,8 @@ function RiskGauge({ value, size = 96, stroke = 8, label = true }) {
   const total = end - start;
   const valEnd = v == null ? start : start + v / 100 * total;
   const color = v == null ? "var(--unk)" :
-  v >= 80 ? "var(--safe)" :
-  v >= 60 ? "var(--warn)" :
+  v >= 85 ? "var(--safe)" :
+  v >= 50 ? "var(--warn)" :
   "var(--crit)";
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="gauge-svg" style={{ width: "65.9943px" }}>
@@ -251,8 +251,8 @@ function RiskGauge({ value, size = 96, stroke = 8, label = true }) {
 function ScoreBar({ value, height = 6 }) {
   const v = value == null ? 0 : Math.max(0, Math.min(100, value));
   const color = value == null ? "var(--unk)" :
-  v >= 80 ? "var(--safe)" :
-  v >= 60 ? "var(--warn)" :
+  v >= 85 ? "var(--safe)" :
+  v >= 50 ? "var(--warn)" :
   "var(--crit)";
   return (
     <div style={{
@@ -348,4 +348,125 @@ function Heatmap({ rows, cols = 24, size = 14, gap = 2 }) {
 
 }
 
-Object.assign(window, { Sparkline, LineChart, StackedRisk, RiskGauge, ScoreBar, StatusDonut, Heatmap });
+// ─── Multi-line chart (N labelled series, shared y-axis) ──────────
+// series: [{ name, color, data }]. data may contain nulls (skipped).
+function MultiLine({ series, height = 200, yUnit = "", yTicks = 4,
+                     xLabels = null /* optional [str,str,...] same length as data */,
+                     yMin: yMinOpt, yMax: yMaxOpt, legend = true }) {
+  const ref = React.useRef(null);
+  const [w, setW] = React.useState(0);
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+
+  if (!series || !series.length || !series[0].data?.length) {
+    return <div ref={ref} style={{ height }} />;
+  }
+  const N = series[0].data.length;
+  const pad = { l: 40, r: 14, t: 8, b: legend ? 32 : 22 };
+  const W = Math.max(220, w);
+  const H = height;
+  const innerW = W - pad.l - pad.r;
+  const innerH = H - pad.t - pad.b;
+
+  const allVals = series.flatMap(s => s.data).filter(v => v != null && !isNaN(v));
+  const yMin = yMinOpt != null ? yMinOpt : Math.min(...allVals);
+  const yMax = yMaxOpt != null ? yMaxOpt : Math.max(...allVals);
+  const yRange = (yMax - yMin) || 1;
+  const stepX = innerW / (N - 1);
+  const yOf = v => pad.t + innerH - (v - yMin) / yRange * innerH;
+  const xOf = i => pad.l + i * stepX;
+
+  // Build path segments, breaking on null/NaN.
+  const pathOf = (data) => {
+    let d = "";
+    let prevNull = true;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i];
+      if (v == null || isNaN(v)) { prevNull = true; continue; }
+      d += `${prevNull ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(v).toFixed(1)} `;
+      prevNull = false;
+    }
+    return d.trim();
+  };
+
+  const yTickVals = [];
+  for (let i = 0; i <= yTicks; i++) yTickVals.push(yMin + yRange * i / yTicks);
+
+  // X labels: 5 evenly-spaced ticks
+  const xTickCount = 4;
+  const xTickIdx = Array.from({ length: xTickCount + 1 }, (_, i) =>
+    Math.round((N - 1) * (i / xTickCount))
+  );
+
+  return (
+    <div ref={ref} style={{ width: "100%", height }}>
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {/* gridlines */}
+        {yTickVals.map((v, i) => (
+          <line key={i} x1={pad.l} x2={W - pad.r}
+                y1={yOf(v)} y2={yOf(v)}
+                stroke="var(--line-2)" strokeWidth="1"
+                strokeDasharray={i === 0 ? "0" : "2 3"} />
+        ))}
+        {/* y labels */}
+        {yTickVals.map((v, i) => (
+          <text key={`yl${i}`} x={pad.l - 8} y={yOf(v) + 3}
+                fontSize="10" textAnchor="end" fill="var(--ink-4)"
+                fontFamily="Geist Mono, monospace">
+            {yRange < 5 ? v.toFixed(2) : yRange < 20 ? v.toFixed(1) : Math.round(v)}{yUnit}
+          </text>
+        ))}
+        {/* x labels */}
+        {xTickIdx.map((idx, i) => (
+          <text key={`xl${i}`} x={xOf(idx)} y={H - (legend ? 18 : 6)}
+                fontSize="10" textAnchor="middle" fill="var(--ink-4)"
+                fontFamily="Geist Mono, monospace">
+            {xLabels ? xLabels[idx] : `${idx}`}
+          </text>
+        ))}
+        {/* series */}
+        {series.map((s, si) => (
+          <path key={si} d={pathOf(s.data)} fill="none" stroke={s.color}
+                strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+        {/* endpoint dots */}
+        {series.map((s, si) => {
+          // find last non-null index
+          let last = -1;
+          for (let i = s.data.length - 1; i >= 0; i--) {
+            if (s.data[i] != null && !isNaN(s.data[i])) { last = i; break; }
+          }
+          if (last < 0) return null;
+          return (
+            <g key={`dot${si}`}>
+              <circle cx={xOf(last)} cy={yOf(s.data[last])} r="2.6" fill={s.color} />
+            </g>
+          );
+        })}
+        {/* legend */}
+        {legend && (() => {
+          let x = pad.l;
+          return series.map((s, si) => {
+            const label = `${s.name}`;
+            const w = 8 + 6 + label.length * 6.5 + 14;
+            const node = (
+              <g key={`lg${si}`} transform={`translate(${x}, ${H - 4})`}>
+                <line x1="0" x2="10" y1="0" y2="0" stroke={s.color} strokeWidth="2" />
+                <text x="14" y="3.5" fontSize="11" fill="var(--ink-3)"
+                      fontFamily="Geist, sans-serif">{label}</text>
+              </g>
+            );
+            x += w;
+            return node;
+          });
+        })()}
+      </svg>
+    </div>
+  );
+}
+
+Object.assign(window, { Sparkline, LineChart, StackedRisk, RiskGauge, ScoreBar, StatusDonut, Heatmap, MultiLine });

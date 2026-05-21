@@ -1,0 +1,29 @@
+{
+    "data_plane_instance_id": "aegis-spoke-edge-iot-publisher-586d84676b-d2gvh",
+    "environment_type": "vm-windows",
+    "factory_id": "factory-c",
+    "input_module_type": "dummy",
+    "message_id": "factory-c:factory_state:factory-c-worker:2026-05-20T09:00:11Z",
+    "node_id": "factory-c-worker",
+    "payload": {
+        "aggregation_window_seconds": 3,
+        "ai_result": {
+            "abnormal_sound": "none",
+            "bend_score": 0,
+            "fall_score": 0,
+            "fire_score": 0,
+            "sample_count": 1
+        },
+        "sensor": {
+            "humidity_percent_avg": 61.33,
+            "pressure_hpa_avg": 1012.09,
+            "sample_count": 1,
+            "temperature_celsius_avg": 23.91
+        }
+    },
+    "published_at": "2026-05-20T09:00:16Z",
+    "schema_version": "0.1.0",
+    "source_timestamp": "2026-05-20T09:00:11Z",
+    "source_type": "factory_state",
+    "received_at": 1779267616715
+}

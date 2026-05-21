@@ -1,0 +1,122 @@
+{
+    "data_plane_instance_id": "aegis-spoke-edge-iot-publisher-bd4bd99cf-5bpx7",
+    "environment_type": "physical-rpi",
+    "factory_id": "factory-a",
+    "input_module_type": "sensor",
+    "message_id": "factory-a:infra_state:cluster:2026-05-19T03:58:16Z",
+    "node_id": "cluster",
+    "payload": {
+        "devices": {
+            "bme280": {
+                "available": true,
+                "last_seen_at": "2026-05-19T03:58:16Z"
+            },
+            "camera": {
+                "available": true,
+                "last_seen_at": "2026-05-19T03:58:16Z"
+            },
+            "microphone": {
+                "available": true,
+                "last_seen_at": "2026-05-19T03:58:16Z"
+            }
+        },
+        "heartbeat": {
+            "agent_status": "alive",
+            "last_spool_write_at": null,
+            "last_spool_write_status": "unknown"
+        },
+        "node_summary": {
+            "not_ready": 0,
+            "ready": 3,
+            "total": 3
+        },
+        "nodes": [
+            {
+                "cpu_usage_percent": null,
+                "disk_usage_percent": null,
+                "memory_usage_percent": null,
+                "network_reachability": "unknown",
+                "node_id": "master",
+                "ready": true,
+                "role": "control-plane"
+            },
+            {
+                "cpu_usage_percent": null,
+                "disk_usage_percent": null,
+                "memory_usage_percent": null,
+                "network_reachability": "unknown",
+                "node_id": "worker1",
+                "ready": true,
+                "role": "failover-standby"
+            },
+            {
+                "cpu_usage_percent": null,
+                "disk_usage_percent": null,
+                "memory_usage_percent": null,
+                "network_reachability": "unknown",
+                "node_id": "worker2",
+                "ready": true,
+                "role": "sensor-ai-audio-preferred"
+            }
+        ],
+        "workload_summary": {
+            "not_running": 0,
+            "running": 6,
+            "total": 6
+        },
+        "workloads": [
+            {
+                "name": "bme280-sensor",
+                "namespace": "monitoring",
+                "node_id": "worker2",
+                "ready": true,
+                "restart_count": 8,
+                "status": "Running"
+            },
+            {
+                "name": "influxdb",
+                "namespace": "monitoring",
+                "node_id": "worker1",
+                "ready": true,
+                "restart_count": 0,
+                "status": "Running"
+            },
+            {
+                "name": "prometheus",
+                "namespace": "monitoring",
+                "node_id": "worker1",
+                "ready": true,
+                "restart_count": 4,
+                "status": "Running"
+            },
+            {
+                "name": "grafana",
+                "namespace": "monitoring",
+                "node_id": "master",
+                "ready": true,
+                "restart_count": 0,
+                "status": "Running"
+            },
+            {
+                "name": "safe-edge-integrated-ai",
+                "namespace": "ai-apps",
+                "node_id": "worker2",
+                "ready": true,
+                "restart_count": 13,
+                "status": "Running"
+            },
+            {
+                "name": "safe-edge-audio",
+                "namespace": "ai-apps",
+                "node_id": "worker2",
+                "ready": true,
+                "restart_count": 4,
+                "status": "Running"
+            }
+        ]
+    },
+    "published_at": "2026-05-19T03:58:21Z",
+    "schema_version": "0.1.0",
+    "source_timestamp": "2026-05-19T03:58:16Z",
+    "source_type": "infra_state"
+}

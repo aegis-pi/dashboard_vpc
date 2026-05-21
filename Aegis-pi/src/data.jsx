@@ -1,445 +1,620 @@
-// ─── Fleet data ──────────────────────────────────────────────────
-// Risk Twin domains: environmental · infrastructure · operational.
-// Scores 0–100, higher = better. status derives from the lowest sub.
+// ─── Data contract — 3 factories, post-real-JSON revision ──────────
+// factory-a reflects the actual factory_state + infra_state JSON shipped
+// from physical-rpi (CPU/Memory/Disk null, network unknown, real workload
+// names, restart counts, devices.{...}.{available,last_seen_at}, heartbeat).
 
-const seed = (s) => () => (s = (s * 9301 + 49297) % 233280, s / 233280);
+const NOW = Date.now();
+const TODAY = "2026-05-19"; // reference date for daily reports
 
+// Risk score semantics: 100 = safest, 0 = most dangerous.
+//   safe    ≥ 85
+//   warning 50 ~ 84
+//   danger  <  50
+
+function seedRand(s) {
+  let x = s >>> 0;
+  return () => {
+    x = (x * 9301 + 49297) % 233280;
+    return x / 233280;
+  };
+}
+
+// ─── LATEST documents ──────────────────────────────────────────────
 const FACTORIES = [
+  // ─── factory-a · physical-rpi · real JSON shape ───
   {
-    id: "fac-osaka-01",
-    code: "OSK-01",
-    name: "Osaka — Kita Line A",
-    region: "Asia-Pacific",
-    country: "Japan",
-    city: "Osaka, JP",
-    coord: [134.7, 34.7],
-    classification: "Tier-1 · Precision",
-    status: "safe",
-    risk: 92,
-    sub: { environmental: 94, infrastructure: 91, operational: 90 },
-    alerts: { critical: 0, warning: 1, info: 3 },
-    uptime: 99.92, throughput: 312, throughputUnit: "u/hr",
-    lastSync: "12s",
-    seed: 17,
-    assets: 412,
-    workforce: 184,
+    factory_id: "factory-a",
+    environment_type: "physical-rpi",
+    updated_at: NOW - 6_000,
+    last_factory_state_at: NOW - 2_400,
+    last_infra_state_at: NOW - 8_000,
+    risk: {
+      score: 78,
+      level: "warning",
+      top_causes: [
+        { name: "safe-edge-integrated-ai 누적 재시작 13회", value: 13, contribution: 12 },
+        { name: "노드 사용률 메트릭 미수신",                 value: 3,  contribution: 7 },
+        { name: "last_spool_write_status unknown",         value: "unknown", contribution: 3 },
+      ],
+    },
+    dashboard: {
+      display_status: "주의",
+      summary: "센서·AI·노드 Ready는 정상. 그러나 AI 워크로드 누적 재시작이 13회로 누적되었고, 노드별 CPU/Memory/Disk 메트릭이 미수신.",
+    },
+    factory_state: {
+      sensor: {
+        temperature_celsius_avg: 22.845,
+        humidity_percent_avg: 48.445,
+        pressure_hpa_avg: 1008.37,
+      },
+      ai_result: {
+        fire_score: 0.0,
+        fall_score: 0.0,
+        bend_score: 0.0,
+        abnormal_sound: "none",
+      },
+    },
+    infra_state: {
+      heartbeat: {
+        agent_status: "alive",
+        last_spool_write_at: null,
+        last_spool_write_status: "unknown",
+      },
+      node_summary: { total: 3, ready: 3, not_ready: 0 },
+      nodes: [
+        { node_id: "master",  role: "control-plane",
+          ready: true,
+          cpu_usage_percent: null, memory_usage_percent: null,
+          disk_usage_percent: null, network_reachability: "unknown" },
+        { node_id: "worker1", role: "failover-standby",
+          ready: true,
+          cpu_usage_percent: null, memory_usage_percent: null,
+          disk_usage_percent: null, network_reachability: "unknown" },
+        { node_id: "worker2", role: "sensor-ai-audio-preferred",
+          ready: true,
+          cpu_usage_percent: null, memory_usage_percent: null,
+          disk_usage_percent: null, network_reachability: "unknown" },
+      ],
+      workload_summary: { total: 6, running: 6, not_running: 0 },
+      workloads: [
+        { namespace: "monitoring", name: "bme280-sensor",            status: "Running", ready: true, restart_count: 8,  node_id: "worker2" },
+        { namespace: "monitoring", name: "influxdb",                 status: "Running", ready: true, restart_count: 0,  node_id: "worker1" },
+        { namespace: "monitoring", name: "prometheus",               status: "Running", ready: true, restart_count: 4,  node_id: "worker1" },
+        { namespace: "monitoring", name: "grafana",                  status: "Running", ready: true, restart_count: 0,  node_id: "master"  },
+        { namespace: "ai-apps",    name: "safe-edge-integrated-ai",  status: "Running", ready: true, restart_count: 13, node_id: "worker2" },
+        { namespace: "ai-apps",    name: "safe-edge-audio",          status: "Running", ready: true, restart_count: 4,  node_id: "worker2" },
+      ],
+      devices: {
+        bme280:     { available: true, last_seen_at: NOW - 7_000 },
+        camera:     { available: true, last_seen_at: NOW - 7_000 },
+        microphone: { available: true, last_seen_at: NOW - 7_000 },
+      },
+    },
+    pipeline_status: {
+      status: "normal",
+      latest_infra_state_age_seconds: 8,
+      latest_s3_raw_age_seconds: 14,
+    },
   },
+
+  // ─── factory-b · vm-mac · real dummy JSON (2026-05-20) ───
   {
-    id: "fac-yokohama-02",
-    code: "YKH-02",
-    name: "Yokohama — Bay 3",
-    region: "Asia-Pacific",
-    country: "Japan",
-    city: "Yokohama, JP",
-    coord: [139.6, 35.4],
-    classification: "Tier-1 · Assembly",
-    status: "warn",
-    risk: 71,
-    sub: { environmental: 68, infrastructure: 84, operational: 72 },
-    alerts: { critical: 0, warning: 4, info: 6 },
-    uptime: 98.41, throughput: 268, throughputUnit: "u/hr",
-    lastSync: "8s",
-    seed: 41,
-    assets: 588, workforce: 246,
+    factory_id: "factory-b",
+    environment_type: "vm-mac",
+    updated_at: NOW - 8_000,
+    last_factory_state_at: NOW - 3_000,
+    last_infra_state_at: NOW - 6_000,
+    risk: {
+      score: 92,
+      level: "safe",
+      top_causes: [
+        { name: "last_spool_write_status: unknown", value: "unknown", contribution: 3 },
+        { name: "sample_count = 1 (단일 표본)",   value: 1,         contribution: 3 },
+        { name: "데이터 소스: dummy (vm-mac)",      value: "dummy",   contribution: 2 },
+      ],
+    },
+    dashboard: {
+      display_status: "안전",
+      summary: "더미 환경 정상 운영 중. 모든 노드 Ready, 워크로드 2/2 Running, 센서·AI 정상. last_spool_write_status만 unknown 지속.",
+    },
+    factory_state: {
+      sensor: {
+        temperature_celsius_avg: 21.84,
+        humidity_percent_avg: 46.49,
+        pressure_hpa_avg: 1013.15,
+      },
+      ai_result: {
+        fire_score: 0.0, fall_score: 0.0, bend_score: 0.0,
+        abnormal_sound: "none",
+      },
+    },
+    infra_state: {
+      heartbeat: {
+        agent_status: "alive",
+        last_spool_write_at: null,
+        last_spool_write_status: "unknown",
+      },
+      node_summary: { total: 2, ready: 2, not_ready: 0 },
+      nodes: [
+        { node_id: "master",  role: "control-plane", ready: true,
+          cpu_usage_percent: 5.7,  memory_usage_percent: 35.64,
+          disk_usage_percent: 25.12, network_reachability: "ok" },
+        { node_id: "worker1", role: "worker",        ready: true,
+          cpu_usage_percent: 8.68, memory_usage_percent: 36.04,
+          disk_usage_percent: 23.13, network_reachability: "ok" },
+      ],
+      workload_summary: { total: 2, running: 2, not_running: 0 },
+      workloads: [
+        { namespace: "ai-apps", name: "dummy-data-generator", status: "Running", ready: true, restart_count: 0, node_id: "worker1" },
+        { namespace: "ai-apps", name: "edge-iot-publisher",   status: "Running", ready: true, restart_count: 0, node_id: "worker1" },
+      ],
+      devices: {
+        bme280:     { available: true, last_seen_at: NOW - 6_000 },
+        camera:     { available: true, last_seen_at: NOW - 6_000 },
+        microphone: { available: true, last_seen_at: NOW - 6_000 },
+      },
+    },
+    pipeline_status: {
+      status: "normal",
+      latest_infra_state_age_seconds: 6,
+      latest_s3_raw_age_seconds: 13,
+    },
   },
+
+  // ─── factory-c · vm-windows · real dummy JSON (2026-05-20) ───
   {
-    id: "fac-stuttgart-04",
-    code: "STG-04",
-    name: "Stuttgart — Hall West",
-    region: "EMEA",
-    country: "Germany",
-    city: "Stuttgart, DE",
-    coord: [9.2, 48.8],
-    classification: "Tier-1 · Powertrain",
-    status: "crit",
-    risk: 48,
-    sub: { environmental: 73, infrastructure: 42, operational: 51 },
-    alerts: { critical: 2, warning: 5, info: 4 },
-    uptime: 96.12, throughput: 148, throughputUnit: "u/hr",
-    lastSync: "3s",
-    seed: 53,
-    assets: 721, workforce: 312,
-  },
-  {
-    id: "fac-rotterdam-03",
-    code: "RTM-03",
-    name: "Rotterdam — Port Dock B",
-    region: "EMEA",
-    country: "Netherlands",
-    city: "Rotterdam, NL",
-    coord: [4.5, 51.9],
-    classification: "Tier-2 · Logistics",
-    status: "safe",
-    risk: 88,
-    sub: { environmental: 89, infrastructure: 87, operational: 89 },
-    alerts: { critical: 0, warning: 0, info: 4 },
-    uptime: 99.78, throughput: 1042, throughputUnit: "TEU/d",
-    lastSync: "11s",
-    seed: 72,
-    assets: 233, workforce: 142,
-  },
-  {
-    id: "fac-monterrey-05",
-    code: "MTY-05",
-    name: "Monterrey — Plant 2",
-    region: "Americas",
-    country: "Mexico",
-    city: "Monterrey, MX",
-    coord: [-100.3, 25.7],
-    classification: "Tier-1 · Body Shop",
-    status: "warn",
-    risk: 76,
-    sub: { environmental: 81, infrastructure: 78, operational: 70 },
-    alerts: { critical: 0, warning: 3, info: 5 },
-    uptime: 99.05, throughput: 196, throughputUnit: "u/hr",
-    lastSync: "6s",
-    seed: 88,
-    assets: 504, workforce: 268,
-  },
-  {
-    id: "fac-austin-06",
-    code: "AUS-06",
-    name: "Austin — Gigaline 1",
-    region: "Americas",
-    country: "United States",
-    city: "Austin, TX",
-    coord: [-97.7, 30.3],
-    classification: "Tier-1 · Drive Unit",
-    status: "safe",
-    risk: 90,
-    sub: { environmental: 91, infrastructure: 92, operational: 88 },
-    alerts: { critical: 0, warning: 1, info: 2 },
-    uptime: 99.86, throughput: 482, throughputUnit: "u/hr",
-    lastSync: "2s",
-    seed: 11,
-    assets: 668, workforce: 354,
-  },
-  {
-    id: "fac-pune-07",
-    code: "PUN-07",
-    name: "Pune — Foundry East",
-    region: "Asia-Pacific",
-    country: "India",
-    city: "Pune, IN",
-    coord: [73.8, 18.5],
-    classification: "Tier-2 · Casting",
-    status: "warn",
-    risk: 67,
-    sub: { environmental: 58, infrastructure: 76, operational: 68 },
-    alerts: { critical: 0, warning: 6, info: 3 },
-    uptime: 97.84, throughput: 92, throughputUnit: "u/hr",
-    lastSync: "14s",
-    seed: 33,
-    assets: 318, workforce: 198,
-  },
-  {
-    id: "fac-katowice-08",
-    code: "KTW-08",
-    name: "Katowice — Stamping",
-    region: "EMEA",
-    country: "Poland",
-    city: "Katowice, PL",
-    coord: [19.0, 50.3],
-    classification: "Tier-2 · Stamping",
-    status: "unk",
-    risk: null,
-    sub: { environmental: null, infrastructure: null, operational: null },
-    alerts: { critical: 0, warning: 0, info: 0 },
-    uptime: null, throughput: null, throughputUnit: "u/hr",
-    lastSync: "4m 12s",
-    seed: 22,
-    assets: 286, workforce: 156,
-    note: "Telemetry stream paused — scheduled gateway maintenance.",
+    factory_id: "factory-c",
+    environment_type: "vm-windows",
+    updated_at: NOW - 5_000,
+    last_factory_state_at: NOW - 4_000,
+    last_infra_state_at: NOW - 7_000,
+    risk: {
+      score: 89,
+      level: "safe",
+      top_causes: [
+        { name: "직전 24h worker NotReady 1회 (복구 완료)", value: 1,         contribution: 6 },
+        { name: "last_spool_write_status: unknown",          value: "unknown", contribution: 3 },
+        { name: "데이터 소스: dummy (vm-windows)",            value: "dummy",   contribution: 2 },
+      ],
+    },
+    dashboard: {
+      display_status: "안전",
+      summary: "현재 모든 노드 Ready, 워크로드 2/2 Running. 직전 24h 내 worker 일시 NotReady 발생 후 자동 복구.",
+    },
+    factory_state: {
+      sensor: {
+        temperature_celsius_avg: 23.91,
+        humidity_percent_avg: 61.33,
+        pressure_hpa_avg: 1012.09,
+      },
+      ai_result: {
+        fire_score: 0.0, fall_score: 0.0, bend_score: 0.0,
+        abnormal_sound: "none",
+      },
+    },
+    infra_state: {
+      heartbeat: {
+        agent_status: "alive",
+        last_spool_write_at: null,
+        last_spool_write_status: "unknown",
+      },
+      node_summary: { total: 2, ready: 2, not_ready: 0 },
+      nodes: [
+        { node_id: "factory-c-master", role: "control-plane", ready: true,
+          cpu_usage_percent: 7.75,  memory_usage_percent: 31.13,
+          disk_usage_percent: 21.41, network_reachability: "ok" },
+        { node_id: "factory-c-worker", role: "worker",        ready: true,
+          cpu_usage_percent: 10.82, memory_usage_percent: 37.44,
+          disk_usage_percent: 27.38, network_reachability: "ok" },
+      ],
+      workload_summary: { total: 2, running: 2, not_running: 0 },
+      workloads: [
+        { namespace: "ai-apps", name: "dummy-data-generator", status: "Running", ready: true, restart_count: 0, node_id: "factory-c-worker" },
+        { namespace: "ai-apps", name: "edge-iot-publisher",   status: "Running", ready: true, restart_count: 0, node_id: "factory-c-worker" },
+      ],
+      devices: {
+        bme280:     { available: true, last_seen_at: NOW - 7_000 },
+        camera:     { available: true, last_seen_at: NOW - 7_000 },
+        microphone: { available: true, last_seen_at: NOW - 7_000 },
+      },
+    },
+    pipeline_status: {
+      status: "normal",
+      latest_infra_state_age_seconds: 7,
+      latest_s3_raw_age_seconds: 16,
+    },
   },
 ];
 
-const STATUS_META = {
-  safe: { label: "Stable",     short: "OK",   color: "var(--safe)" },
-  warn: { label: "At risk",    short: "WARN", color: "var(--warn)" },
-  crit: { label: "Critical",   short: "CRIT", color: "var(--crit)" },
-  unk:  { label: "Unknown",    short: "—",    color: "var(--unk)" },
+// ─── Display tone mapping ──────────────────────────────────────────
+const LEVEL_META = {
+  safe:    { label: "안전", tone: "safe" },
+  warning: { label: "주의", tone: "warn" },
+  danger:  { label: "위험", tone: "crit" },
+};
+const PIPELINE_META = {
+  normal:   { label: "정상", tone: "safe" },
+  warning:  { label: "주의", tone: "warn" },
+  critical: { label: "심각", tone: "crit" },
+};
+const HEARTBEAT_META = {
+  alive:    { label: "alive",    tone: "safe" },
+  degraded: { label: "degraded", tone: "warn" },
+  down:     { label: "down",     tone: "crit" },
 };
 
-// Deterministic series gen — same seed always returns the same shape.
-function makeSeries(n, low, high, seedVal, smooth = 0.55) {
-  const r = seed(seedVal);
+// ─── History window spec ──────────────────────────────────────────
+function windowSpec(w) {
+  if (w === "1h")  return { n: 60, stepMs:    60_000 };
+  if (w === "6h")  return { n: 72, stepMs:   300_000 };
+  if (w === "12h") return { n: 72, stepMs:   600_000 };
+  return                 { n: 48, stepMs: 1_800_000 };
+}
+
+function walk(n, lo, hi, target, seed, smooth = 0.78) {
+  const r = seedRand(seed);
   const out = [];
-  let v = (low + high) / 2;
+  let v = (lo + hi) / 2;
   for (let i = 0; i < n; i++) {
-    const target = low + r() * (high - low);
-    v = v * smooth + target * (1 - smooth);
+    const pullFrac = i / (n - 1);
+    const center = (lo + hi) / 2 * (1 - pullFrac) + target * pullFrac;
+    const noiseRange = (hi - lo) * (1 - pullFrac * 0.5);
+    const candidate = center + (r() - 0.5) * noiseRange;
+    v = v * smooth + candidate * (1 - smooth);
     out.push(v);
   }
   return out;
 }
 
-// Per-factory telemetry — used by Factory Detail and sparklines.
-function buildTelemetry(factory) {
-  const s = factory.seed;
-  return {
-    tempC:        makeSeries(48, 19, 24, s + 1, 0.7),
-    humidity:     makeSeries(48, 38, 55, s + 2, 0.75),
-    vibration:    makeSeries(48, 0.6, 2.1, s + 3, 0.5),
-    pm25:         makeSeries(48, 8, 22, s + 4, 0.75),
-    powerKw:      makeSeries(48, 1800, 2400, s + 5, 0.6),
-    netLatencyMs: makeSeries(48, 8, 22, s + 6, 0.55),
-    cpuLoad:      makeSeries(48, 0.32, 0.72, s + 7, 0.6),
-    errorRate:    makeSeries(48, 0.001, 0.018, s + 8, 0.55),
-    throughput:   makeSeries(48, 240, 340, s + 9, 0.65),
-    oee:          makeSeries(48, 78, 92, s + 10, 0.7),
-    riskTrend:    makeSeries(60, Math.max(20, (factory.risk ?? 70) - 14), Math.min(100, (factory.risk ?? 70) + 6), s + 11, 0.78),
-  };
-}
+function buildHistory(factory, win) {
+  const { n, stepMs } = windowSpec(win);
+  const t0 = NOW - n * stepMs;
+  const fid = factory.factory_id;
+  const baseSeed = fid === "factory-a" ? 17 : fid === "factory-b" ? 41 : 53;
 
-// ─── Fleet KPIs ──────────────────────────────────────────────────
-const safeFactories = FACTORIES.filter(f => f.status === "safe").length;
-const warnFactories = FACTORIES.filter(f => f.status === "warn").length;
-const critFactories = FACTORIES.filter(f => f.status === "crit").length;
-const unkFactories  = FACTORIES.filter(f => f.status === "unk").length;
-const monitoredFactories = FACTORIES.length - unkFactories;
-const totalCritical = FACTORIES.reduce((s, f) => s + f.alerts.critical, 0);
-const totalWarning  = FACTORIES.reduce((s, f) => s + f.alerts.warning, 0);
-const avgRisk = Math.round(
-  FACTORIES.filter(f => f.risk != null).reduce((s, f) => s + f.risk, 0) /
-    monitoredFactories
-);
-const avgUptime = (
-  FACTORIES.filter(f => f.uptime != null).reduce((s, f) => s + f.uptime, 0) /
-    monitoredFactories
-).toFixed(2);
+  const fs = factory.factory_state;
+  const ir = factory.infra_state;
+  const targetScore = factory.risk.score;
 
-const FLEET_KPIS = [
-  {
-    key: "fleet-risk-index",
-    label: "Fleet Risk Index",
-    value: avgRisk, unit: "",
-    delta: -1.2, deltaSuffix: " vs 24h", trend: "down",
-    hint: "Composite Risk Twin score, fleet weighted.",
-    sparkSeed: 91, color: "var(--accent)",
-  },
-  {
-    key: "sites-active",
-    label: "Sites monitored",
-    value: monitoredFactories, unit: ` / ${FACTORIES.length}`,
-    sub: `${unkFactories} offline`,
-    hint: "Sites currently streaming telemetry.",
-    sparkSeed: 13, color: "var(--ink-3)",
-  },
-  {
-    key: "critical-events",
-    label: "Critical alerts",
-    value: totalCritical, unit: "",
-    delta: +1, deltaSuffix: " vs 24h", trend: "up",
-    hint: "Unacknowledged severity ≥ critical.",
-    sparkSeed: 64, color: "var(--crit)",
-  },
-  {
-    key: "open-warnings",
-    label: "Open warnings",
-    value: totalWarning, unit: "",
-    delta: -2, deltaSuffix: " vs 24h", trend: "down",
-    hint: "Open severity = warning.",
-    sparkSeed: 28, color: "var(--warn)",
-  },
-  {
-    key: "fleet-uptime",
-    label: "Fleet uptime · 30d",
-    value: avgUptime, unit: "%",
-    delta: +0.08, deltaSuffix: "pp vs 30d", trend: "up",
-    hint: "Time-weighted across monitored sites.",
-    sparkSeed: 47, color: "var(--safe)",
-  },
-];
+  // RISK history — score semantics: 100 safest, 0 worst.
+  const riskScores = walk(
+    n,
+    Math.max(0, targetScore - 10),
+    Math.min(100, targetScore + 14),
+    targetScore,
+    baseSeed + 1, 0.7
+  );
+  const risk_history = riskScores.map((s, i) => ({
+    timestamp: t0 + i * stepMs,
+    risk_score: Math.max(0, Math.min(100, s)),
+    risk_level: s >= 85 ? "safe" : s >= 50 ? "warning" : "danger",
+    top_cause_names: factory.risk.top_causes.map(c => c.name),
+  }));
 
-// ─── Alerts ──────────────────────────────────────────────────────
-const ALERTS = [
-  { id: "A-9241", sev: "crit", factory: "STG-04", title: "Coolant pressure below 1.2 bar — Line W3",
-    domain: "infrastructure", ts: "2m ago", ageMin: 2, status: "open", owner: null,
-    asset: "Coolant pump CP-W3", rule: "coolant.pressure < 1.5 bar for 30s",
-    description: "Hydraulic coolant loop on Line W3 has dropped below the safe operating pressure. Sustained low pressure risks thermal trip on robot R-12 and cell shutdown.",
-    runbook: "ROB-COOLANT-RECOVER-02", sparkSeed: 941 },
+  // FACTORY history — sensor + ai
+  const tempEnd = fs.sensor.temperature_celsius_avg;
+  const humEnd  = fs.sensor.humidity_percent_avg;
+  const presEnd = fs.sensor.pressure_hpa_avg;
+  const temp = walk(n, tempEnd - 4, tempEnd + 3, tempEnd, baseSeed + 2, 0.82);
+  const hum  = walk(n, humEnd  - 8, humEnd  + 6, humEnd,  baseSeed + 3, 0.85);
+  const pres = walk(n, presEnd - 4, presEnd + 3, presEnd, baseSeed + 4, 0.88);
+  const fire = walk(n, 0, Math.max(0.08, fs.ai_result.fire_score + 0.08), fs.ai_result.fire_score, baseSeed + 5, 0.7).map(v => Math.max(0, v));
+  const fall = walk(n, 0, Math.max(0.08, fs.ai_result.fall_score + 0.12), fs.ai_result.fall_score, baseSeed + 6, 0.7).map(v => Math.max(0, v));
+  const bend = walk(n, 0, Math.max(0.08, fs.ai_result.bend_score + 0.10), fs.ai_result.bend_score, baseSeed + 7, 0.7).map(v => Math.max(0, v));
+  const factory_history = temp.map((_, i) => ({
+    timestamp: t0 + i * stepMs,
+    temperature_celsius_avg: temp[i],
+    humidity_percent_avg: hum[i],
+    pressure_hpa_avg: pres[i],
+    fire_score: fire[i],
+    fall_score: fall[i],
+    bend_score: bend[i],
+  }));
 
-  { id: "A-9240", sev: "crit", factory: "STG-04", title: "Cell W3 emergency stop circuit open",
-    domain: "operational", ts: "8m ago", ageMin: 8, status: "open", owner: null,
-    asset: "Safety PLC · W3", rule: "estop.state == OPEN",
-    description: "Light curtain breached and not yet reset; cell remains de-energized.",
-    runbook: "SAFETY-ESTOP-RESET-01", sparkSeed: 940 },
-
-  { id: "A-9239", sev: "crit", factory: "STG-04", title: "Robot R-12 servo temperature 92 °C — sustained 18m",
-    domain: "infrastructure", ts: "14m ago", ageMin: 14, status: "ack", owner: "M. Vogel",
-    asset: "ABB IRB 6700 · R-12", rule: "servo.temp > 85 °C for 10m",
-    description: "Servo motor on axis 4 is running hot. Correlated with coolant pressure drop on the same line.",
-    runbook: "ROB-SERVO-COOLDOWN-01", sparkSeed: 939 },
-
-  { id: "A-9237", sev: "warn", factory: "PUN-07", title: "Exhaust scrubber filter > 84% saturated",
-    domain: "environmental", ts: "22m ago", ageMin: 22, status: "open", owner: null,
-    asset: "Scrubber stack S-2", rule: "scrubber.saturation > 80%",
-    description: "Foundry exhaust scrubber filter approaching replacement threshold. Particulate breakthrough risk in 6–8h.",
-    runbook: "HVAC-SCRUBBER-SWAP", sparkSeed: 937 },
-
-  { id: "A-9235", sev: "warn", factory: "YKH-02", title: "Indoor humidity drift +9% over 6h",
-    domain: "environmental", ts: "31m ago", ageMin: 31, status: "open", owner: null,
-    asset: "HVAC zone 3", rule: "humidity.6h_drift > 8%",
-    description: "Relative humidity has drifted upward outside the seasonal baseline. Air handler ramp may be required.",
-    runbook: "HVAC-HUMIDITY-RECAL", sparkSeed: 935 },
-
-  { id: "A-9234", sev: "info", factory: "AUS-06", title: "Twin model v4.2 deployed — drift detector enabled",
-    domain: "operational", ts: "43m ago", ageMin: 43, status: "open", owner: null,
-    asset: "Twin runtime · AUS-06", rule: "deploy.event",
-    description: "New twin model rolled out across drive unit assembly. Monitor anomaly rate over next 4h shift.",
-    runbook: null, sparkSeed: 934 },
-
-  { id: "A-9232", sev: "warn", factory: "PUN-07", title: "PM2.5 exceeds shift threshold (28 µg/m³)",
-    domain: "environmental", ts: "47m ago", ageMin: 47, status: "open", owner: null,
-    asset: "Air sensor cluster · Bay 2", rule: "pm25 > 25 µg/m³",
-    description: "Foundry casting bay airborne particulate above shift-average threshold.",
-    runbook: "HVAC-PM25-MITIGATE", sparkSeed: 932 },
-
-  { id: "A-9230", sev: "warn", factory: "MTY-05", title: "Conveyor C-3 vibration anomaly · 1.8 g rms",
-    domain: "operational", ts: "1h ago", ageMin: 62, status: "ack", owner: "L. Reyes",
-    asset: "Conveyor drive C-3", rule: "vibration.rms > 1.5 g for 5m",
-    description: "Anomalous bearing vibration on conveyor C-3 drive unit. Likely bearing wear; predicted MTBF: 9 days.",
-    runbook: "ROB-CONVEY-03", sparkSeed: 930 },
-
-  { id: "A-9229", sev: "warn", factory: "STG-04", title: "Hydraulic oil temperature trending high",
-    domain: "infrastructure", ts: "1h ago", ageMin: 64, status: "open", owner: null,
-    asset: "Hydraulic skid H-2", rule: "oil.temp > 62 °C trend",
-    description: "Hydraulic oil temperature rising at 0.4 °C/min. Cooler outlet flow nominal.",
-    runbook: "HYD-COOLER-CHECK", sparkSeed: 929 },
-
-  { id: "A-9228", sev: "warn", factory: "STG-04", title: "Power factor below 0.92 on Feeder-B",
-    domain: "infrastructure", ts: "1h ago", ageMin: 68, status: "open", owner: null,
-    asset: "MV Feeder-B", rule: "pf < 0.92",
-    description: "Capacitor bank may need re-tuning. Reactive penalty risk if sustained > 4h.",
-    runbook: "ELEC-PF-CORRECTION", sparkSeed: 928 },
-
-  { id: "A-9226", sev: "warn", factory: "YKH-02", title: "QC station camera dropped frames · Line B",
-    domain: "infrastructure", ts: "2h ago", ageMin: 112, status: "open", owner: null,
-    asset: "QC vision cam · L-B-2", rule: "vision.frame_drop > 2%",
-    description: "Frame drop rate elevated; inspection coverage at risk.",
-    runbook: "QC-VISION-CALIBRATE", sparkSeed: 926 },
-
-  { id: "A-9224", sev: "warn", factory: "YKH-02", title: "Outbound network latency p95 → 38ms",
-    domain: "infrastructure", ts: "2h ago", ageMin: 124, status: "ack", owner: "H. Tanaka",
-    asset: "Pi-Edge gateway 04", rule: "net.latency.p95 > 30ms",
-    description: "Upstream telemetry export latency elevated. Edge buffer holding 14k events.",
-    runbook: "NET-EDGE-FAILOVER", sparkSeed: 924 },
-
-  { id: "A-9221", sev: "info", factory: "RTM-03", title: "Pi-Edge node 07 auto-restarted (41s)",
-    domain: "infrastructure", ts: "3h ago", ageMin: 167, status: "resolved", owner: null,
-    asset: "Pi-Edge gateway 07", rule: "service.restart",
-    description: "Edge service restarted by health watchdog. No telemetry gap observed downstream.",
-    runbook: null, sparkSeed: 921 },
-
-  { id: "A-9219", sev: "info", factory: "OSK-01", title: "Predictive: bearing wear forecast in 11d",
-    domain: "operational", ts: "3h ago", ageMin: 184, status: "open", owner: null,
-    asset: "Spindle bearing · L-A-1", rule: "predictive.mtbf < 14d",
-    description: "Twin model forecasts bearing replacement within 11 days based on vibration spectral signature.",
-    runbook: "MAINT-BEARING-SWAP", sparkSeed: 919 },
-
-  { id: "A-9215", sev: "warn", factory: "MTY-05", title: "Compressed air dew point rising",
-    domain: "infrastructure", ts: "4h ago", ageMin: 251, status: "open", owner: null,
-    asset: "Air dryer · A-1", rule: "dewpoint > -20 °C",
-    description: "Pneumatic system dew point above spec; condensation risk in valve manifold.",
-    runbook: "AIR-DRYER-REGEN", sparkSeed: 915 },
-
-  { id: "A-9212", sev: "warn", factory: "PUN-07", title: "Furnace zone 2 thermocouple drift detected",
-    domain: "infrastructure", ts: "5h ago", ageMin: 312, status: "ack", owner: "R. Patel",
-    asset: "Furnace TC-Z2", rule: "thermocouple.drift > 1.5%",
-    description: "Sensor drift confirmed against backup TC. Trend suggests recalibration needed.",
-    runbook: "SENSOR-TC-RECAL", sparkSeed: 912 },
-
-  { id: "A-9209", sev: "info", factory: "AUS-06", title: "Shift handover anomaly — 4 missed checks",
-    domain: "operational", ts: "6h ago", ageMin: 368, status: "resolved", owner: "J. Park",
-    asset: "Shift checklist L-A", rule: "handover.missed > 3",
-    description: "Pre-shift inspection checklist had 4 unchecked items at handover. Closed out after walkdown.",
-    runbook: null, sparkSeed: 909 },
-
-  { id: "A-9205", sev: "info", factory: "OSK-01", title: "Twin model accuracy 94.2% — within tolerance",
-    domain: "operational", ts: "8h ago", ageMin: 484, status: "resolved", owner: null,
-    asset: "Twin runtime · OSK-01", rule: "model.accuracy.weekly",
-    description: "Weekly twin model accuracy report.",
-    runbook: null, sparkSeed: 905 },
-
-  { id: "A-9201", sev: "warn", factory: "RTM-03", title: "Crane lift slack-line warning",
-    domain: "operational", ts: "10h ago", ageMin: 612, status: "resolved", owner: "K. de Vries",
-    asset: "Gantry crane G-2", rule: "tension.slack_event",
-    description: "Slack-line condition detected during unload cycle. Operator notified; lift completed safely.",
-    runbook: "CRANE-SLACK-INVESTIGATE", sparkSeed: 901 },
-
-  { id: "A-9195", sev: "warn", factory: "STG-04", title: "UPS battery health 76% — replace within 30d",
-    domain: "infrastructure", ts: "14h ago", ageMin: 842, status: "open", owner: null,
-    asset: "UPS-2 · MCC room", rule: "ups.battery.health < 80%",
-    description: "Battery health degrading. Replacement window opens 30 Apr — schedule procurement.",
-    runbook: "ELEC-UPS-BATT-SWAP", sparkSeed: 895 },
-];
-
-// ─── Recent events (timeline preview) ────────────────────────────
-const EVENTS = [
-  { id: "E-22184", ts: "13:42", factory: "STG-04", kind: "incident", title: "Risk score → 48 (critical)", detail: "Coolant + servo correlated anomaly" },
-  { id: "E-22183", ts: "13:24", factory: "PUN-07", kind: "telemetry", title: "PM2.5 threshold breach", detail: "Exhaust scrubber filter > 84% saturated" },
-  { id: "E-22182", ts: "12:58", factory: "AUS-06", kind: "deploy",   title: "Twin model v4.2 deployed", detail: "Improved drift detection on Drive Unit" },
-  { id: "E-22181", ts: "12:31", factory: "MTY-05", kind: "ack",      title: "Acknowledged · A-9230", detail: "L. Reyes — runbook ROB-CONVEY-03" },
-  { id: "E-22180", ts: "12:14", factory: "KTW-08", kind: "system",   title: "Gateway maintenance window", detail: "Scheduled — telemetry resumes 14:00 UTC" },
-  { id: "E-22179", ts: "11:47", factory: "YKH-02", kind: "telemetry",title: "Humidity drift detected", detail: "+9% over 6h vs seasonal baseline" },
-  { id: "E-22177", ts: "11:02", factory: "RTM-03", kind: "system",   title: "Pi-Edge node restart", detail: "Auto-recovery completed in 41s" },
-];
-
-// ─── Regions ─────────────────────────────────────────────────────
-const REGIONS = [
-  { key: "all", label: "All regions", count: FACTORIES.length },
-  { key: "APAC", label: "Asia-Pacific", count: FACTORIES.filter(f => f.region === "Asia-Pacific").length },
-  { key: "EMEA", label: "EMEA",         count: FACTORIES.filter(f => f.region === "EMEA").length },
-  { key: "AMER", label: "Americas",     count: FACTORIES.filter(f => f.region === "Americas").length },
-];
-
-// Used by factory detail to show its operational lines
-function buildLines(f) {
-  const r = seed(f.seed + 99);
-  const status = f.status;
-  const lineNames = ["Line A · Assembly", "Line B · QC", "Line C · Pack", "Line D · Calibration"];
-  return lineNames.map((name, i) => {
-    const drift = r();
-    const localStatus = status === "crit" && i === 0 ? "crit"
-                      : status === "warn" && i === 1 ? "warn"
-                      : drift > 0.85 ? "warn"
-                      : status === "unk" ? "unk" : "safe";
+  // INFRA history — per-node CPU/Memory/Disk series.
+  // If LATEST values are all-null for a node, return null series.
+  const nodes = ir.nodes;
+  const node_series = nodes.map((node, ni) => {
+    const allNull =
+      node.cpu_usage_percent == null &&
+      node.memory_usage_percent == null &&
+      node.disk_usage_percent == null;
+    if (allNull) {
+      return {
+        node_id: node.node_id,
+        cpu:    Array(n).fill(null),
+        memory: Array(n).fill(null),
+        disk:   Array(n).fill(null),
+        allNull: true,
+      };
+    }
+    if (node.ready === false) {
+      // Recently NotReady — drop trailing 30%.
+      const broken = Math.floor(n * 0.7);
+      const cpuMid = 60 + ni * 5;
+      const memMid = 65 + ni * 4;
+      const diskMid = 60 + ni * 3;
+      return {
+        node_id: node.node_id,
+        cpu:    walk(n, cpuMid - 8,  cpuMid + 10, cpuMid,  baseSeed + 10 + ni * 3, 0.82).map((v, i) => i >= broken ? null : v),
+        memory: walk(n, memMid - 6,  memMid + 8,  memMid,  baseSeed + 11 + ni * 3, 0.85).map((v, i) => i >= broken ? null : v),
+        disk:   walk(n, diskMid - 4, diskMid + 2, diskMid, baseSeed + 12 + ni * 3, 0.9 ).map((v, i) => i >= broken ? null : v),
+      };
+    }
     return {
-      id: `${f.code}-L${i+1}`,
-      name,
-      status: localStatus,
-      throughput: Math.round(60 + r() * 240),
-      oee: Math.round(72 + r() * 22),
-      uptime: (96 + r() * 3.9).toFixed(2),
-      operators: Math.round(6 + r() * 22),
+      node_id: node.node_id,
+      cpu:    walk(n, Math.max(0, node.cpu_usage_percent    - 12), node.cpu_usage_percent    + 14, node.cpu_usage_percent,    baseSeed + 10 + ni * 3, 0.82),
+      memory: walk(n, Math.max(0, node.memory_usage_percent - 8),  node.memory_usage_percent + 10, node.memory_usage_percent, baseSeed + 11 + ni * 3, 0.85),
+      disk:   walk(n, Math.max(0, node.disk_usage_percent   - 3),  node.disk_usage_percent   + 4,  node.disk_usage_percent,   baseSeed + 12 + ni * 3, 0.9 ),
     };
   });
+
+  const infra_history = Array.from({ length: n }, (_, i) => ({
+    timestamp: t0 + i * stepMs,
+    node_summary: ir.node_summary,
+    nodes: nodes.map((nd, ni) => ({
+      node_id: nd.node_id,
+      cpu:    node_series[ni].cpu[i],
+      memory: node_series[ni].memory[i],
+      disk:   node_series[ni].disk[i],
+    })),
+    workload_summary: ir.workload_summary,
+  }));
+
+  return { risk: risk_history, factory: factory_history, infra: infra_history, node_series };
 }
 
-// Per-factory assets list
-function buildAssets(f) {
-  const r = seed(f.seed + 7);
-  const types = [
-    { id: "ROBO-12", name: "ABB IRB 6700 · R-12",   kind: "Articulated robot" },
-    { id: "HVAC-01", name: "HVAC zone 3 chiller",   kind: "Climate" },
-    { id: "PLC-04",  name: "Siemens S7-1500 / PLC-4", kind: "Controller" },
-    { id: "CNVY-3",  name: "Conveyor C-3 · drive",   kind: "Conveyor" },
-    { id: "TRANSF",  name: "Step-down · Feeder-B",   kind: "Power" },
-    { id: "GATE-7",  name: "Pi-Edge gateway 07",     kind: "Network" },
-  ];
-  return types.map((a, i) => ({
-    ...a,
-    health: Math.round(60 + r() * 38),
-    status: i === 0 && f.status === "crit" ? "crit"
-          : r() < 0.18 ? "warn"
-          : r() < 0.04 ? "unk" : "safe",
-    lastMaint: `${Math.round(2 + r() * 28)}d`,
-  }));
+// ─── Derived timeline (expanded vocabulary) ────────────────────────
+// Event kinds:
+//   risk_drop          score 하락 (위험 쪽 변화)
+//   risk_recovery      score 상승 (복구)
+//   risk_change        risk_level 전환 (safe↔warning↔danger)
+//   cause_change       top_causes 변화
+//   device_off         device available true→false
+//   node_down          node not_ready 증가
+//   restart_inc        workload restart_count 누적
+//   workload_unhealthy workload status != Running
+//   heartbeat_issue    agent_status != alive, last_spool_write_status = failed/unknown
+//   pipeline_change    pipeline_status 전환
+const TIMELINE = {
+  "factory-a": [
+    { ts: NOW - 6 * 60_000,    kind: "restart_inc",       severity: "warn",
+      title: "safe-edge-integrated-ai 누적 재시작 +2",
+      detail: "ai-apps/safe-edge-integrated-ai · restart_count 11 → 13." },
+    { ts: NOW - 24 * 60_000,   kind: "risk_drop",         severity: "warn",
+      title: "안전 점수 하락 -6",
+      detail: "84 → 78. 워크로드 재시작 누적이 score에 반영됨." },
+    { ts: NOW - 38 * 60_000,   kind: "heartbeat_issue",   severity: "warn",
+      title: "last_spool_write_status: unknown",
+      detail: "edge agent heartbeat alive 유지, 그러나 last_spool_write_at null · 상태 unknown." },
+    { ts: NOW - 65 * 60_000,   kind: "cause_change",      severity: "info",
+      title: "top_causes 갱신",
+      detail: "“노드 메트릭 미수신” 항목이 신규 진입." },
+    { ts: NOW - 3 * 3600_000,  kind: "risk_recovery",     severity: "info",
+      title: "안전 점수 회복 +5",
+      detail: "이전 구간 79 → 84. 일시적 CPU 알람 해소 영향." },
+    { ts: NOW - 5 * 3600_000,  kind: "restart_inc",       severity: "info",
+      title: "prometheus 재시작 +1",
+      detail: "monitoring/prometheus · restart_count 3 → 4." },
+  ],
+  "factory-b": [
+    { ts: NOW - 45 * 60_000,   kind: "risk_recovery",     severity: "info",
+      title: "안전 점수 회복 +4",
+      detail: "88 → 92. 더미 환경 안정 운영 지속." },
+    { ts: NOW - 2 * 3600_000,  kind: "risk_change",       severity: "info",
+      title: "risk_level: warning → safe",
+      detail: "안전 점수 85 이상으로 회복. AI 탐지 점수 전부 0.0." },
+    { ts: NOW - 3 * 3600_000,  kind: "cause_change",      severity: "info",
+      title: "top_causes 갱신",
+      detail: "더미 fire_score 관련 항목이 top_causes에서 제거." },
+    { ts: NOW - 6 * 3600_000,  kind: "heartbeat_issue",   severity: "info",
+      title: "last_spool_write_status: unknown",
+      detail: "agent_status alive 유지, spool write 기록 없음 지속." },
+    { ts: NOW - 16 * 3600_000, kind: "restart_inc",       severity: "info",
+      title: "직전 24h 재시작 0회",
+      detail: "ai-apps/dummy-data-generator, edge-iot-publisher 모두 restart_count 0 유지." },
+  ],
+  "factory-c": [
+    { ts: NOW - 1 * 3600_000,  kind: "risk_recovery",     severity: "info",
+      title: "안전 점수 +5 회복",
+      detail: "84 → 89. 모든 인프라 정상 수신 안정." },
+    { ts: NOW - 3 * 3600_000,  kind: "pipeline_change",   severity: "info",
+      title: "pipeline: warning → normal",
+      detail: "latest_infra_state_age 정상 구간 복귀." },
+    { ts: NOW - 3.5 * 3600_000,kind: "risk_change",       severity: "info",
+      title: "risk_level: warning → safe",
+      detail: "안전 점수 85 이상 복귀." },
+    { ts: NOW - 5 * 3600_000,  kind: "node_down",         severity: "info",
+      title: "factory-c-worker Ready 복귀",
+      detail: "node_summary.not_ready 1 → 0. 일시 장애 자동 복구 완료." },
+    { ts: NOW - 10 * 3600_000, kind: "heartbeat_issue",   severity: "info",
+      title: "last_spool_write_status: unknown 지속",
+      detail: "alive 유지, spool write 기록 없음." },
+  ],
+};
+
+const EVENT_KIND_META = {
+  risk_drop:          { label: "risk_score 하락",      icon: "arrowDown" },
+  risk_recovery:      { label: "risk_score 상승",      icon: "arrowUp"   },
+  risk_change:        { label: "risk_level 전환",      icon: "trend"     },
+  cause_change:       { label: "top_causes 변화",      icon: "events"    },
+  device_off:         { label: "device 비가용",        icon: "drop"      },
+  node_down:          { label: "node not_ready",      icon: "server"    },
+  restart_inc:        { label: "restart_count 증가",   icon: "refresh"   },
+  workload_unhealthy: { label: "workload 비정상",      icon: "alert"     },
+  heartbeat_issue:    { label: "edge heartbeat 이상", icon: "shield"    },
+  pipeline_change:    { label: "pipeline 전환",        icon: "net"       },
+};
+
+// ─── Recent fleet changes (risk_level transitions) ─────────────────
+const FLEET_RECENT = [
+  { ts: NOW - 24 * 60_000,  factory_id: "factory-a", from: "safe",    to: "warning", score: 78 },
+  { ts: NOW - 45 * 60_000,  factory_id: "factory-b", from: "warning", to: "safe",    score: 92 },
+  { ts: NOW - 1 * 3600_000, factory_id: "factory-c", from: "warning", to: "safe",    score: 89 },
+  { ts: NOW - 6 * 3600_000, factory_id: "factory-c", from: "safe",    to: "warning", score: 82 },
+  { ts: NOW - 10 * 3600_000,factory_id: "factory-b", from: "safe",    to: "warning", score: 84 },
+];
+
+// ─── Daily reports mock ────────────────────────────────────────────
+// Per FR-DASH-06, FR-DATA-07/08: 일간 보고서. Markdown body, status,
+// generated_at, error if any. Indexed by factory_id × YYYY-MM-DD.
+
+const reportMarkdownA = `# factory-a 일간 보고서 · 2026-05-19
+
+## 1. 요약
+- 운영 시간 24h 동안 **모든 노드 Ready**, 워크로드 6/6 Running.
+- AI 결과: fire/fall/bend = 0.0, abnormal_sound = none.
+- 워크로드 재시작이 누적 \`safe-edge-integrated-ai 13회\` 등으로 안전 점수 일부 차감.
+
+## 2. 환경 센서 24h 평균
+| 지표 | 평균 | 최소 | 최대 |
+|---|---|---|---|
+| 온도 | 22.7 °C | 20.4 °C | 24.1 °C |
+| 습도 | 47.9 % | 44.2 % | 51.8 % |
+| 기압 | 1008.4 hPa | 1006.9 hPa | 1009.2 hPa |
+
+## 3. 워크로드 재시작 Top 3
+1. \`ai-apps/safe-edge-integrated-ai\` — 13회
+2. \`monitoring/bme280-sensor\` — 8회
+3. \`monitoring/prometheus\` — 4회
+
+## 4. 권장 조치
+- safe-edge-integrated-ai 재시작 원인 분석: CPU 또는 메모리 압박 가능성.
+- 노드 사용률 메트릭 수집 파이프라인 점검 (현재 CPU/Memory/Disk 모두 \`null\`).
+- last_spool_write_status \`unknown\` 상태 — agent 측 spool 경로 확인 필요.
+`;
+
+const reportMarkdownB = `# factory-b 일간 보고서 · 2026-05-19
+
+## 1. 요약
+- vm-mac 더미 환경. 안전 점수 **92점**, 상태 안전.
+- 모든 노드 Ready (master + worker1), 워크로드 2/2 Running.
+- 디바이스 3종 모두 available, 환경 센서 정상 범위.
+
+## 2. 환경 센서 스냅샷
+| 지표 | 값 |
+|---|---|
+| 온도 | 21.84 °C |
+| 습도 | 46.49 % |
+| 기압 | 1013.15 hPa |
+
+## 3. 워크로드
+- \`ai-apps/dummy-data-generator\` — Running, restart 0
+- \`ai-apps/edge-iot-publisher\` — Running, restart 0
+
+## 4. 권장 조치
+- last_spool_write_at이 null로 지속 — edge agent spool 디스크 경로 확인.
+- sample_count가 1로 낮음 — 더미 발행 주기 또는 aggregation 윈도우 검토.
+`;
+
+const reportMarkdownC = `# factory-c 일간 보고서 · 2026-05-19
+
+## 1. 요약
+- vm-windows 더미 환경. 안전 점수 **89점**, 현재 안전.
+- 직전 24h 중 factory-c-worker NotReady 일시 발생 후 자동 복구.
+
+## 2. 환경 센서 스냅샷
+| 지표 | 값 |
+|---|---|
+| 온도 | 23.91 °C |
+| 습도 | 61.33 % |
+| 기압 | 1012.09 hPa |
+
+## 3. 주요 이벤트
+- −5h — factory-c-worker Ready 복귀
+- −3h — pipeline warning → normal
+- −1h — 안전 점수 84 → 89 회복
+
+## 4. 권장 조치
+- factory-c-worker 재발 방지를 위한 노드 헬스체크 임계치 조정 검토.
+- last_spool_write_status: unknown — spool 경로 점검.
+`;
+
+const REPORTS = {
+  "factory-a": {
+    [TODAY]:        { status: "ready",      generated_at: NOW - 2 * 3600_000, markdown: reportMarkdownA },
+    "2026-05-18":   { status: "ready",      generated_at: NOW - 26 * 3600_000, markdown: "# factory-a 일간 보고서 · 2026-05-18\n\n- 안전 점수 평균 89점.\n- 주요 이벤트 없음.\n" },
+    "2026-05-17":   { status: "ready",      generated_at: NOW - 50 * 3600_000, markdown: "# factory-a 일간 보고서 · 2026-05-17\n\n- 평온한 24h. 안전 점수 91점.\n" },
+    "2026-05-16":   { status: "failed",     generated_at: NOW - 74 * 3600_000, error: "Lambda timeout · history aggregator 12s" },
+    "2026-05-15":   { status: "ready",      generated_at: NOW - 98 * 3600_000, markdown: "# factory-a 일간 보고서 · 2026-05-15\n\n- 정상.\n" },
+  },
+  "factory-b": {
+    [TODAY]:        { status: "generating", queued_at: NOW - 4 * 60_000 },
+    "2026-05-18":   { status: "ready",      generated_at: NOW - 25 * 3600_000, markdown: reportMarkdownB },
+    "2026-05-17":   { status: "none" },
+    "2026-05-16":   { status: "ready",      generated_at: NOW - 73 * 3600_000, markdown: "# factory-b 일간 보고서 · 2026-05-16\n\n- 더미 데이터, 정상.\n" },
+    "2026-05-15":   { status: "ready",      generated_at: NOW - 97 * 3600_000, markdown: "# factory-b 일간 보고서 · 2026-05-15\n\n- 더미 데이터, 정상.\n" },
+  },
+  "factory-c": {
+    [TODAY]:        { status: "ready",      generated_at: NOW - 30 * 60_000, markdown: reportMarkdownC },
+    "2026-05-18":   { status: "failed",     generated_at: NOW - 26 * 3600_000, error: "history aggregator: missing INFRA bucket for 2026-05-18" },
+    "2026-05-17":   { status: "ready",      generated_at: NOW - 49 * 3600_000, markdown: "# factory-c 일간 보고서 · 2026-05-17\n\n- 안전 점수 평균 41점.\n- 야간에 risk 변동 폭 큼.\n" },
+    "2026-05-16":   { status: "none" },
+    "2026-05-15":   { status: "ready",      generated_at: NOW - 97 * 3600_000, markdown: "# factory-c 일간 보고서 · 2026-05-15\n\n- 더미 시나리오 정상 종료.\n" },
+  },
+};
+
+const REPORT_DATES = [TODAY, "2026-05-18", "2026-05-17", "2026-05-16", "2026-05-15"];
+const REPORT_STATUS_META = {
+  ready:      { label: "준비됨",     tone: "safe" },
+  generating: { label: "생성 중",    tone: "warn" },
+  failed:     { label: "생성 실패",  tone: "crit" },
+  none:       { label: "보고서 없음", tone: "unk"  },
+};
+
+// ─── Auth mock (Cognito stand-in) ──────────────────────────────────
+// guest = 로그인 전. viewer = 조회만. admin = 조회 + 재생성/refresh.
+// factory-c는 admin 전용으로 가정 (권한 없는 공장 접근 시나리오 시연용).
+const RESTRICTED_FACTORIES = {
+  "factory-c": ["admin"], // 이 공장은 admin만 접근 가능
+};
+function canAccessFactory(role, factory_id) {
+  const allowed = RESTRICTED_FACTORIES[factory_id];
+  if (!allowed) return true;
+  return allowed.includes(role);
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────
+function ageSeconds(ts) {
+  if (ts == null) return null;
+  return Math.max(0, Math.floor((NOW - ts) / 1000));
+}
+function relTime(ts) {
+  if (ts == null) return "—";
+  const s = ageSeconds(ts);
+  if (s < 60)     return `${s}초 전`;
+  if (s < 3600)   return `${Math.floor(s / 60)}분 전`;
+  if (s < 86400)  return `${Math.floor(s / 3600)}시간 전`;
+  return `${Math.floor(s / 86400)}일 전`;
+}
+function clockHHMM(ts) {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function clockHHMMSS(ts) {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+}
+
+function fleetCounts() {
+  const total = FACTORIES.length;
+  const byLevel = { safe: 0, warning: 0, danger: 0 };
+  let stale = 0;
+  for (const f of FACTORIES) {
+    if (f.risk?.level) byLevel[f.risk.level]++;
+    const fAge = ageSeconds(f.last_factory_state_at);
+    const iAge = ageSeconds(f.last_infra_state_at);
+    if ((fAge ?? 0) > 10 || (iAge ?? 0) > 40) stale++;
+  }
+  return { total, danger: byLevel.danger, warning: byLevel.warning, safe: byLevel.safe, stale };
 }
 
 Object.assign(window, {
-  FACTORIES, STATUS_META, FLEET_KPIS, ALERTS, EVENTS, REGIONS,
-  makeSeries, buildTelemetry, buildLines, buildAssets, seed,
-  __FLEET: { safeFactories, warnFactories, critFactories, unkFactories,
-             monitoredFactories, totalCritical, totalWarning, avgRisk, avgUptime },
+  NOW, TODAY, FACTORIES,
+  LEVEL_META, PIPELINE_META, HEARTBEAT_META,
+  TIMELINE, EVENT_KIND_META, FLEET_RECENT,
+  REPORTS, REPORT_DATES, REPORT_STATUS_META,
+  RESTRICTED_FACTORIES, canAccessFactory,
+  buildHistory, windowSpec,
+  ageSeconds, relTime, clockHHMM, clockHHMMSS, fleetCounts,
 });

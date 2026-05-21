@@ -1,358 +1,529 @@
-// Fleet Overview screen — the operational landing page across all factories.
+// Fleet Overview — refined design (A: pulse track, B: serif numbers, C: cards).
+// Data sources unchanged: FACTORIES[] (LATEST docs) + FLEET_RECENT + buildHistory.
 
-function FleetOverview({ onOpenFactory, onOpenAlerts }) {
-  const [region, setRegion] = React.useState("all");
-  const [view, setView] = React.useState("cards");
-  const factories = window.FACTORIES.filter((f) =>
-  region === "all" ? true :
-  region === "APAC" ? f.region === "Asia-Pacific" :
-  region === "EMEA" ? f.region === "EMEA" :
-  region === "AMER" ? f.region === "Americas" : true
-  );
+const SERIF_FONT = '"Instrument Serif", ui-serif, Georgia, serif';
 
-  // Build a fleet-wide risk trajectory from a blend of all factories
-  const fleetSeries = React.useMemo(() => {
-    const all = window.FACTORIES.filter((f) => f.risk != null).
-    map((f) => window.buildTelemetry(f).riskTrend);
-    return all[0].map((_, i) => {
-      const avg = all.reduce((s, a) => s + a[i], 0) / all.length;
-      return Math.round(avg * 10) / 10;
-    });
-  }, []);
-
-  const domainSeries = React.useMemo(() => {
-    const facs = window.FACTORIES.filter((f) => f.risk != null);
-    const N = 60;
-    // Independent per-domain noise so the three lines tell different stories.
-    const envBase = window.makeSeries(N, 78, 92, 201, 0.72);
-    const infBase = window.makeSeries(N, 58, 78, 303, 0.62);
-    const opBase = window.makeSeries(N, 70, 88, 407, 0.68);
-    return Array.from({ length: N }).map((_, i) => ({
-      environmental: envBase[i],
-      infrastructure: infBase[i],
-      operational: opBase[i]
-    }));
-  }, []);
-
-  const counts = {
-    safe: factories.filter((f) => f.status === "safe").length,
-    warn: factories.filter((f) => f.status === "warn").length,
-    crit: factories.filter((f) => f.status === "crit").length,
-    unk: factories.filter((f) => f.status === "unk").length
-  };
-
-  // 8 most-at-risk telemetry hotspots for the heatmap
-  const heatRows = React.useMemo(() => {
-    return window.FACTORIES.slice(0, 6).map((f) => {
-      const t = window.buildTelemetry(f);
-      const norm = t.errorRate.slice(-24).map((v) => Math.min(1, v / 0.02));
-      return { label: f.code, values: norm };
-    });
-  }, []);
-
+function FleetOverview({ onOpenFactory, pulseDemo = "off" }) {
   return (
     <>
-      {/* ─── Page header ────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+      {/* ─── Page header — editorial serif h1 ──────────────────── */}
+      <div style={{ marginBottom: 22 }}>
+        <div className="eyebrow" style={{ marginBottom: 6 }}>Risk Twin · Fleet</div>
+        <h1 style={{
+          font: `400 36px/1.05 ${SERIF_FONT}`,
+          letterSpacing: "-0.01em",
+          color: "var(--ink)",
+          margin: 0,
+        }}>전체 개요</h1>
+        <p className="sub" style={{ margin: "8px 0 0", maxWidth: 620 }}>
+          공장 3개의 LATEST 문서 — risk·pipeline·infra 요약.
+          <span className="mono"> factory_state</span> 3초, <span className="mono">infra_state</span> 20초 주기로 갱신.
+        </p>
+      </div>
+
+      {/* ─── A: Fleet Safety Pulse ────────────────────────────── */}
+      <FleetPulse demoMode={pulseDemo} />
+
+      {/* ─── Factory cards (3) ────────────────────────────────── */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{
+          display: "flex", alignItems: "baseline", justifyContent: "space-between",
+          marginBottom: 12,
+        }}>
+          <h2 className="h2">Factories</h2>
+          <span className="micro">안전 점수 오름차순 · 위험한 것 먼저</span>
+        </div>
+        <div className="grid row3">
+          {[...window.FACTORIES]
+            .sort((a, b) => a.risk.score - b.risk.score)
+            .map(f => <FactoryCard key={f.factory_id} f={f} onOpen={onOpenFactory} />)
+          }
+        </div>
+      </div>
+
+      {/* ─── Recent risk_level changes ────────────────────────── */}
+      <div className="card">
+        <SectionHeader
+          title="최근 상태 변화"
+          hint={`HISTORY#RISK · risk_level 변화 ${window.FLEET_RECENT.length}건`}
+        />
         <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>Risk Twin · Fleet</div>
-          <h1 className="h1">Fleet overview</h1>
-          <p className="sub" style={{ margin: "6px 0 0", maxWidth: 560 }}>
-            Operational risk surface across <span className="mono tnum">{window.FACTORIES.length}</span> sites in <span className="mono tnum">3</span> regions.
-            Composite scores update every 15 seconds from edge gateways.
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div className="seg">
-            {window.REGIONS.map((r) =>
-            <button key={r.key}
-            aria-pressed={region === r.key}
-            onClick={() => setRegion(r.key)}>
-                {r.label === "All regions" ? "ALL" : r.key}
-                <span className="mono tnum" style={{ marginLeft: 5, color: "var(--ink-4)", fontWeight: 400 }}>{r.count}</span>
-              </button>
-            )}
-          </div>
-          <button className="btn"><Icon name="filter" size={13} />Filter</button>
-          <button className="btn primary"><Icon name="plus" size={13} />Add site</button>
+          {window.FLEET_RECENT.length === 0
+            ? <EmptyNote text="최근 24시간 내 변화가 없습니다." />
+            : window.FLEET_RECENT.map((e, i) => (
+                <RecentRow key={i} e={e} onOpen={onOpenFactory} />
+              ))
+          }
         </div>
       </div>
-
-      {/* ─── KPI row ────────────────────────────────────────────── */}
-      <div className="grid row5" style={{ marginBottom: 14 }}>
-        {window.FLEET_KPIS.map((k) => <KPICard key={k.key} kpi={k} />)}
-      </div>
-
-      {/* ─── Fleet risk trajectory + status distribution ────────── */}
-      <div className="grid split-3-2" style={{ marginBottom: 14 }}>
-        <div className="card">
-          <SectionHeader
-            title="Fleet risk trajectory"
-            hint="composite · last 24h"
-            trailing={
-            <>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--ink-3)" }}>
-                  <span style={{ width: 8, height: 2, background: "var(--safe)" }} />Environmental
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--ink-3)" }}>
-                  <span style={{ width: 8, height: 2, background: "var(--warn)" }} />Infrastructure
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--ink-3)" }}>
-                  <span style={{ width: 8, height: 2, background: "var(--ops)" }} />Operational
-                </span>
-                <button className="btn ghost btn-icon" aria-label="Expand"><Icon name="expand" size={13} /></button>
-              </>
-            } />
-          
-          <div className="card-bd" style={{ paddingTop: 6 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 18, marginBottom: 6 }}>
-              <div>
-                <div className="eyebrow">Composite</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <span className="num-big tnum" style={{ fontSize: "30px", width: "35px" }}>{window.__FLEET.avgRisk}</span>
-                  <span className="kpi-delta down"><Icon name="arrowDown" size={11} />1.2 last 24h</span>
-                </div>
-              </div>
-              <div className="vhr" style={{ height: 36 }} />
-              <div>
-                <div className="eyebrow">Domain min</div>
-                <div className="num-md tnum" style={{ color: "var(--warn)" }}>62 <span className="micro" style={{ color: "var(--ink-3)" }}>infra · STG-04</span></div>
-              </div>
-              <div className="vhr" style={{ height: 36 }} />
-              <div>
-                <div className="eyebrow">Domain max</div>
-                <div className="num-md tnum" style={{ color: "var(--safe)" }}>91 <span className="micro" style={{ color: "var(--ink-3)" }}>env · AUS-06</span></div>
-              </div>
-            </div>
-            <StackedRisk data={domainSeries} height={188} />
-          </div>
-        </div>
-
-        <div className="card" style={{ display: "flex", flexDirection: "column" }}>
-          <SectionHeader title="Fleet status" hint="now"
-          trailing={<button className="btn ghost btn-icon" aria-label="More"><Icon name="more" size={13} /></button>} />
-          <div className="card-bd" style={{ display: "flex", gap: 18, alignItems: "center" }}>
-            <StatusDonut counts={counts} size={130} stroke={14} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-              { k: "safe", label: "Stable", count: counts.safe },
-              { k: "warn", label: "At risk", count: counts.warn },
-              { k: "crit", label: "Critical", count: counts.crit },
-              { k: "unk", label: "Unknown", count: counts.unk }].
-              map((row) =>
-              <div key={row.k} style={{ display: "grid", gridTemplateColumns: "12px 1fr auto", alignItems: "center", gap: 9 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2,
-                  background: row.k === "safe" ? "var(--safe)" :
-                  row.k === "warn" ? "var(--warn)" :
-                  row.k === "crit" ? "var(--crit)" : "var(--unk)" }} />
-                  <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{row.label}</span>
-                  <span className="mono tnum" style={{ fontSize: 12.5, color: "var(--ink)", fontWeight: 500 }}>{row.count}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)", background: "var(--surface-2)" }}>
-            <div className="eyebrow" style={{ marginBottom: 6 }}>Operational anomalies · last 24h</div>
-            <Heatmap rows={heatRows} cols={24} size={11} gap={2} />
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Factory grid ────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, marginTop: 4 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <h2 className="h2">Sites</h2>
-          <span className="micro">{factories.length} of {window.FACTORIES.length} · sorted by risk · ascending</span>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <div className="seg">
-            <button aria-pressed={view === "cards"} onClick={() => setView("cards")}>CARDS</button>
-            <button aria-pressed={view === "table"} onClick={() => setView("table")}>TABLE</button>
-            <button aria-pressed={view === "map"} onClick={() => setView("map")}>MAP</button>
-          </div>
-          <button className="btn"><Icon name="filter" size={13} />Sort</button>
-        </div>
-      </div>
-
-      {view === "cards" &&
-      <div className="grid row4" style={{ marginBottom: 14 }}>
-          {[...factories].sort((a, b) => (a.risk ?? 200) - (b.risk ?? 200)).
-        map((f) => <FactoryTile key={f.id} f={f} onOpen={onOpenFactory} />)}
-        </div>
-      }
-
-      {view === "table" &&
-      <div className="card" style={{ marginBottom: 14, overflow: "hidden" }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Site</th><th>Region</th><th>Status</th>
-                <th style={{ textAlign: "right" }}>Risk</th>
-                <th>Env</th><th>Infra</th><th>Ops</th>
-                <th style={{ textAlign: "right" }}>Uptime</th>
-                <th style={{ textAlign: "right" }}>Alerts</th>
-                <th style={{ textAlign: "right" }}>Last sync</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...factories].sort((a, b) => (a.risk ?? 200) - (b.risk ?? 200)).map((f) =>
-            <tr key={f.id} className="row-hover" onClick={() => onOpenFactory(f.id)}>
-                  <td>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontWeight: 500, color: "var(--ink)" }}>{f.name}</span>
-                      <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)", letterSpacing: ".06em" }}>{f.code} · {f.classification}</span>
-                    </div>
-                  </td>
-                  <td>{f.country}</td>
-                  <td><StatusPill status={f.status} /></td>
-                  <td style={{ textAlign: "right" }} className="mono tnum">{f.risk ?? "—"}</td>
-                  <td className="mono tnum" style={{ color: "var(--ink-3)" }}>{f.sub.environmental ?? "—"}</td>
-                  <td className="mono tnum" style={{ color: "var(--ink-3)" }}>{f.sub.infrastructure ?? "—"}</td>
-                  <td className="mono tnum" style={{ color: "var(--ink-3)" }}>{f.sub.operational ?? "—"}</td>
-                  <td style={{ textAlign: "right" }} className="mono tnum">{f.uptime ? `${f.uptime}%` : "—"}</td>
-                  <td style={{ textAlign: "right" }}>
-                    <span style={{ display: "inline-flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
-                      {f.alerts.critical > 0 && <span style={{ color: "var(--crit)", fontWeight: 500 }} className="mono tnum">{f.alerts.critical}</span>}
-                      {f.alerts.warning > 0 && <span style={{ color: "var(--warn)", fontWeight: 500 }} className="mono tnum">{f.alerts.warning}</span>}
-                      {f.alerts.critical + f.alerts.warning === 0 && <span className="mono" style={{ color: "var(--ink-4)" }}>—</span>}
-                    </span>
-                  </td>
-                  <td className="mono" style={{ textAlign: "right", color: "var(--ink-3)", fontSize: 11.5 }}>{f.lastSync}</td>
-                  <td><Icon name="chevRight" size={14} style={{ color: "var(--ink-4)" }} /></td>
-                </tr>
-            )}
-            </tbody>
-          </table>
-        </div>
-      }
-
-      {view === "map" &&
-      <div className="card" style={{ marginBottom: 14 }}>
-          <SectionHeader title="Geographic distribution" hint="3 regions · 8 sites"
-        trailing={<button className="btn ghost btn-icon"><Icon name="expand" size={13} /></button>} />
-          <div className="card-bd">
-            <FleetMap factories={factories} onOpen={onOpenFactory} />
-          </div>
-        </div>
-      }
-
-      {/* ─── Alerts + Events ────────────────────────────────────── */}
-      <div className="grid split-2-1">
-        <div className="card">
-          <SectionHeader
-            title="Active alerts"
-            hint={`${window.ALERTS.filter((a) => a.status === "open").length} open · ${window.ALERTS.filter((a) => a.status === "ack").length} acknowledged`}
-            trailing={
-            <>
-                <div className="seg">
-                  <button aria-pressed="true">ALL</button>
-                  <button aria-pressed="false">CRIT</button>
-                  <button aria-pressed="false">WARN</button>
-                  <button aria-pressed="false">INFO</button>
-                </div>
-                <button className="btn ghost" style={{ paddingLeft: 8, paddingRight: 8 }}
-                        onClick={onOpenAlerts}>View all <Icon name="arrowRight" size={12} /></button>
-              </>
-            } />
-          
-          <div>
-            {window.ALERTS.slice(0, 6).map((a) => <AlertRow key={a.id} a={a} />)}
-          </div>
-        </div>
-
-        <div className="card">
-          <SectionHeader
-            title="Recent events"
-            hint="last 2h"
-            trailing={<button className="btn ghost btn-icon"><Icon name="refresh" size={13} /></button>} />
-          
-          <div>
-            {window.EVENTS.slice(0, 6).map((e) => <EventRow key={e.id} e={e} />)}
-          </div>
-        </div>
-      </div>
-    </>);
-
+    </>
+  );
 }
 
-// ─── Simple fleet map (abstracted regions) ───────────────────────
-function FleetMap({ factories, onOpen }) {
-  // World coords roughly mapped onto a flat plate
-  // long [-180,180] -> x [0, 100]
-  // lat  [60, -50]   -> y [0, 100]
-  const toXY = (coord) => {
-    const [lng, lat] = coord;
-    const x = (lng + 180) / 360 * 100;
-    const y = (60 - lat) / 110 * 100;
-    return [x, y];
-  };
+// ─── A · Fleet Safety Pulse ──────────────────────────────────────
+// One horizontal 0–100 axis. Bands shaded by status. Dots at each
+// factory's score with serif labels. Replaces dry KPI strip.
+
+function FleetPulse({ demoMode = "off" }) {
+  const counts = window.fleetCounts();
+  const factories = applyPulseDemo(window.FACTORIES, demoMode);
+
+  // The three bands: 0–49 위험, 50–84 주의, 85–100 안전
+  const bands = [
+    { from: 0,  to: 49,  color: "var(--crit)", label: "위험" },
+    { from: 50, to: 84,  color: "var(--warn)", label: "주의" },
+    { from: 85, to: 100, color: "var(--safe)", label: "안전" },
+  ];
+
+  // Sort factories by score for layout — leftmost is most dangerous.
+  const sorted = [...factories].sort((a, b) => a.risk.score - b.risk.score);
+
+  return (
+    <div className="card" style={{ marginBottom: 18 }}>
+      {/* Header row: title + compact stats */}
+      <div style={{
+        padding: "16px 22px 6px",
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        gap: 16, flexWrap: "wrap",
+      }}>
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 4 }}>Fleet Safety Pulse</div>
+          <div style={{ fontSize: 13, color: "var(--ink-3)" }}>
+            오른쪽에 가까울수록 안전. 점은 각 공장의 현재 안전 점수.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 18, alignItems: "baseline" }}>
+          <PulseStat label="공장"        value={counts.total}   tone="ink" />
+          <PulseStat label="위험"        value={counts.danger}  tone={counts.danger > 0 ? "crit" : "ink-mute"} />
+          <PulseStat label="주의"        value={counts.warning} tone={counts.warning > 0 ? "warn" : "ink-mute"} />
+          <PulseStat label="안전"        value={counts.safe}    tone={counts.safe > 0 ? "safe" : "ink-mute"} />
+          <PulseStat label="데이터 지연" value={counts.stale}   tone={counts.stale > 0 ? "warn" : "ink-mute"} />
+        </div>
+      </div>
+
+      {/* The pulse track */}
+      <div style={{ padding: "16px 22px 22px" }}>
+        <div style={{ position: "relative", padding: "8px 6px 0" }}>
+          {/* Track w/ band tints */}
+          <div style={{
+            position: "relative", height: 44, borderRadius: 10,
+            border: "1px solid var(--line-2)", overflow: "hidden",
+            background: "var(--surface-2)",
+          }}>
+            {bands.map((b, i) => (
+              <div key={i} style={{
+                position: "absolute",
+                left: `${b.from}%`,
+                width: `${b.to - b.from + 1}%`,
+                top: 0, bottom: 0,
+                background: `color-mix(in srgb, ${b.color} 7%, transparent)`,
+              }} />
+            ))}
+            {/* Band labels */}
+            <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+              <BandLabel from={0}  to={49}  color="var(--crit)" label="위험" />
+              <BandLabel from={50} to={84}  color="var(--warn)" label="주의" />
+              <BandLabel from={85} to={100} color="var(--safe)" label="안전" />
+            </div>
+            {/* Threshold gridlines */}
+            <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "var(--line-3)" }} />
+            <div style={{ position: "absolute", left: "85%", top: 0, bottom: 0, width: 1, background: "var(--line-3)" }} />
+          </div>
+
+          {/* Anti-collision label area — dots at top edge, labels at bottom,
+              connected by leader lines via SVG. Labels shift only when their
+              dots would collide; otherwise sit directly under each dot. */}
+          {(() => {
+            const dotXs = sorted.map(f => Math.max(2, Math.min(98, f.risk.score)));
+            // Vertical stack index for tied dots so identical scores remain visible
+            const dotStack = sorted.map((_, i) => {
+              let s = 0;
+              for (let j = 0; j < i; j++) {
+                if (Math.abs(dotXs[i] - dotXs[j]) < 0.4) s++;
+              }
+              return s;
+            });
+            const labelXs = computeLabelPositions(dotXs, 11);
+            const baseAreaH = 88;
+            const maxStack = Math.max(0, ...dotStack);
+            const areaH = baseAreaH + maxStack * 18;
+            return (
+              <div style={{ position: "relative", height: areaH, marginTop: 6 }}>
+                {/* Leader lines */}
+                <svg width="100%" height={areaH}
+                     viewBox={`0 0 100 ${areaH}`} preserveAspectRatio="none"
+                     style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                  {sorted.map((f, i) => {
+                    const x1 = dotXs[i];
+                    const x2 = labelXs[i];
+                    const y1 = 4 + dotStack[i] * 18;
+                    const y2 = areaH - 30;
+                    const same = Math.abs(x1 - x2) < 0.2;
+                    const d = same
+                      ? `M ${x1} ${y1} L ${x2} ${y2}`
+                      : `M ${x1} ${y1} C ${x1} ${(y1 + y2) / 2} ${x2} ${(y1 + y2) / 2} ${x2} ${y2}`;
+                    return (
+                      <path key={f.factory_id} d={d}
+                            fill="none" stroke="var(--line-3)"
+                            strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                    );
+                  })}
+                </svg>
+
+                {/* Dots — anchored to band edge; tied dots stack downward */}
+                {sorted.map((f, i) => {
+                  const x = dotXs[i];
+                  const stackIdx = dotStack[i];
+                  const tone = window.LEVEL_META[f.risk.level].tone;
+                  const color =
+                    tone === "safe" ? "var(--safe)" :
+                    tone === "warn" ? "var(--warn)" :
+                    "var(--crit)";
+                  return (
+                    <div key={`dot-${f.factory_id}`} style={{
+                      position: "absolute", left: `${x}%`,
+                      top: -7 + stackIdx * 18,
+                      transform: "translateX(-50%)",
+                      pointerEvents: "none",
+                    }}>
+                      <div style={{
+                        width: 14, height: 14, borderRadius: "50%",
+                        background: color,
+                        boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 18%, transparent), 0 0 0 1px var(--surface)`,
+                      }} />
+                    </div>
+                  );
+                })}
+
+                {/* Labels — anchored to bottom of area at labelX positions */}
+                {sorted.map((f, i) => {
+                  const lx = labelXs[i];
+                  const tone = window.LEVEL_META[f.risk.level].tone;
+                  const color =
+                    tone === "safe" ? "var(--safe)" :
+                    tone === "warn" ? "var(--warn)" :
+                    "var(--crit)";
+                  return (
+                    <div key={`lbl-${f.factory_id}`} style={{
+                      position: "absolute", left: `${lx}%`, bottom: 0,
+                      transform: "translateX(-50%)",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                    }}>
+                      <span className="tnum" style={{
+                        fontFamily: SERIF_FONT,
+                        fontSize: 30, lineHeight: 0.85, color: color,
+                        letterSpacing: "-0.01em",
+                        display: "inline-block",
+                        transform: "scaleY(0.84) scaleX(1.06)",
+                        transformOrigin: "center bottom",
+                      }}>{f.risk.score}</span>
+                      <span className="mono" style={{
+                        fontSize: 10.5, color: "var(--ink-2)",
+                        letterSpacing: ".03em",
+                        marginTop: 4, fontWeight: 500,
+                      }}>{f.factory_id}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Scale axis */}
+          <div style={{
+            position: "relative", height: 14, marginTop: 8,
+            fontSize: 10, color: "var(--ink-4)",
+            borderTop: "1px dashed var(--line-2)", paddingTop: 4,
+          }}>
+            <div className="mono" style={{ position: "absolute", left: 0,    transform: "translateX(0)"   }}>0</div>
+            <div className="mono" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)" }}>50</div>
+            <div className="mono" style={{ position: "absolute", left: "85%", transform: "translateX(-50%)" }}>85</div>
+            <div className="mono" style={{ position: "absolute", right: 0,   transform: "translateX(0)"   }}>100</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Label anti-collision helper ─────────────────────────────────
+// Given dot x-positions (0–100), returns label x-positions that don't overlap.
+// Dots within minGap of each other form a "cluster"; labels in the cluster
+// are evenly spread around the cluster's center. Isolated dots keep their
+// natural position so most factories appear directly under their dot.
+function computeLabelPositions(dots, minGap = 11) {
+  if (!dots.length) return [];
+  const labels = [...dots];
+  // Step 1: cluster spreading
+  const clusters = [];
+  let cur = [0];
+  for (let i = 1; i < dots.length; i++) {
+    if (dots[i] - dots[i - 1] < minGap) cur.push(i);
+    else { clusters.push(cur); cur = [i]; }
+  }
+  clusters.push(cur);
+  for (const c of clusters) {
+    if (c.length === 1) continue;
+    const first = dots[c[0]];
+    const last  = dots[c[c.length - 1]];
+    const center = (first + last) / 2;
+    const total = minGap * (c.length - 1);
+    let startX = center - total / 2;
+    if (startX < 6)            startX = 6;
+    if (startX + total > 94)   startX = 94 - total;
+    for (let j = 0; j < c.length; j++) labels[c[j]] = startX + j * minGap;
+  }
+  // Step 2: global enforcement — catch cluster-to-cluster spillovers.
+  for (let i = 1; i < labels.length; i++) {
+    if (labels[i] - labels[i - 1] < minGap) labels[i] = labels[i - 1] + minGap;
+  }
+  for (let i = labels.length - 1; i >= 0; i--) {
+    if (labels[i] > 94) labels[i] = 94;
+    if (i < labels.length - 1 && labels[i + 1] - labels[i] < minGap) {
+      labels[i] = labels[i + 1] - minGap;
+    }
+  }
+  if (labels[0] < 6) {
+    const shift = 6 - labels[0];
+    for (let i = 0; i < labels.length; i++) labels[i] += shift;
+  }
+  return labels;
+}
+
+// Demo override for the Pulse visualization. Used by the Tweaks panel to
+// preview how tied scores render. Only affects the Pulse track; the factory
+// cards and recent-changes list keep real data.
+function applyPulseDemo(factories, mode) {
+  if (mode === "tie2") {
+    return factories.map(f =>
+      f.factory_id === "factory-c"
+        ? { ...f, risk: { ...f.risk, score: 78, level: "warning" } }
+        : f
+    );
+  }
+  if (mode === "tie3") {
+    return factories.map(f => ({
+      ...f, risk: { ...f.risk, score: 78, level: "warning" },
+    }));
+  }
+  return factories;
+}
+
+function BandLabel({ from, to, color, label }) {
   return (
     <div style={{
-      position: "relative", width: "100%", aspectRatio: "16/6",
-      background: "var(--surface-2)", borderRadius: 8,
-      overflow: "hidden",
-      backgroundImage: `
-        repeating-linear-gradient(0deg,  transparent 0 39px, rgba(0,0,0,.025) 39px 40px),
-        repeating-linear-gradient(90deg, transparent 0 39px, rgba(0,0,0,.025) 39px 40px)
-      `,
-      border: "1px solid var(--line-2)"
+      position: "absolute", left: `${from}%`, width: `${to - from + 1}%`,
+      top: 0, bottom: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      pointerEvents: "none",
     }}>
-      {/* continent silhouettes — abstract pill shapes */}
-      <svg viewBox="0 0 100 38" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.55 }}>
-        {/* Americas */}
-        <path d="M14 10 Q 20 6 24 11 L 26 17 Q 22 22 24 27 L 20 32 Q 16 31 14 24 Z" fill="var(--line-3)" />
-        {/* Europe + Africa */}
-        <path d="M44 8 Q 51 7 54 12 L 56 18 Q 52 26 54 30 L 50 33 Q 46 31 45 26 L 44 18 Z" fill="var(--line-3)" />
-        {/* Asia + Aus */}
-        <path d="M62 8 Q 76 6 84 11 L 86 17 Q 84 21 80 22 L 70 21 Q 64 21 62 17 Z" fill="var(--line-3)" />
-        <path d="M78 28 Q 84 26 86 30 L 84 33 Q 80 32 78 30 Z" fill="var(--line-3)" />
-      </svg>
-      {factories.map((f) => {
-        const [x, y] = toXY(f.coord);
-        const c = f.status === "safe" ? "var(--safe)" :
-        f.status === "warn" ? "var(--warn)" :
-        f.status === "crit" ? "var(--crit)" : "var(--unk)";
-        return (
-          <div key={f.id} onClick={() => onOpen(f.id)}
-          style={{
-            position: "absolute",
-            left: `${x}%`, top: `${y / 38 * 100}%`, transform: "translate(-50%, -50%)",
-            cursor: "pointer", display: "flex", alignItems: "center", gap: 8
-          }}>
-            <span style={{
-              width: 10, height: 10, borderRadius: "50%",
-              background: c, boxShadow: `0 0 0 4px color-mix(in srgb, ${c} 20%, transparent), 0 0 0 1px var(--surface)`
-            }} />
-            <div style={{
-              padding: "3px 7px", background: "var(--surface)",
-              border: "1px solid var(--line)", borderRadius: 5,
-              fontSize: 10.5, fontWeight: 500, color: "var(--ink)",
-              boxShadow: "var(--shadow-card)",
-              whiteSpace: "nowrap"
-            }}>
-              <span className="mono" style={{ color: "var(--ink-4)", letterSpacing: ".06em", marginRight: 5 }}>{f.code}</span>
-              <span className="mono tnum">{f.risk ?? "—"}</span>
-            </div>
-          </div>);
+      <span className="mono" style={{
+        fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+        color, fontWeight: 600, opacity: 0.55,
+      }}>{label}</span>
+    </div>
+  );
+}
 
-      })}
+// Note: dot+label rendering is now inline within FleetPulse, with a separate
+// legend row below. The previous PulseDot helper has been replaced.
+
+function PulseStat({ label, value, tone }) {
+  const color =
+    tone === "crit" ? "var(--crit)" :
+    tone === "warn" ? "var(--warn)" :
+    tone === "safe" ? "var(--safe)" :
+    tone === "ink-mute" ? "var(--ink-4)" : "var(--ink)";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+      <span className="mono tnum" style={{
+        fontSize: 18, fontWeight: 500, color,
+        letterSpacing: "-0.01em", lineHeight: 1,
+      }}>{value}</span>
+      <span className="micro" style={{ fontSize: 10, letterSpacing: ".04em" }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── C · Factory card — refined ──────────────────────────────────
+// • 3px left stripe in status color
+// • Big serif score number (B)
+// • Mini 24h sparkline beside it
+// • Thinner borders, slight elevation on hover
+
+function FactoryCard({ f, onOpen }) {
+  const tone = window.LEVEL_META[f.risk?.level]?.tone ?? "unk";
+  const scoreColor =
+    tone === "safe" ? "var(--safe)" :
+    tone === "warn" ? "var(--warn)" :
+    tone === "crit" ? "var(--crit)" : "var(--ink-3)";
+  const ns = f.infra_state?.node_summary;
+  const causes = f.risk?.top_causes ?? [];
+
+  // 24h spark of risk_score (memoized per factory)
+  const sparkData = React.useMemo(() => {
+    const h = window.buildHistory(f, "24h");
+    return h.risk.map(r => r.risk_score);
+  }, [f.factory_id]);
+
+  return (
+    <div className="card" onClick={() => onOpen(f.factory_id)}
+         style={{
+           cursor: "pointer", display: "flex", flexDirection: "column",
+           position: "relative", overflow: "hidden",
+           transition: "border-color .12s, box-shadow .15s, transform .15s",
+         }}
+         onMouseEnter={e => {
+           e.currentTarget.style.borderColor = "var(--ink-5)";
+           e.currentTarget.style.boxShadow = "var(--shadow-lift)";
+         }}
+         onMouseLeave={e => {
+           e.currentTarget.style.borderColor = "var(--line)";
+           e.currentTarget.style.boxShadow = "var(--shadow-card)";
+         }}>
+      {/* Left status stripe */}
       <div style={{
-        position: "absolute", left: 12, bottom: 12,
-        display: "flex", gap: 12, padding: "6px 10px",
-        background: "var(--surface)", border: "1px solid var(--line)",
-        borderRadius: 6, fontSize: 11
-      }}>
-        {["safe", "warn", "crit", "unk"].map((k) =>
-        <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%",
-            background: k === "safe" ? "var(--safe)" : k === "warn" ? "var(--warn)" : k === "crit" ? "var(--crit)" : "var(--unk)" }} />
-            <span style={{ color: "var(--ink-3)" }}>{window.STATUS_META[k].label}</span>
-          </span>
-        )}
-      </div>
-    </div>);
+        position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
+        background: scoreColor,
+      }} />
 
+      {/* Header */}
+      <div style={{ padding: "16px 18px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)", letterSpacing: ".06em" }}>
+              {f.environment_type}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>
+              {f.factory_id}
+            </span>
+          </div>
+          <LevelBadge level={f.risk?.level} />
+        </div>
+
+        {/* B · Score block — serif numeral + companion sparkline */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "auto 1fr",
+          gap: 14, alignItems: "end",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span className="tnum" style={{
+              fontFamily: SERIF_FONT,
+              fontSize: 68, lineHeight: 0.78,
+              color: scoreColor,
+              letterSpacing: "-0.02em",
+              fontWeight: 400,
+              display: "inline-block",
+              transform: "scaleY(0.84) scaleX(1.08)",
+              transformOrigin: "left bottom",
+            }}>{f.risk?.score ?? "—"}</span>
+            <span className="micro" style={{ marginTop: 6 }}>
+              / 100 안전 점수
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, paddingBottom: 6 }}>
+            <Sparkline data={sparkData} width={120} height={32}
+                       color={scoreColor} strokeWidth={1.4} showDot={true} fill={true} />
+            <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: ".06em", textAlign: "right" }}>
+              지난 24h
+            </span>
+          </div>
+        </div>
+
+        {/* Meta strip */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          paddingTop: 6, borderTop: "1px solid var(--line-2)",
+        }}>
+          <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+            {ns ? <>node <span style={{ color: "var(--ink)" }} className="tnum">{ns.ready}/{ns.total}</span> Ready</> : "노드 미수신"}
+          </span>
+          <PipelineBadge status={f.pipeline_status?.status} />
+        </div>
+      </div>
+
+      {/* Top causes */}
+      <div style={{ padding: "10px 18px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="eyebrow" style={{ marginBottom: 2 }}>top_causes</div>
+        {causes.length === 0
+          ? <div className="micro">미계산</div>
+          : causes.slice(0, 3).map((c, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                fontSize: 12, color: "var(--ink-2)",
+              }}>
+                <span className="mono tnum" style={{
+                  fontSize: 10.5, color: "var(--crit)", width: 30, textAlign: "right",
+                }}>−{c.contribution}</span>
+                <span style={{
+                  flex: 1, minWidth: 0, overflow: "hidden",
+                  textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{c.name}</span>
+              </div>
+            ))
+        }
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        marginTop: "auto", padding: "10px 18px",
+        borderTop: "1px solid var(--line-2)",
+        background: "var(--surface-2)",
+        display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
+        fontSize: 11.5,
+      }}>
+        <span className="mono" style={{ color: "var(--ink-3)" }}>
+          updated <span style={{ color: "var(--ink-2)" }}>{window.relTime(f.updated_at)}</span>
+        </span>
+        <StalenessBadge factory={f} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Recent row (risk_level transition) ──────────────────────────
+function RecentRow({ e, onOpen }) {
+  const fromMeta = window.LEVEL_META[e.from];
+  const toMeta   = window.LEVEL_META[e.to];
+  const changed  = e.from !== e.to;
+  const toneColor = (m) =>
+    m.tone === "safe" ? "var(--safe)" :
+    m.tone === "warn" ? "var(--warn)" :
+    m.tone === "crit" ? "var(--crit)" : "var(--ink-3)";
+
+  return (
+    <div className="list-row" style={{ padding: "12px 16px", alignItems: "center" }}
+         onClick={() => onOpen(e.factory_id)}>
+      <span style={{
+        width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+        background: toneColor(toMeta),
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="mono" style={{ fontSize: 11.5, color: "var(--ink)", fontWeight: 500 }}>
+            {e.factory_id}
+          </span>
+          {changed ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: toneColor(fromMeta) }}>{fromMeta.label}</span>
+              <Icon name="arrowRight" size={11} style={{ color: "var(--ink-4)" }} />
+              <span style={{ color: toneColor(toMeta), fontWeight: 500 }}>{toMeta.label}</span>
+            </span>
+          ) : (
+            <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+              {toMeta.label} 유지
+            </span>
+          )}
+        </div>
+        <div className="micro" style={{ marginTop: 2 }}>
+          risk_score <span className="mono tnum" style={{ color: "var(--ink-2)" }}>{e.score}</span>
+        </div>
+      </div>
+      <span className="mono" style={{ fontSize: 11, color: "var(--ink-4)", whiteSpace: "nowrap" }}>
+        {window.relTime(e.ts)}
+      </span>
+    </div>
+  );
 }
 
 window.FleetOverview = FleetOverview;

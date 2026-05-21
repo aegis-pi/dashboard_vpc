@@ -1,0 +1,82 @@
+{
+    "data_plane_instance_id": "aegis-spoke-edge-iot-publisher-586d84676b-d2gvh",
+    "environment_type": "vm-windows",
+    "factory_id": "factory-c",
+    "input_module_type": "dummy",
+    "message_id": "factory-c:infra_state:cluster:2026-05-20T09:00:23Z",
+    "node_id": "cluster",
+    "payload": {
+        "devices": {
+            "bme280": {
+                "available": true,
+                "last_seen_at": "2026-05-20T09:00:23Z"
+            },
+            "camera": {
+                "available": true,
+                "last_seen_at": "2026-05-20T09:00:23Z"
+            },
+            "microphone": {
+                "available": true,
+                "last_seen_at": "2026-05-20T09:00:23Z"
+            }
+        },
+        "heartbeat": {
+            "agent_status": "alive",
+            "last_spool_write_at": null,
+            "last_spool_write_status": "unknown"
+        },
+        "node_summary": {
+            "not_ready": 0,
+            "ready": 2,
+            "total": 2
+        },
+        "nodes": [
+            {
+                "cpu_usage_percent": 7.75,
+                "disk_usage_percent": 21.41,
+                "memory_usage_percent": 31.13,
+                "network_reachability": "ok",
+                "node_id": "factory-c-master",
+                "ready": true,
+                "role": "control-plane"
+            },
+            {
+                "cpu_usage_percent": 10.82,
+                "disk_usage_percent": 27.38,
+                "memory_usage_percent": 37.44,
+                "network_reachability": "ok",
+                "node_id": "factory-c-worker",
+                "ready": true,
+                "role": "worker"
+            }
+        ],
+        "workload_summary": {
+            "not_running": 0,
+            "running": 2,
+            "total": 2
+        },
+        "workloads": [
+            {
+                "name": "dummy-data-generator",
+                "namespace": "ai-apps",
+                "node_id": "factory-c-worker",
+                "ready": true,
+                "restart_count": 0,
+                "status": "Running"
+            },
+            {
+                "name": "edge-iot-publisher",
+                "namespace": "ai-apps",
+                "node_id": "factory-c-worker",
+                "ready": true,
+                "restart_count": 0,
+                "status": "Running"
+            }
+        ]
+    },
+    "published_at": "2026-05-20T09:00:27Z",
+    "schema_version": "0.1.0",
+    "source_timestamp": "2026-05-20T09:00:23Z",
+    "source_type": "infra_state",
+    "received_at": 1779267628418
+}

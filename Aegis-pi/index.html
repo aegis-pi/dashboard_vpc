@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=1440" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Aegis-π · Risk Twin</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,13 +50,13 @@
     --crit-tint-2: #FAEEEE;
     --unk:         #6B7280;
     --unk-tint:    #ECEEF1;
-    --focus:       #10B981;
-    --focus-tint:  #D1F4E3;
+    --focus:       #2563EB;
+    --focus-tint:  #DCE7FB;
 
-    /* Accent (selected/focus) — bright clean emerald */
-    --accent:      #10B981;
-    --accent-2:    #0E9F6E;
-    --accent-tint: #D6F4E5;
+    /* Accent (selected/focus) — clean operational blue */
+    --accent:      #2563EB;
+    --accent-2:    #1E50C8;
+    --accent-tint: #DCE7FB;
 
     /* Domain colors — environmental uses safe; ops needs distinct hue */
     --ops:         #5A4FB8;
@@ -96,8 +96,8 @@
     --crit-tint:   rgba(184,58,58,.16);
     --crit-tint-2: rgba(184,58,58,.07);
     --unk-tint:    rgba(107,114,128,.18);
-    --focus-tint:  rgba(16,185,129,.20);
-    --accent-tint: rgba(16,185,129,.18);
+    --focus-tint:  rgba(37,99,235,.22);
+    --accent-tint: rgba(37,99,235,.20);
   }
 
   /* Density */
@@ -168,7 +168,7 @@
   .pill.crit .dot  { background: var(--crit); }
   .pill.unk   { background: var(--unk-tint);   color: var(--ink-3); border-color: var(--line-3); }
   .pill.unk .dot   { background: var(--unk); }
-  .pill.info  { background: var(--accent-tint);color: var(--accent-2); border-color: rgba(37,99,235,.22); }
+  .pill.info  { background: var(--accent-tint);color: var(--accent-2); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
   .pill.info .dot  { background: var(--accent); }
   [data-theme="dark"] .pill.safe { color: #6BCB9A; }
   [data-theme="dark"] .pill.warn { color: #E7B768; }
@@ -333,6 +333,34 @@
   /* skeleton color text-balance helpers */
   .num-big { font: 500 40px/1 "Geist"; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
   .num-md  { font: 500 18px/1 "Geist"; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+
+  /* toast */
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .toast-stack {
+    position: fixed; bottom: 18px; right: 18px;
+    display: flex; flex-direction: column-reverse; gap: 8px;
+    z-index: 200; pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex; align-items: center; gap: 9px;
+    min-width: 220px; max-width: 380px;
+    padding: 10px 14px; border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-lift);
+    color: var(--ink);
+    font-size: 12.5px; font-weight: 500;
+    animation: toastIn .2s ease;
+  }
+  .toast .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .toast.info    .dot { background: var(--accent); }
+  .toast.success .dot { background: var(--safe); }
+  .toast.warn    .dot { background: var(--warn); }
+  .toast.error   .dot { background: var(--crit); }
 </style>
 
 <script type="application/json" id="__editmode_meta">{"hide_default_density": true}</script>
@@ -349,11 +377,15 @@
   <script type="text/babel" src="src/data.jsx"></script>
   <script type="text/babel" src="src/charts.jsx"></script>
   <script type="text/babel" src="src/shared.jsx"></script>
+  <script type="text/babel" src="src/auth.jsx"></script>
   <script type="text/babel" src="src/sidebar.jsx"></script>
   <script type="text/babel" src="src/topbar.jsx"></script>
   <script type="text/babel" src="src/fleet.jsx"></script>
   <script type="text/babel" src="src/factory.jsx"></script>
-  <script type="text/babel" src="src/alerts.jsx"></script>
+  <script type="text/babel" src="src/factory-history.jsx"></script>
+  <script type="text/babel" src="src/factory-infra.jsx"></script>
+  <script type="text/babel" src="src/factory-timeline.jsx"></script>
+  <script type="text/babel" src="src/reports.jsx"></script>
   <script type="text/babel" src="src/app.jsx"></script>
 </body>
 </html>
