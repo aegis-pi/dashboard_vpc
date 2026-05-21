@@ -198,13 +198,13 @@
 
 #### Phase 1 Step 3 — Terraform 데이터 저장소
 
-- 목표: DynamoDB `aegis-factory-status`(LATEST+HISTORY, TTL 48h, `pk`/`sk`, Streams) + `aegis-daily-report`, S3 `processed/`·`reports/` prefix IAM, RDS PostgreSQL `db.t4g.micro` Single-AZ gp3 20GiB, Secrets Manager, ElastiCache Redis 단일 노드 + AUTH + transit_encryption
+- 목표: DynamoDB `AEGIS-DynamoDB-FactoryStatus`(기존 실데이터 LATEST+HISTORY, `pk`/`sk`, Streams 활성화 필요, ADR 0022) + `aegis-daily-report`, S3 `processed/`·`reports/` prefix IAM, RDS PostgreSQL `db.t4g.micro` Single-AZ gp3 20GiB, Secrets Manager, ElastiCache Redis 단일 노드 + AUTH + transit_encryption
 - DoD: RDS 가 Private Data Subnet 에 배포, Redis 가 Private App Subnet 에 배포, Secrets 가 AWS Secrets Manager 에 저장 (값은 평문 로그 금지), Alembic baseline migration 적용 가능 상태
 - 데이터 계약 (DynamoDB): § 8 참조
 - 허용 파일: `infra/data-dashboard/**`, `apps/dashboard-backend/migrations/**` (Alembic baseline)
 - 금지: bucket-level 정책 변경 (워크스트림 A 소유). RDS 초기 비밀번호를 평문 commit
 - 검증:
-  - `aws dynamodb describe-table --table-name aegis-factory-status` 의 StreamSpecification 활성
+  - `aws dynamodb describe-table --table-name AEGIS-DynamoDB-FactoryStatus` 의 StreamSpecification 활성
   - `aws rds describe-db-instances` → MultiAZ=false, StorageType=gp3
   - `aws elasticache describe-replication-groups` → TransitEncryptionEnabled=true
 - 롤백: `terraform destroy -target` 로 단일 리소스 제거 가능. 운영 데이터가 들어가기 전에만 안전
@@ -340,7 +340,7 @@
 | Backend 컨테이너 헬스 | `docker run ... && curl -sf localhost:8000/healthz` | HTTP 200 |
 | 인증 차단 케이스 | `curl -sI -H "Authorization: Bearer invalid" https://api.<도메인>/factories` | HTTP 401 |
 | WebSocket 핸드셰이크 | `wscat -c wss://api.<도메인>/ws/factories/factory-a -H "Authorization: Bearer <valid>"` | `Connected` |
-| DynamoDB | `aws dynamodb describe-table --table-name aegis-factory-status` | StreamSpecification.StreamEnabled=true |
+| DynamoDB | `aws dynamodb describe-table --table-name AEGIS-DynamoDB-FactoryStatus` | StreamSpecification.StreamEnabled=true |
 | RDS | `aws rds describe-db-instances --db-instance-identifier <id>` | DBInstanceStatus=available, MultiAZ=false, StorageType=gp3 |
 | Redis | `aws elasticache describe-replication-groups --replication-group-id <id>` | TransitEncryptionEnabled=true, AuthTokenEnabled=true |
 | Bedrock 호출 | `aws bedrock-runtime invoke-model --model-id anthropic.claude-3-haiku-20240307-v1:0 --region <region> --body @prompt.json out.json` | 정상 응답 |
@@ -368,7 +368,7 @@
 - IoT 메시지 스키마 source of truth: `docs/specs/iot_data_format.md`
 - 표준 처리 파이프라인: `docs/specs/data_storage_pipeline.md`
 - DynamoDB 키 (요약 — 상세는 `data_storage_pipeline.md` 우선):
-  - `aegis-factory-status` (LATEST + HISTORY 통합): PK `pk` (e.g., `FACTORY#<factory_id>`), SK `sk` (e.g., `LATEST` 또는 `HISTORY#STATE#<ISO timestamp>`), Streams `NEW_AND_OLD_IMAGES`, TTL 48h on HISTORY items (`ttl`)
+  - `AEGIS-DynamoDB-FactoryStatus` (LATEST + HISTORY 통합): PK `pk` (e.g., `FACTORY#<factory_id>`), SK `sk` (e.g., `LATEST` 또는 `HISTORY#RISK#<ISO timestamp>` / `HISTORY#FACTORY#<ISO timestamp>` / `HISTORY#INFRA#<ISO timestamp>`), Streams `NEW_AND_OLD_IMAGES` 필요. `aegis-factory-status` 신규 사용 금지(ADR 0022)
   - `aegis-daily-report`: PK `report_date` (YYYY-MM-DD), SK `factory_id`
 - S3 prefix: `raw/`, `processed/`, `reports/` (ADR 0009)
 - IoT Rule 트리거: § 5 Phase 1 Step 4 결정 ADR 에 따른다
@@ -398,7 +398,7 @@
 | ECS Task Role (Backend) | `dynamodb:Get/Query/PutItem` (테이블 2개), `s3:GetObject` (`processed/*`, `reports/*`), `secretsmanager:GetSecretValue` (RDS·Redis AUTH), `bedrock:InvokeModel` (Claude 3 Haiku), `kms:Decrypt` (필요 시) |
 | Lambda data processor | `dynamodb:PutItem/UpdateItem` (테이블 1), `s3:PutObject` (`processed/*`), `logs:*` |
 | Lambda notifier | DDB Streams read, ElastiCache (보안그룹), `secretsmanager:GetSecretValue` (Redis AUTH), `logs:*` |
-| Lambda report-generator | `dynamodb:Query` (`aegis-factory-status` HISTORY), `s3:Get/PutObject` (`processed/*`, `reports/*`), `bedrock:InvokeModel`, `dynamodb:PutItem` (`aegis-daily-report`) |
+| Lambda report-generator | `dynamodb:Query` (`AEGIS-DynamoDB-FactoryStatus` HISTORY), `s3:Get/PutObject` (`processed/*`, `reports/*`), `bedrock:InvokeModel`, `dynamodb:PutItem` (`aegis-daily-report`) |
 
 ### 8.4 환경변수 / 시크릿 정책
 

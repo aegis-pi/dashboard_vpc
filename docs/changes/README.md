@@ -41,6 +41,7 @@
 | 0019 | factory-c 토폴로지: single-node → master + worker (2-VM K3s cluster) | accepted | 2026-05-19 | M5 VM Spoke 확장, factory-c testbed, 시연 표현 |
 | 0020 | data-processor 계약 정렬: 팀원 코드 수용, DDB pk/sk, TTL 48h, S3 processed 경로 스펙 보정 | accepted | 2026-05-21 | M4 데이터 플레인, apps/data-processor, DDB aegis-factory-status |
 | 0021 | Lambda data processor IoT Rule 트리거: 신규 Rule 2개 추가 (factory_state / infra_state), 기존 Rule 미수정 | accepted | 2026-05-21 | Phase 1 Step 4, M4 합류 지점, infra/data-dashboard, IoT Rule |
+| 0022 | Dashboard hot store: 신규 `aegis-factory-status` 대신 기존 `AEGIS-DynamoDB-FactoryStatus` 사용 | accepted | 2026-05-21 | Phase 1 Step 3~6, DynamoDB, Lambda data processor/notifier, Dashboard Backend |
 
 ## 파일 형식
 

@@ -114,8 +114,10 @@ processed/factory-a/state_snapshot/yyyy=2026/mm=05/dd=14/hh=12/factory-a:state_s
 테이블명:
 
 ```text
-aegis-factory-status
+AEGIS-DynamoDB-FactoryStatus
 ```
+
+주의: `aegis-factory-status`는 Phase 1 Step 3~5 중복 생성 table로 확인되어 신규 사용을 중단한다. 공식 hot store는 실제 dummy/sensor 데이터가 적재 중인 `AEGIS-DynamoDB-FactoryStatus`다(ADR 0022).
 
 기본 키:
 

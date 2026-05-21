@@ -24,7 +24,7 @@
   - 2번 Control / Management VPC
   - EKS Hub, ArgoCD, Tailscale, Prometheus Agent, Grafana, AWS LBC, Admin UI
   - Lambda data processor (IoT Rule trigger, VPC 밖 — 팀 합의 영역, ADR 0007 유효 부분)
-  - DynamoDB aegis-factory-status, S3 raw/processed (스키마는 팀 합의 영역)
+  - DynamoDB AEGIS-DynamoDB-FactoryStatus, S3 raw/processed (스키마는 팀 합의 영역)
   - 마일스톤: M1, M2, M3, M5 (Hub/배포/Spoke 연결 측)
 
 워크스트림 B (이 환경, Phase 1 통합 목표)
@@ -55,7 +55,7 @@
 | Cognito User Pool + App Client + Hosted UI (관리자 전용, MFA Required) | Terraform | 본 환경 (MVP 범위, ADR 0008) |
 | Lambda data processor (코드/패키지/IAM/IoT Rule 라우팅) — VPC 밖 | Terraform + 코드 | 본 환경 |
 | Lambda notifier / Lambda report-generator | Terraform + 코드 | 본 환경 |
-| DynamoDB `aegis-factory-status` (LATEST + HISTORY, TTL 48h, pk/sk) | Terraform | 본 환경 |
+| DynamoDB `AEGIS-DynamoDB-FactoryStatus` (LATEST + HISTORY, pk/sk, Streams 활성화 필요) | Terraform | 본 환경 (기존 실데이터 table 참조/정렬, ADR 0022) |
 | DynamoDB `aegis-daily-report` | Terraform | 본 환경 |
 | S3 `aegis-bucket-data/processed/` prefix (단일 bucket 공유, ADR 0009) | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
 | S3 `aegis-bucket-data/reports/` prefix | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
@@ -178,7 +178,7 @@
 
 ```text
 - DynamoDB:
-    aegis-factory-status (LATEST + HISTORY, TTL 48h, pk/sk, Streams NEW_AND_OLD_IMAGES)
+    AEGIS-DynamoDB-FactoryStatus (기존 실데이터 LATEST + HISTORY, pk/sk, Streams NEW_AND_OLD_IMAGES 활성화 필요 — ADR 0022)
     aegis-daily-report (PK: report_date, SK: factory_id)
 - S3 prefix 추가 (aegis-bucket-data는 워크스트림 A가 소유, prefix·IAM만 본 환경):
     processed/ (Lambda data processor write)
@@ -210,6 +210,7 @@
 
 ```text
 - DDB Streams trigger event source mapping
+- 공식 source table은 AEGIS-DynamoDB-FactoryStatus (ADR 0022)
 - VPC-attach (Private App Subnet, Redis 접근용)
 - Redis AUTH token Secrets Manager 조회
 - 메시지 가공: factory_id 추출 + payload 정리
