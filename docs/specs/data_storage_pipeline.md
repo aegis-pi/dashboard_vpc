@@ -1,7 +1,7 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-05-20
+기준일: 2026-05-21
 
 ## 목적
 
@@ -83,29 +83,28 @@ raw/factory-a/infra_state/yyyy=2026/mm=05/dd=14/factory-a:infra_state:cluster:20
 
 Lambda는 계산 결과와 상태 요약을 S3 processed에 저장한다.
 
-Risk 결과:
+경로 형식 (공통):
 
 ```text
-processed/risk-score/{factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{message_id}.json
+processed/{factory_id}/{dataset}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{message_id}.json
 ```
 
-환경 상태 처리 결과:
+dataset 이름:
 
-```text
-processed/factory-state/{factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{message_id}.json
-```
-
-인프라 상태 처리 결과:
-
-```text
-processed/infra-state/{factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{message_id}.json
-```
+| dataset | 내용 |
+| --- | --- |
+| `factory_state` | 환경 상태 처리 결과 (온도/습도/기압/AI score) |
+| `risk_score` | Risk 계산 결과 |
+| `infra_state` | 인프라 상태 처리 결과 (노드/워크로드/장치) |
+| `state_snapshot` | Lambda HISTORY 항목의 상태 요약 스냅샷 |
 
 예시:
 
 ```text
-processed/risk-score/factory-a/yyyy=2026/mm=05/dd=14/hh=12/factory-a:factory_state:worker2:2026-05-14T12:00:06Z.json
-processed/infra-state/factory-a/yyyy=2026/mm=05/dd=14/hh=12/factory-a:infra_state:cluster:2026-05-14T12:00:20Z.json
+processed/factory-a/factory_state/yyyy=2026/mm=05/dd=14/hh=12/factory-a:factory_state:worker2:2026-05-14T12:00:06Z.json
+processed/factory-a/risk_score/yyyy=2026/mm=05/dd=14/hh=12/factory-a:factory_state:worker2:2026-05-14T12:00:06Z.json
+processed/factory-a/infra_state/yyyy=2026/mm=05/dd=14/hh=12/factory-a:infra_state:cluster:2026-05-14T12:00:20Z.json
+processed/factory-a/state_snapshot/yyyy=2026/mm=05/dd=14/hh=12/factory-a:state_snapshot:2026-05-14T12:00:20Z.json
 ```
 
 `S3 processed`는 장기 이력과 재처리 비교를 위한 저장소다. Dashboard의 기본 현재 상태와 최근 그래프는 DynamoDB를 먼저 조회한다.

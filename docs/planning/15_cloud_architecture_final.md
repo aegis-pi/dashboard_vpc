@@ -1,9 +1,10 @@
 # Cloud Architecture Final
 
 상태: source of truth
-기준일: 2026-05-20
+기준일: 2026-05-21
 
 수정 이력:
+- 2026-05-21 v0.5  워크스트림 B 신규 Terraform 리소스 네이밍에 개인 작업 prefix `KJW` 적용. 1번 VPC 신규 리소스 기본 prefix를 `KJW-AEGIS-Data-*`로 고정.
 - 2026-05-20 v0.4  Phase 1 통합 결정(ADR 0012~0017)을 본문에 반영. 1번 VPC의 서버리스 MVP/비어 있는 VPC 표현 제거.
 - 2026-05-15 v0.3  워크스트림 분리와 1번 VPC MVP 토폴로지 반영.
 - 2026-05-14 v0.2  Lambda data processor + DynamoDB/S3 processed 데이터 흐름 반영.
@@ -198,6 +199,15 @@ Grafana 관측 대상
 ## 1번 VPC: Data / Dashboard VPC
 
 1번 VPC는 데이터 처리와 사용자 대시보드 영역이다.
+
+워크스트림 B에서 새로 생성하는 Terraform 리소스는 팀원 VPC 2/Foundation/Factory 리소스와 구분하기 위해 기존 `AEGIS` prefix 앞에 개인 작업 prefix `KJW`를 붙인다.
+
+```text
+Terraform root: infra/data-dashboard/
+기본 Name prefix: KJW-AEGIS-Data-*
+lowercase 제약 리소스: kjw-aegis-data-*
+금지: infra/hub, infra/foundation, infra/mesh-vpn, infra/safe-edge, infra/deploy 수정
+```
 
 ### Public Subnet
 

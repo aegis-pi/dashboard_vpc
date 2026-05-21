@@ -1,7 +1,7 @@
 # AI Agent Harness — Aegis-Pi Risk Twin
 
 상태: source of truth
-기준일: 2026-05-19
+기준일: 2026-05-21
 대상: Claude Code, Codex, 또는 동급의 AI 코딩 에이전트
 언어: 한국어 (개조식 우선) / 코드·식별자는 원문 유지
 
@@ -19,6 +19,7 @@
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
+- **Claude Code 세션 기준**: 같은 Step의 검증·수정은 기존 터미널을 이어서 사용. Step/Phase 전환 시에는 새 Claude Code 세션을 시작하고 위 문서들을 다시 읽는다.
 
 ---
 
@@ -67,7 +68,7 @@
 | 허용 | `infra/data-dashboard/**` *(신설, Phase 1 Step 2)* | 자유 |
 | 허용 | `apps/dashboard-backend/**` *(신설, Phase 1 Step 6)* | 자유 |
 | 허용 | `apps/dashboard-web/**` *(신설, Phase 1 Step 1)* | 자유 |
-| 허용 | `apps/lambda-data-processor/**` *(신설, Phase 1 Step 4)* | 자유 (IoT Rule 트리거 라우팅은 ADR 합의 후) |
+| 허용 | `apps/data-processor/**` *(ADR 0020, Phase 1 Step 4 사전 정렬 완료)* | 자유 (IoT Rule 트리거 라우팅은 ADR 합의 후) |
 | 허용 | `apps/lambda-notifier/**`, `apps/lambda-report-generator/**` | 자유 |
 | 허용 | `docs/**` (워크스트림 A 운영 문서 제외) | 자유 (편집 규칙 § 9 준수) |
 | 허용 | `docs/changes/0NNN-*.md` (신규 ADR 추가) | 자유 |
@@ -113,6 +114,13 @@
 4. `git status` / `git diff --stat` 으로 현재 상태 파악
 5. 필요한 경우 `TaskCreate` 로 작업 단위 분해
 
+**Claude Code 세션 운영**
+
+- 같은 Phase 1 Step 안에서 이어지는 검증, 작은 수정, 재실행은 기존 Claude Code 터미널을 이어서 사용한다.
+- Phase 또는 Step이 바뀌면 새 Claude Code 세션을 시작한다. 예: Step 2 완료 후 Step 3 진입, Phase 1 완료 후 Phase 2 진입.
+- 새 세션 첫 작업은 `SESSION_STATE.md`, 본 harness, `16_data_dashboard_vpc_workplan.md`의 해당 Step을 다시 읽고 현재 `git status` / `git diff --stat`를 확인하는 것이다.
+- 세션 종료 전에는 `SESSION_STATE.md`, 비용 영향이 있는 경우 `docs/ops/15_aws_cost_baseline.md`, 새 결정이 있는 경우 `docs/changes/` ADR을 갱신한다.
+
 **종료**
 
 1. § 7 의 verification 명령 실행
@@ -155,21 +163,31 @@
 
 #### Phase 1 Step 1 — Frontend Vite + React 마이그레이션
 
-- 목표: 현 prototype (`Aegis-pi/Aegis-pi/`) 의 컴포넌트를 Vite + React 모듈 구조로 이전 + Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
+- 목표: `Aegis-pi2/` prototype reference의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 모듈 구조로 이전 + Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
 - DoD: `npm run build` 성공, `dist/` 산출물 검증, prototype 의 시각·UX 회귀 없음, Cognito 콜백 URL 와 WebSocket endpoint는 환경변수로 추상화
 - 허용 파일: `apps/dashboard-web/**`(신설), `docs/specs/monitoring_dashboard/04_risk_twin_web_screen_design.md` 갱신
-- 금지: 마이그레이션 도중 백엔드 endpoint 를 hardcode 하지 않는다. `.env*` 는 `.env.example` 만 commit
+- 금지: `Aegis-pi2/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다. 마이그레이션 도중 백엔드 endpoint 를 hardcode 하지 않는다. `.env*` 는 `.env.example` 만 commit
 - 환경변수 계약 (Frontend): `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`
 - 검증: `npm run build`, `npm run lint`, `npm run test`, prototype 스크린샷 diff
-- 롤백: `apps/dashboard-web/` 디렉터리 삭제. 기존 prototype 은 그대로 유지
+- 롤백: `apps/dashboard-web/` 디렉터리 삭제. `Aegis-pi2/` prototype reference 는 그대로 유지
 
 #### Phase 1 Step 2 — Terraform 1번 VPC 골격 (`infra/data-dashboard/`)
 
 - 목표: 신규 Terraform root 생성. Public + Private App + Private Data subnet × 2 AZ, IGW, NAT GW × 1, ALB, ACM × 2, Route53, CloudFront, S3 SPA, Cognito UserPool/App Client/Hosted UI Domain
 - DoD: `terraform -chdir=infra/data-dashboard plan` 가 정상, **state 가 `infra/hub` / `infra/foundation` 과 분리**되어 있음, `terraform apply` 후 ALB DNS·CloudFront domain·Cognito Hosted UI URL 출력
 - 허용 파일: `infra/data-dashboard/**`, `docs/ops/15_aws_cost_baseline.md` (NAT GW 1개 비용 반영), `docs/ops/2N_dashboard_domain_runbook.md` (신설)
-- 금지: `infra/hub/` / `infra/foundation/` Terraform state 와 backend 가 충돌 → 별도 backend (S3 key 또는 별도 backend block) 필수
-- 네이밍 규칙: 기존 `AEGIS-[resource]-[feature]-[zone]` 유지. Data 영역은 `AEGIS-Data-*` prefix 권장
+- 금지: `infra/hub/` / `infra/foundation/` Terraform 코드·state·backend 변경. `infra/data-dashboard/` 는 별도 backend (S3 key 또는 별도 backend block) 필수
+- 네이밍 규칙: 기존 `AEGIS-[resource]-[feature]-[zone]` 앞에 개인 작업 prefix `KJW` 를 붙인다. Data 영역 기본 prefix는 `KJW-AEGIS-Data-*`
+- Claude Code handoff guard:
+  - 사용자가 Terraform 구현을 요청하면 먼저 이 Step의 허용/금지 파일을 재확인한다.
+  - `https://github.com/aegis-pi/Aegis-pi/tree/main` 의 `infra/hub`, `infra/foundation`, `infra/mesh-vpn`, `infra/safe-edge`, `infra/deploy` 는 참고 전용이다. PR/patch 대상에 포함하지 않는다.
+  - 원격 main 기준 `infra/foundation/github_actions_ecr_push.tf` 는 팀원 ECR/GitHub Actions OIDC 작업이다. VPC 1 작업에서 role/provider/policy 이름을 재사용하거나 수정하지 않는다.
+  - VPC 1 CIDR은 Hub VPC `10.0.0.0/16` 과 겹치지 않는 새 CIDR로 둔다.
+  - Terraform `locals.naming_prefix` 는 `KJW-AEGIS-Data` 또는 동등한 조합(`owner_prefix = "KJW"`, `project_prefix = "AEGIS"`, `area_prefix = "Data"`)으로 둔다. `Name` tag와 IAM/SG/ALB/ECS/RDS/Redis 등 사람이 지정하는 이름은 `KJW-AEGIS-Data-*` 로 시작해야 한다.
+  - S3 bucket, Cognito domain, CloudFront alias 보조 이름처럼 lowercase/문자 제약이 있는 리소스는 `kjw-aegis-data-*` 형식으로 변환한다.
+  - S3 `aegis-bucket-data` 는 `data` source 또는 변수로 참조만 한다. `aws_s3_bucket` 으로 재생성하거나 bucket-level policy/lifecycle/KMS/versioning 을 관리하지 않는다.
+  - 기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3` 는 수정하지 않는다. Lambda processor 트리거는 Step 4 ADR 합의 후 `infra/data-dashboard/iot_rule.tf` 의 신규 Rule로만 다룬다.
+  - 신규 ECR repository가 필요하면 `aegis/dashboard-backend` 처럼 Dashboard 전용 이름을 사용하고, `aegis/edge-agent`, `aegis/factory-a-log-adapter`, `aegis/edge-iot-publisher` 는 수정하지 않는다.
 - 검증:
   - `terraform -chdir=infra/data-dashboard fmt -check`
   - `terraform -chdir=infra/data-dashboard validate`
@@ -180,7 +198,7 @@
 
 #### Phase 1 Step 3 — Terraform 데이터 저장소
 
-- 목표: DynamoDB `aegis-factory-status`(LATEST+HISTORY, TTL 24h, Streams) + `aegis-daily-report`, S3 `processed/`·`reports/` prefix IAM, RDS PostgreSQL `db.t4g.micro` Single-AZ gp3 20GiB, Secrets Manager, ElastiCache Redis 단일 노드 + AUTH + transit_encryption
+- 목표: DynamoDB `aegis-factory-status`(LATEST+HISTORY, TTL 48h, `pk`/`sk`, Streams) + `aegis-daily-report`, S3 `processed/`·`reports/` prefix IAM, RDS PostgreSQL `db.t4g.micro` Single-AZ gp3 20GiB, Secrets Manager, ElastiCache Redis 단일 노드 + AUTH + transit_encryption
 - DoD: RDS 가 Private Data Subnet 에 배포, Redis 가 Private App Subnet 에 배포, Secrets 가 AWS Secrets Manager 에 저장 (값은 평문 로그 금지), Alembic baseline migration 적용 가능 상태
 - 데이터 계약 (DynamoDB): § 8 참조
 - 허용 파일: `infra/data-dashboard/**`, `apps/dashboard-backend/migrations/**` (Alembic baseline)
@@ -350,7 +368,7 @@
 - IoT 메시지 스키마 source of truth: `docs/specs/iot_data_format.md`
 - 표준 처리 파이프라인: `docs/specs/data_storage_pipeline.md`
 - DynamoDB 키 (요약 — 상세는 `data_storage_pipeline.md` 우선):
-  - `aegis-factory-status` (LATEST + HISTORY 통합): PK `factory_id`, SK `sort_key` (e.g., `LATEST` 또는 `HISTORY#<ISO timestamp>`), Streams `NEW_AND_OLD_IMAGES`, TTL 24h on HISTORY items
+  - `aegis-factory-status` (LATEST + HISTORY 통합): PK `pk` (e.g., `FACTORY#<factory_id>`), SK `sk` (e.g., `LATEST` 또는 `HISTORY#STATE#<ISO timestamp>`), Streams `NEW_AND_OLD_IMAGES`, TTL 48h on HISTORY items (`ttl`)
   - `aegis-daily-report`: PK `report_date` (YYYY-MM-DD), SK `factory_id`
 - S3 prefix: `raw/`, `processed/`, `reports/` (ADR 0009)
 - IoT Rule 트리거: § 5 Phase 1 Step 4 결정 ADR 에 따른다
@@ -424,8 +442,7 @@
 - M0 Issue 12 — `start_test` 자동화 부분 완료. Hot/Cold 티어링 자동화 미완
 - M1 Issue 11 — Admin UI 운영 보안 강화 (WAF / Cognito / OIDC): 보류
 - EKS API endpoint public CIDR 축소: 보류
-- 본 환경 `infra/data-dashboard/` Terraform root 자체가 아직 미생성 — Phase 1 Step 2 의 첫 PR 가 신설
-- `apps/dashboard-backend/`, `apps/dashboard-web/`, `apps/lambda-notifier/`, `apps/lambda-report-generator/` 디렉터리 미존재 — 각각 Phase 1 Step 6/1/5/8 의 첫 PR 가 신설
+- `apps/dashboard-backend/`, `apps/dashboard-web/`, `apps/lambda-report-generator/` 디렉터리 미존재 — 각각 Phase 1 Step 6/1/8 의 첫 PR 가 신설
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
 - Markdown 린트 / 문서 테스트 도구 미설정 — § 7.1 수기 체크리스트로 대체
 
@@ -433,7 +450,6 @@
 
 | 항목 | 위치 | 메모 |
 | --- | --- | --- |
-| Lambda data processor IoT Rule 트리거 (옵션 A: 기존 Rule 확장 vs 옵션 B: 신규 Rule) | Phase 1 Step 4 | ADR 0018 작성 필요. 워크스트림 A 와 합의 |
 | Bedrock 호출 region 확정 (`ap-south-1` vs `us-east-1` cross-region) | Phase 1 Step 8 | Bedrock 가용 모델 목록 확인 후 ADR 0016 부록 추가 |
 | 신규 Dashboard 도메인명 | Phase 1 Step 0 | Gabia 구매 후 ADR 0010 부록에 도메인명 + NS 4개 기록 (전체 NS 풀세트는 별도 보관) |
 | RDS PostgreSQL 운영 백업 / PITR 정책 (데모 운영 vs 상시 운영) | Phase 1 Step 3 / Phase 2 | 상시 운영 결정 시점에 ADR 작성 |
@@ -467,7 +483,7 @@
 ### 11.2 단순 명령 예
 
 - "Phase 1 Step 0 도메인 ADR 부록 작성. NS 4개 placeholder 유지."
-- "Phase 1 Step 2 Terraform skeleton. `infra/data-dashboard/` 신설. 워크스트림 A plan 변경 0 검증."
+- "Phase 1 Step 2 Terraform skeleton. `infra/data-dashboard/` 신설. 신규 리소스 prefix는 `KJW-AEGIS-Data-*`. 워크스트림 A plan 변경 0 검증."
 - "Phase 1 Step 3 DynamoDB + RDS + Redis Terraform 추가. RDS 초기 비밀번호 Secrets Manager 로 분리."
 - "Phase 1 Step 6 Backend FastAPI 골격. `/healthz` + `/factories` + `/ws/factories/{id}` 만 우선."
 

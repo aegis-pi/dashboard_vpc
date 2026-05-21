@@ -1,7 +1,7 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-20
+기준일: 2026-05-21
 
 ## 목적
 
@@ -109,39 +109,121 @@ Step 0 - 외부 사전 작업 (병행 가능)
   + Gabia 도메인 구매 + DNS 전파 시간 확보
 
 Step 1 - Frontend 마이그레이션 (병행 가능)
-  + Aegis-pi/Aegis-pi/ prototype을 Vite + React로 마이그레이션
+  + 현재 보류. Step 6 Backend FastAPI 이후 진행 가능
+  + Aegis-pi2/ 는 Dashboard Web 화면 설계/prototype reference로 보관
+  + 공식 프론트엔드 소스 경로는 apps/dashboard-web/ 유지
+  + 진행 시 Aegis-pi2/ 내용을 apps/dashboard-web/ Vite + React 프로젝트로 마이그레이션
+  + Aegis-pi2/ 를 배포/CI/S3 source path로 직접 사용하지 않음
   + Cognito Hosted UI 연동
   + WebSocket client 추가
   + 보고서 탭 react-markdown 렌더링
 
-Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/)
-  + Public/Private App/Private Data subnet × 2 AZ
-  + Internet Gateway + NAT Gateway × 1 (단일 AZ)
-  + ALB + ACM + 보안그룹 5종
-  + Route53 hosted zone + CloudFront + S3 SPA + Cognito
+Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/) ✅ 완료 (2026-05-21)
+  + 전체 apply 완료: 47 resources (Route53 zone 1 + 40 + 잔여 6)
+  + backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
+  + S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
+  + 네이밍: KJW-AEGIS-Data-* / kjw-aegis-data-* 규칙 준수, 도메인: aegis-pi.cloud
+  + Route53 hosted zone 생성 완료. NS 4개 → secret/dashboard-nameservers.txt (git 추적 제외)
+  + ACM 상태: ISSUED (ALB ap-south-1 / CloudFront us-east-1) — DNS validation 통과
+  + terraform plan → No changes 확인 완료
+  + 확인된 output:
+    - ALB DNS: kjw-aegis-data-alb-1136678448.ap-south-1.elb.amazonaws.com
+    - CloudFront domain: d3kuj3rm94dooi.cloudfront.net
+    - Cognito Hosted UI: https://kjw-aegis-data-auth.auth.ap-south-1.amazoncognito.com
+    - dashboard_api_url: https://api.aegis-pi.cloud
+    - dashboard_web_url: https://dashboard.aegis-pi.cloud
 
-Step 3 - Terraform 데이터 저장소
-  + DynamoDB aegis-factory-status (Streams 활성화) + aegis-daily-report
-  + RDS PostgreSQL + Secrets Manager
-  + ElastiCache Redis (단일 노드, AUTH, transit_encryption)
+Step 3 - Terraform 데이터 저장소 ✅ 완료 (2026-05-21)
+  + DynamoDB aegis-factory-status: ACTIVE, Streams(NEW_AND_OLD_IMAGES), TTL(ttl attr) 활성
+  + DynamoDB aegis-daily-report: ACTIVE, on-demand
+  + RDS PostgreSQL kjw-aegis-data-pg: available, db.t4g.micro, Single-AZ, gp3 20GiB, maxStorage 100GiB
+  + Secrets Manager: kjw-aegis-data-rds-master / kjw-aegis-data-redis-auth
+  + ElastiCache Redis kjw-aegis-data-redis: available, transit_encryption=true, auth_token=true
+  + terraform plan → No changes 확인 완료
+  + 확인된 output:
+    - RDS endpoint: kjw-aegis-data-pg.c7ou2qkgi4nf.ap-south-1.rds.amazonaws.com:5432
+    - Redis primary endpoint: master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com
+    - DDB factory_status stream ARN: 활성 (arn 기록 금지)
+  + 신규 파일: dynamodb.tf / rds.tf / redis.tf / secrets.tf
+  + versions.tf: random provider ~> 3.6 추가
+  + outputs.tf: Step 3 output 블록 추가 (secret value 미노출)
+  + 누적 리소스: 47(Step 2) + 12(Step 3) = 59 resources
+
+Step 4 사전 정렬 ✅ 완료 (2026-05-21, ADR 0020)
+  + apps/data-processor: 팀원 원격 코드(aegis-pi/Aegis-pi main) 동기화 완료
+    - lambda_function.py / processor/{dynamo,envelope,normalizer,pipeline_status,risk,s3_writer}.py
+    - tests/{test_dynamo,test_envelope,test_pipeline_status,test_risk,test_s3_writer}.py
+  + DynamoDB aegis-factory-status KeySchema: pk(HASH) / sk(RANGE) — ADR 0020 (교체 완료)
+    - TTL: ENABLED, AttributeName=ttl, HISTORY_TTL_HOURS=48h
+    - Streams: NEW_AND_OLD_IMAGES (유지)
+    - terraform plan → No changes 확인 완료
+  + S3 processed 경로: processed/{factory_id}/{dataset}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.json
+    - dataset: factory_state / risk_score / infra_state / state_snapshot (underscore, 팀원 코드/실제 S3 기준)
+  + pytest: 20 passed
+  + 다음: Step 4 본 구현 (IoT Rule trigger + Lambda 배포) — Codex 검토 후 진행
+
+Step 4 본 구현 ✅ 완료 (2026-05-21, ADR 0021)
+  + Lambda KJW-AEGIS-Data-Lambda-data-processor: active (Python 3.12, 256MB, 30s)
+  + IAM KJW-AEGIS-Data-IAMRole-Lambda-data-processor: DDB GetItem/PutItem/UpdateItem + S3 PutObject(processed/*)
+  + IoT Rule KJW_AEGIS_Data_IoTRule_factory_state_processor: active, SELECT * FROM 'aegis/+/factory_state'
+  + IoT Rule KJW_AEGIS_Data_IoTRule_infra_state_processor: active, SELECT * FROM 'aegis/+/infra_state'
+  + terraform apply: 8 added, 0 changed, 0 destroyed
+  + terraform plan (post-apply): No changes
+  + pytest: 24 passed
+  + Direct invoke factory_state: DDB LATEST pk=FACTORY#factory-a / sk=LATEST 생성, HISTORY 적재
+  + Direct invoke infra_state: DDB LATEST infra_state 갱신, pipeline_status=normal
+  + S3 processed 경로 확인: factory_state / risk_score / infra_state / state_snapshot 모두 생성
+  + IoT Rule 경유: aws iot-data publish → DDB LATEST updated_at 갱신 확인
+  + 기존 AEGIS_IoTRule_factory_a_raw_s3: 변경 없음 (워크스트림 A 소유 — 접근 거부로 독립 확인)
+  + aegis-bucket-data bucket-level: 변경 없음
+  + 신규 파일: infra/data-dashboard/iam_data_processor.tf, lambda_data_processor.tf, iot_rule.tf
+  + versions.tf: archive provider ~> 2.4 추가
+  + outputs.tf: lambda_data_processor_name / iot_rule_factory_state_processor / iot_rule_infra_state_processor
+  + ADR: docs/changes/0021-data-processor-iot-rule-trigger.md
+
+Step 5 본 구현 ✅ 완료 (2026-05-21)
+  + Lambda notifier KJW-AEGIS-Data-Lambda-notifier: active (Python 3.12, 256MB, 30s, VPC-attach)
+    - VPC: private_app subnet × 2 (Azone/Czone), SG: KJW-AEGIS-Data-SG-LambdaNotifier
+    - env: REDIS_HOST=master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com REDIS_PORT=6379 REDIS_AUTH_SECRET_NAME=kjw-aegis-data-redis-auth
+  + IAM KJW-AEGIS-Data-IAMRole-Lambda-notifier: AWSLambdaVPCAccessExecutionRole + DDB Streams read + SecretsManager + SQS DLQ
+  + SQS DLQ kjw-aegis-data-notifier-dlq: active, 14일 보존
+  + ESM: DDB factory-status stream → Lambda notifier (UUID: 233e8443-b8b4-4bd5-b639-ed5ea8ba9283)
+    - batch=10, maxRetry=3, bisect=true, starting_position=LATEST, DLQ destination 설정
+  + terraform apply: 7 added, 0 changed, 0 destroyed
+  + terraform plan (post-apply): No changes
+  + ESM 상태: Enabled / LastResult=OK
+  + DLQ 메시지 수: 0
+  + CloudWatch Logs 검증 (2026-05-21T08:44:04Z):
+    "published factory_id=factory-a channel=factory:update:factory-a"
+    "batch done published=1 skipped=0"
+    Duration: 285.56 ms (DDB write → Redis PUBLISH: ~0.45초 — DoD 5초 이내 기준 통과)
+  + 신규 파일: apps/lambda-notifier/lambda_function.py, requirements.txt
+               infra/data-dashboard/lambda_notifier.tf
+  + versions.tf: null provider ~> 3.2 추가
+  + outputs.tf: lambda_notifier_name / lambda_notifier_dlq_url / lambda_notifier_event_source_mapping_uuid
+  + .gitignore: apps/**/.build/ 추가
+  + 다음: Step 6 (Dashboard Backend FastAPI, 새 Claude Code 세션)
 ```
 
 다음 세션 최우선 실행 순서 (본 환경):
 
 ```text
-1. Step 0/1을 병행 시작
-   - Gabia에서 신규 도메인 구매
-   - Frontend Vite + React 마이그레이션 (스타일은 그대로, 구조만 모듈화)
+Step 6 — Dashboard Backend FastAPI 구현 (새 Claude Code 세션)
+  - apps/dashboard-backend/ 신설 (FastAPI, routers/factories.py / routers/ws.py / deps/*)
+  - ECR: aegis/dashboard-backend 신규 repo
+  - 로컬 docker-compose 검증 (/healthz, /factories, /ws/factories/{id})
+  - 허용 파일: apps/dashboard-backend/**, .github/workflows/dashboard-backend.yml
 
-2. Step 2 Terraform skeleton 생성
-   - infra/data-dashboard/ root 분리 (state 별도)
-   - VPC/Subnet/NAT/ALB 단가 영향 docs/ops/15_aws_cost_baseline.md 확인
+3. Step 1 Frontend 마이그레이션은 Step 6 이후 진행 가능
+   - Aegis-pi2/ prototype reference → apps/dashboard-web/ 공식 Vite + React 소스
+   - Aegis-pi2/ 를 공식 배포/CI/S3 source path로 직접 사용하지 않음
+   - Cognito Hosted UI / WebSocket client / 보고서 탭 준비
 
-3. Step 4 (Lambda data processor 협의) — 워크스트림 A와 합류 지점
+4. Step 4 (Lambda data processor 협의) — 워크스트림 A와 합류 지점
    - IoT Rule trigger 방식 확정 (기존 Rule 확장 vs 신규 Rule)
    - 결정 즉시 ADR로 기록 (docs/changes/0018~)
 
-4. Step 6 Backend (FastAPI) 골격 구현 — 로컬 docker-compose로 우선 확인
+5. Step 6 Backend (FastAPI) 골격 구현 — 로컬 docker-compose로 우선 확인
    - routers/factories.py, routers/reports.py, routers/ws.py
    - Cognito JWT 앱 레벨 검증, RDS PostgreSQL SQLAlchemy async + asyncpg, Redis asyncio
 ```
@@ -156,17 +238,72 @@ M3 Issue 2 마무리
 M3 Issue 3 - GitHub Actions OIDC build/push workflow 구성
 ```
 
+## 2026-05-21 Terraform handoff guard
+
+사용자가 VPC 1 Terraform 구현을 Claude Code에 위임할 예정이므로, 본 작업환경에서 문제를 만들지 않기 위한 문서 기준을 보강했다.
+
+```text
+확인한 외부 참고 repo:
+  https://github.com/aegis-pi/Aegis-pi/tree/main
+  main SHA: d4437ea9b9e4ec18605bc92da16abba48c453db8
+
+로컬 origin:
+  https://github.com/aegis-pi/dashboard_vpc.git
+  사용자가 준 참고 repo와 다를 수 있으므로, 팀원 Terraform 확인은 외부 repo main을 별도 조회한다.
+
+원격 main의 Terraform 역할:
+  infra/hub/        2번 Control / Management VPC + EKS
+  infra/foundation/ 공유 S3/AMP/ECR/IoT Rule/GitHub Actions OIDC
+  infra/mesh-vpn/   Tailscale Hub-Spoke
+  infra/safe-edge/  factory-a 기준선 문서
+  infra/deploy/     배포 파이프라인 보조 영역
+
+Claude Code 작업 제한:
+  - VPC 1 Terraform은 `infra/data-dashboard/` 신규 root에만 작성
+  - 신규 Data/Dashboard 리소스 이름은 `KJW-AEGIS-Data-*` 사용
+  - lowercase 제약 리소스(S3 bucket, Cognito domain 등)는 `kjw-aegis-data-*` 사용
+  - `infra/hub/**`, `infra/foundation/**`, `infra/mesh-vpn/**`, `infra/safe-edge/**`, `infra/deploy/**` 수정 금지
+  - Terraform state/backend는 Hub/Foundation과 분리
+  - `aegis-bucket-data` bucket 자체와 bucket-level policy/lifecycle/KMS/versioning 변경 금지
+  - 기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3` 변경 금지
+  - ECR `aegis/edge-agent`, `aegis/factory-a-log-adapter`, `aegis/edge-iot-publisher` 변경 금지
+  - Dashboard Backend ECR은 필요 시 `aegis/dashboard-backend` 신규 repo로 분리
+```
+
+반영 문서:
+
+- `docs/AI_AGENT_HARNESS.md` — Phase 1 Step 2 Claude Code handoff guard 추가
+- `docs/planning/15_cloud_architecture_final.md` — 1번 VPC 신규 Terraform 리소스 `KJW-AEGIS-Data-*` 기준 추가
+- `docs/planning/16_data_dashboard_vpc_workplan.md` — Step 2 원격 repo 참고 전용/공유 리소스 충돌 방지 기준 추가
+- `docs/architecture/01_target_architecture.md` — Terraform 구현 기준과 `KJW-AEGIS-Data-*` 네이밍 예시 추가
+
 ## 현재 큰 상태
 
 ```text
-현재 단계: M3 배포 파이프라인 준비
+현재 단계: Phase 1 Step 5 완료 → Step 6 (Dashboard Backend FastAPI, 새 Claude Code 세션)
+워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
-진행 중: M3 Issue 2 ECR 범위는 edge-agent로 확정, infra/foundation Terraform source 작성 및 ECR repository 생성/스캔 설정 검증 완료
+진행 중(워크스트림 A): M3 Issue 2 ECR 범위는 edge-agent로 확정, ECR repository 생성/스캔 설정 검증 완료
+Phase 1 Step 2: 2026-05-21 전체 apply 완료. 47 resources. terraform plan No changes 확인.
+Phase 1 Step 3: 2026-05-21 apply 완료. 12 resources 추가. terraform plan No changes 확인.
+Phase 1 Step 4 사전 정렬: 2026-05-21 완료 (ADR 0020). apps/data-processor 동기화, DDB pk/sk 교체, S3 경로 스펙 정렬.
+Phase 1 Step 4 본 구현: 2026-05-21 완료 (ADR 0021). Lambda KJW-AEGIS-Data-Lambda-data-processor active. IoT Rule 2개 active. DDB/S3 end-to-end 검증 완료.
+Phase 1 Step 5 본 구현: 2026-05-21 완료. Lambda notifier KJW-AEGIS-Data-Lambda-notifier active. DDB Streams ESM Enabled. DDB write → Redis PUBLISH 0.45초 검증. DLQ=0.
+backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
+S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
+Data/Dashboard VPC 핵심 리소스: VPC/subnets/NAT GW/IGW/route tables/SGs/ALB/CloudFront/Cognito/S3-web/ACM/Route53 전체 활성
+DynamoDB aegis-factory-status: ACTIVE, KeySchema pk/sk, Streams(NEW_AND_OLD_IMAGES), TTL(ttl, 48h) 활성
+DynamoDB aegis-daily-report: ACTIVE, on-demand
+RDS PostgreSQL kjw-aegis-data-pg: available, db.t4g.micro, Single-AZ, gp3 20GiB
+ElastiCache Redis kjw-aegis-data-redis: available, transit_encryption=true, auth_token=true
+Secrets Manager: kjw-aegis-data-rds-master / kjw-aegis-data-redis-auth
+RDS endpoint: kjw-aegis-data-pg.c7ou2qkgi4nf.ap-south-1.rds.amazonaws.com:5432
+Redis primary endpoint: master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com
+apps/data-processor: 팀원 코드 동기화 완료. S3 경로 processed/{factory_id}/{dataset}/... 형식 (팀원 코드/실제 S3 기준)
+다음 작업: Phase 1 Step 6 Dashboard Backend FastAPI 구현 — 새 Claude Code 세션에서 시작
 현재 AWS 상태: Hub/Foundation/IoT/Admin UI 리소스 재생성 완료. ECR `aegis/edge-agent` repository 활성 상태
-이미지 기준: Docker Hub가 아니라 ECR `611058323802.dkr.ecr.ap-south-1.amazonaws.com/aegis/edge-agent`를 표준 registry로 사용
-남음: GitHub Actions OIDC push role, Spoke K3s imagePullSecret 갱신 방식, 실제 image push/pull 검증
-후속 리팩토링: 문서 repo/code repo/GitOps repo 분리와 OIDC 기반 CI/CD/Destroy 고도화는 M7 Issue 0에서 최종 통합 검증 전 진행
+남음(워크스트림 A): GitHub Actions OIDC push role, Spoke K3s imagePullSecret 갱신, image push/pull 검증
 완료: M0 factory-a Safe-Edge 기준선
 완료: M1 Issue 0 AWS CLI MFA 및 Terraform 접근 설정
 완료: M1 Issue 1 EKS/VPC Terraform apply 및 kubectl 접근 확인
@@ -276,7 +413,7 @@ Ansible bootstrap:
 Region: ap-south-1
 VPC: 신규 생성
 VPC CIDR: 10.0.0.0/16
-Resource naming: AEGIS-[resource]-[feature]-[zone]
+Resource naming: 워크스트림 A 기존 Hub/Foundation은 AEGIS-[resource]-[feature]-[zone]. 워크스트림 B 신규 Data/Dashboard Terraform은 KJW-AEGIS-Data-*.
 Target cluster name: AEGIS-EKS
 Target Kubernetes version: 1.34
 AZ: ap-south-1a, ap-south-1c
@@ -717,6 +854,8 @@ ApplicationSet aegis-spoke active, Application aegis-spoke-factory-a Synced + He
 ## 갱신 규칙
 
 - 이 파일은 새 내용을 아래에 계속 추가하지 않는다.
+- Phase/Step이 넘어가면 Claude Code는 새 세션으로 시작한다. 같은 Step 안의 검증·소규모 수정만 기존 Claude Code 터미널을 이어서 사용한다.
+- 새 Claude Code 세션은 작업 전 `docs/issues/SESSION_STATE.md`, `docs/AI_AGENT_HARNESS.md`, 해당 Step 기준 문서(`docs/planning/16_data_dashboard_vpc_workplan.md`)를 다시 읽고 시작한다.
 - 세션 저장 요청이 오면 `마일스톤 기준 진행 현황`, `현재 큰 상태`, `지금까지 완료한 일`, `현재 AWS 상태`, `다음에 할 일`, `현재 세션 정리 내용`을 현재 기준으로 갱신한다.
 - 오래된 완료 기록이 현재 판단에 불필요하면 요약으로 줄인다.
 - 공식 체크 여부는 항상 `docs/issues/MASTER_CHECKLIST.md`와 각 M0~M7 이슈 문서를 우선한다.

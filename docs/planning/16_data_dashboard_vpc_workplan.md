@@ -1,8 +1,11 @@
 # Data / Dashboard VPC Workplan (이 작업 환경)
 
 상태: source of truth
-기준일: 2026-05-19
+기준일: 2026-05-21
 수정 이력:
+  - 2026-05-21 v0.7  Claude Code 세션 운영 기준 추가. 같은 Step은 기존 세션, Step/Phase 전환은 새 세션으로 시작하고 문서 재확인 후 작업.
+  - 2026-05-21 v0.6  VPC 1 Terraform 신규 리소스 이름에 개인 작업 prefix `KJW` 적용. 기본 이름을 `KJW-AEGIS-Data-*`, lowercase 제약 리소스를 `kjw-aegis-data-*`로 고정.
+  - 2026-05-21 v0.5  Claude Code Terraform handoff guard 추가. 원격 `aegis-pi/Aegis-pi` main의 VPC 2/Foundation/Factory Terraform은 참고 전용으로 고정하고, VPC 1 root/state/CIDR/공유 리소스 충돌 방지 기준 보강.
   - 2026-05-19 v0.4  ADR 0017 반영. 메타 저장소를 RDS PostgreSQL(db.t4g.micro, gp3 20GiB)로 변경.
   - 2026-05-18 v0.3  ADR 0012~0016 반영. Phase 1 통합 결정(ECS Fargate Backend + 관계형 메타 저장소 + Redis + WebSocket + Bedrock). 진입 순서를 구현 Step 1~9로 재정의. 데모 운영 패턴(build/destroy 사이클) 명시.
   - 2026-05-15 v0.2  ADR 0006~0010으로 1번 VPC MVP 토폴로지 확정. 진입 순서를 placeholder에서 확정 순서로 갱신.
@@ -52,7 +55,7 @@
 | Cognito User Pool + App Client + Hosted UI (관리자 전용, MFA Required) | Terraform | 본 환경 (MVP 범위, ADR 0008) |
 | Lambda data processor (코드/패키지/IAM/IoT Rule 라우팅) — VPC 밖 | Terraform + 코드 | 본 환경 |
 | Lambda notifier / Lambda report-generator | Terraform + 코드 | 본 환경 |
-| DynamoDB `aegis-factory-status` (LATEST + HISTORY, TTL 24h) | Terraform | 본 환경 |
+| DynamoDB `aegis-factory-status` (LATEST + HISTORY, TTL 48h, pk/sk) | Terraform | 본 환경 |
 | DynamoDB `aegis-daily-report` | Terraform | 본 환경 |
 | S3 `aegis-bucket-data/processed/` prefix (단일 bucket 공유, ADR 0009) | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
 | S3 `aegis-bucket-data/reports/` prefix | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
@@ -99,6 +102,7 @@
 ## 확정 진입 순서 (Phase 1 구현 Step)
 
 > 본 문서의 Step은 **구현 단계**다. `docs/planning/17_expansion_roadmap.md`의 Phase 1~4는 **확장 단계**로, 용어가 다르므로 혼동하지 않는다.
+> Claude Code 작업은 같은 Step 내부 검증·수정만 기존 세션을 이어서 사용한다. Step 또는 Phase가 넘어가면 새 Claude Code 세션을 시작하고 `docs/issues/SESSION_STATE.md`, `docs/AI_AGENT_HARNESS.md`, 본 문서의 해당 Step을 다시 읽는다.
 
 ### Step 0 — 외부 사전 작업 (병행 가능)
 
@@ -110,7 +114,10 @@
 ### Step 1 — Frontend 마이그레이션 (병행 가능)
 
 ```text
-- 현재 prototype (`Aegis-pi/Aegis-pi/`)을 Vite + React 프로젝트로 마이그레이션
+- 현재 prototype reference는 `Aegis-pi2/` 로 둔다
+- 공식 프론트엔드 소스 경로는 `apps/dashboard-web/` 로 고정한다
+- Step 1 진행 시 `Aegis-pi2/` 화면 설계를 `apps/dashboard-web/` Vite + React 프로젝트로 마이그레이션
+- `Aegis-pi2/` 는 배포/CI/S3 source path로 직접 사용하지 않는다
 - 컴포넌트(`fleet/factory/alerts/charts/sidebar/topbar`) 그대로 재사용
 - import 기반 모듈 구조로 전환, ReactDOM.createRoot은 main.jsx로 분리
 - Cognito Hosted UI 연동(oidc-client-ts 또는 aws-amplify/auth)
@@ -123,10 +130,29 @@
 
 ```text
 - 신규 root 생성. 워크스트림 A의 infra/hub, infra/foundation과 state 분리
-- 네이밍 규칙: AEGIS-[resource]-[feature]-[zone] (기존 규칙 유지),
-            Data/Dashboard 영역은 AEGIS-Data-* prefix 권장
+- 팀원이 작성한 원격 `aegis-pi/Aegis-pi` main의 Terraform은 참고 전용:
+    infra/hub/          = 2번 Control / Management VPC + EKS
+    infra/foundation/   = 공유 S3/AMP/ECR/IoT Rule/GitHub Actions OIDC
+    infra/mesh-vpn/     = Tailscale Hub-Spoke
+    infra/safe-edge/    = factory-a 기준선 문서
+    infra/deploy/       = 배포 파이프라인 보조 영역
+  위 경로는 본 작업환경 PR/patch 대상에서 제외한다.
+- 로컬 origin이 `aegis-pi/dashboard_vpc.git` 로 설정되어 있을 수 있으므로,
+  Claude Code는 사용자가 준 `https://github.com/aegis-pi/Aegis-pi/tree/main` 을
+  참고 코드로 별도 확인하되, 구현 파일은 이 작업트리의 `infra/data-dashboard/`에만 만든다.
+- 네이밍 규칙:
+    기존 AEGIS-[resource]-[feature]-[zone] 규칙 앞에 개인 작업 prefix `KJW` 적용
+    Data/Dashboard 영역 기본 prefix: KJW-AEGIS-Data-*
+    Terraform local 권장:
+      owner_prefix   = "KJW"
+      project_prefix = "AEGIS"
+      area_prefix    = "Data"
+      naming_prefix  = "KJW-AEGIS-Data"
+    S3 bucket, Cognito domain, CloudFront 보조 이름처럼 lowercase/문자 제약이 있는 리소스:
+      kjw-aegis-data-*
 - 1번 VPC (Phase 1, ADR 0012):
     VPC 10.x.0.0/16 + Public/Private App/Private Data subnet × 2 AZ
+    단, Hub VPC `10.0.0.0/16` 과 겹치지 않는 CIDR만 사용
     Internet Gateway
     NAT Gateway × 1 (단일 AZ, 비용 절감)
     Route table 분리 (Public 0.0.0.0/0 → IGW, Private 0.0.0.0/0 → NAT)
@@ -138,6 +164,13 @@
     S3 dashboard-web bucket (정적 SPA 호스팅, OAC)
     CloudFront distribution + WAF (관리자 IP allow-list 옵션)
     Cognito User Pool + App Client + Hosted UI Domain (Self sign-up Disabled, MFA Required)
+- 공유 리소스 충돌 방지:
+    S3 `aegis-bucket-data` 는 data source/변수 참조만 허용.
+    bucket 자체, bucket policy, lifecycle, KMS, versioning 변경 금지.
+    기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3` 변경 금지.
+    Lambda processor 트리거는 Step 4 ADR 합의 후 신규 IoT Rule로만 추가.
+    ECR `aegis/edge-agent`, `aegis/factory-a-log-adapter`, `aegis/edge-iot-publisher` 변경 금지.
+    Dashboard Backend ECR이 필요하면 `aegis/dashboard-backend` 신규 repo로 분리.
 - 비용 영향 사전 확인: docs/ops/15_aws_cost_baseline.md 갱신
 ```
 
@@ -145,7 +178,7 @@
 
 ```text
 - DynamoDB:
-    aegis-factory-status (LATEST + HISTORY, TTL 24h, Streams NEW_AND_OLD_IMAGES)
+    aegis-factory-status (LATEST + HISTORY, TTL 48h, pk/sk, Streams NEW_AND_OLD_IMAGES)
     aegis-daily-report (PK: report_date, SK: factory_id)
 - S3 prefix 추가 (aegis-bucket-data는 워크스트림 A가 소유, prefix·IAM만 본 환경):
     processed/ (Lambda data processor write)
@@ -261,7 +294,7 @@
 
 ## 합류 지점 운영 규칙
 
-- **S3, DynamoDB**: 두 워크스트림이 동일 리소스를 다른 prefix/table로 사용한다. Terraform state는 분리하되, 네이밍은 충돌하지 않게 prefix(`AEGIS-Data-*`) 등으로 구분한다.
+- **S3, DynamoDB**: 두 워크스트림이 동일 리소스를 다른 prefix/table로 사용한다. Terraform state는 분리하되, 신규 Data/Dashboard 리소스 네이밍은 `KJW-AEGIS-Data-*` 또는 lowercase 제약 시 `kjw-aegis-data-*`로 구분한다.
 - **IoT Core**: Thing/Policy/Rule(`AEGIS_IoTRule_factory_a_raw_s3`)는 워크스트림 A가 관리. 본 환경에서는 Lambda를 트리거하는 신규 IoT Rule을 추가하거나 기존 Rule action 확장을 결정해야 하므로, 결정 즉시 ADR로 기록한다.
 - **GitHub Actions**: 본 환경에서 새 워크플로우를 만들 때 `aegis-pi-gitops` 또는 코드 repo 어느 쪽 GitOps에 배포 결과를 반영할지 명시한다. ArgoCD 직접 sync는 워크스트림 A의 Hub ArgoCD가 담당하므로 본 환경은 manifest/values만 푸시한다.
 - **문서**: 1번 VPC 신규 결정은 `docs/changes/`에 ADR로 남기고, 운영 절차는 `docs/ops/`에 누적한다. 워크스트림 A 영역 문서는 본 환경에서 새로 만들지 않는다.

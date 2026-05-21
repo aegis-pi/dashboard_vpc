@@ -1,9 +1,15 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-20
+기준일: 2026-05-21
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-21 v1.2  Step 5 apply 완료. Lambda notifier/SQS DLQ 추가 (7 resources 추가, 누적 73). 리소스 상태 표 갱신.
+  - 2026-05-21 v1.1  Step 3 apply 완료. DynamoDB 2개/RDS PostgreSQL/ElastiCache Redis/Secrets Manager 2개 생성(12 resources 추가, 누적 59). 리소스 상태 표 갱신.
+  - 2026-05-21 v1.0  Step 2 전체 apply 완료. 47 resources 생성 (3회 apply 누적). ACM ISSUED(ALB ap-south-1 / CloudFront us-east-1). CloudFront 배포/HTTPS listener/S3 bucket policy/Route53 web_cloudfront 레코드 활성. terraform plan No changes 확인. 리소스 상태 표 갱신.
+  - 2026-05-21 v0.9  Step 2 부분 apply 완료. 41 resources 생성(VPC/NAT GW/ALB/SGs/Cognito/S3-web/CloudFront-OAC/Route53-zone/ACM 요청). ACM PENDING_VALIDATION(Gabia NS 위임 필요). 잔여 6개(CloudFront 배포/HTTPS listener 등)는 NS 위임 후 전체 apply. 현재 리소스 상태 반영. 비용은 추정치 유지(NAT GW 1개 포함 상시 가동 ~$125/월, 데모 ~$8~10/월).
+  - 2026-05-21 v0.8  backend-bootstrap apply 완료(`kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile). DynamoDB lock table은 미사용으로 정정. plan 47 resources 검증 완료. 비용 항목은 apply 전 추정치 그대로 유지(실측은 infra/data-dashboard apply 후 v0.9에서 갱신 예정).
+  - 2026-05-21 v0.7  Phase 1 Step 2 `infra/data-dashboard/` Terraform skeleton 완성. 리소스 상태 표에 1번 VPC skeleton 반영. 비용 항목은 v0.5/v0.6 추정치 그대로 유지(실측은 apply 후 v0.8에서 갱신 예정).
   - 2026-05-20 v0.6  2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 1번 VPC 미배포 상태를 현재 리소스 상태에 반영.
   - 2026-05-19 v0.5  ADR 0017 반영. 1번 VPC 메타 저장소를 Aurora Serverless v2에서 RDS PostgreSQL(db.t4g.micro, gp3 20GiB)로 변경하고 비용 기준 재계산.
   - 2026-05-18 v0.4  ADR 0012~0016 반영. Phase 1 통합으로 NAT GW × 1 + ALB + ECS Fargate + Aurora Serverless v2 + ElastiCache Redis + Bedrock 항목 신설. 데모 운영 패턴(build/destroy 사이클) 비용 분리.
@@ -19,7 +25,7 @@
 
 ## 현재 Aegis 리소스 상태
 
-2026-05-15 rebuild 후 세션 스냅샷 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard VPC는 아직 apply 전이며, 예상 비용은 별도 섹션에 둔다.
+2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 2026-05-21 Data/Dashboard VPC Step 5 apply 결과 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard VPC는 Step 2의 VPC/ALB/CloudFront/Cognito/Route53 기반, Step 3의 DynamoDB/RDS PostgreSQL/ElastiCache Redis/Secrets Manager, Step 4의 Lambda data processor/IoT Rule, Step 5의 Lambda notifier/SQS DLQ까지 배포 완료됐다.
 
 | 영역 | 리소스 | 수량/크기 | 상태 |
 | --- | --- | ---: | --- |
@@ -40,12 +46,29 @@
 | Route53 | public hosted zone `minsoo-tech.cloud` | 1 zone | active |
 | ACM | public certificate for Admin UI hosts | 1 regional certificate set | active / ISSUED |
 | ALB | `aegis-admin-ui` | 1 | active |
-| Data/Dashboard VPC | 1번 VPC / ALB / ECS / RDS / Redis | 0 | not deployed |
+| Data/Dashboard VPC | `infra/data-dashboard/` Terraform (14 tf files) | 47 resources | 전체 apply 완료 (2026-05-21). terraform plan No changes 확인 |
+| Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | apply 완료 |
+| Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 1 zone | active. Gabia NS 위임 완료 |
+| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | active | active (2026-05-21 apply) |
+| Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 2 certs | **ISSUED** — DNS validation 완료 |
+| Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | active | active (2026-05-21 full apply) |
+| Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 1 table | **active** (2026-05-21). Streams=NEW_AND_OLD_IMAGES, TTL 활성, on-demand |
+| Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 1 table | **active** (2026-05-21). on-demand |
+| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | db.t4g.micro, gp3 20GiB | **available** (2026-05-21). Single-AZ, maxStorage 100GiB |
+| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | cache.t4g.micro | **available** (2026-05-21). transit_encryption=true, auth_token=true, single node |
+| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 2 secrets | **active** (2026-05-21) |
+| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 1 function | **active** (2026-05-21). Python 3.12, 256MB, 30s timeout |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 1 rule | **active** (2026-05-21). topic: aegis/+/factory_state |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 1 rule | **active** (2026-05-21). topic: aegis/+/infra_state |
+| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 function | **active** (2026-05-21). Python 3.12, 256MB, 30s timeout, VPC-attach |
+| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 queue | **active** (2026-05-21). 14일 보존 |
+| Data/Dashboard VPC | DDB Streams ESM (factory-status → Lambda notifier) | 1 mapping | **Enabled** (2026-05-21). batch=10, maxRetry=3 |
+| Data/Dashboard VPC | ECS Fargate / Lambda report-generator | 0 | not deployed — Phase 1 Step 6~8 |
 
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- 1번 Data/Dashboard VPC 미배포
+- 1번 Data/Dashboard VPC Step 6 이후 리소스(ECS Fargate Backend, Backend ECR, Lambda report-generator)는 미배포
 - Dashboard Backend용 ECR `aegis/dashboard-backend` 없음
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산

@@ -39,6 +39,8 @@
 | 0017 | 메타데이터 저장소: RDS PostgreSQL | accepted | 2026-05-19 | M6, 1번 VPC, 관계형 DB, 비용 |
 | 0018 | IoT Topic Rule 확장: factory-a 단일 구독 → factory-c 추가 구독 | accepted | 2026-05-19 | M4 데이터 평면, M5 factory-c, 워크스트림 A↔B 합류 |
 | 0019 | factory-c 토폴로지: single-node → master + worker (2-VM K3s cluster) | accepted | 2026-05-19 | M5 VM Spoke 확장, factory-c testbed, 시연 표현 |
+| 0020 | data-processor 계약 정렬: 팀원 코드 수용, DDB pk/sk, TTL 48h, S3 processed 경로 스펙 보정 | accepted | 2026-05-21 | M4 데이터 플레인, apps/data-processor, DDB aegis-factory-status |
+| 0021 | Lambda data processor IoT Rule 트리거: 신규 Rule 2개 추가 (factory_state / infra_state), 기존 Rule 미수정 | accepted | 2026-05-21 | Phase 1 Step 4, M4 합류 지점, infra/data-dashboard, IoT Rule |
 
 ## 파일 형식
 
