@@ -1,7 +1,7 @@
 # Build Scripts
 
 상태: source of truth
-기준일: 2026-05-08
+기준일: 2026-05-22
 
 ## 목적
 
@@ -33,6 +33,11 @@
    - IoT Thing / Policy / certificate 등록
    - local secret/iot/factory-a 출력
    - K3s Secret 등록
+
+4. data-dashboard
+   - infra/data-dashboard Terraform apply
+   - 워크스트림 B 1번 Data/Dashboard VPC만 생성
+   - Hub/Foundation/EKS/Admin UI는 건드리지 않음
 ```
 
 ## 파일
@@ -44,6 +49,7 @@
 | `build-foundation.sh` | `infra/foundation` Terraform apply |
 | `build-hub.sh` | `infra/hub` Terraform apply 후 Ansible bootstrap. 기본적으로 Tailscale Hub 복구까지 실행 |
 | `build-iot-factory-a.sh` | `factory-a` IoT Thing/certificate 생성 및 K3s Secret 등록 |
+| `build-data-dashboard.sh` | `infra/data-dashboard` Terraform apply. 1번 Data/Dashboard VPC 전용 |
 
 Hub build는 ArgoCD/Grafana 설치 검증 후 `secret/hub-ui-credentials.txt`를 갱신한다. 이 파일은 `.gitignore`의 `secret/` 규칙으로 Git에 들어가지 않으며, 파일 권한은 `0600`으로 설정된다.
 
@@ -208,6 +214,20 @@ IoT `factory-a`만:
 ```bash
 scripts/build/build-iot-factory-a.sh
 ```
+
+Data/Dashboard VPC만:
+
+```bash
+scripts/build/build-data-dashboard.sh --domain aegis-pi.cloud
+```
+
+MFA 세션이 없으면 OTP를 전달한다.
+
+```bash
+scripts/build/build-data-dashboard.sh --domain aegis-pi.cloud --otp <MFA_OTP>
+```
+
+이 스크립트는 삭제 예약 중인 `kjw-aegis-data-*` Secrets Manager secret을 강제 삭제해 재생성 이름 충돌을 막는다.
 
 전체 생성에서 특정 단계를 건너뛰려면 환경 변수를 사용한다.
 

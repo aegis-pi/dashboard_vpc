@@ -1,7 +1,7 @@
 # Destroy Scripts
 
 상태: source of truth
-기준일: 2026-05-08
+기준일: 2026-05-22
 
 ## 목적
 
@@ -33,6 +33,12 @@
 3. foundation
    - infra/foundation Terraform destroy
    - S3 data bucket, IoT Rule, AMP Workspace 같은 영속 리소스
+
+4. data-dashboard
+   - infra/data-dashboard Terraform destroy
+   - 워크스트림 B 1번 Data/Dashboard VPC만 삭제
+   - Hub/Foundation/EKS/Admin UI는 건드리지 않음
+   - Terraform backend S3 bucket과 RDS final snapshot은 잔존
 ```
 
 ## 파일
@@ -44,6 +50,7 @@
 | `destroy-k3s-iot-secret.sh` | K3s Secret만 삭제 |
 | `destroy-hub.sh` | Hub EKS/VPC와 hub-bound IAM 리소스 삭제 |
 | `destroy-foundation.sh` | Foundation 영속 리소스 삭제. `DESTROY_FOUNDATION=true` 필요 |
+| `destroy-data-dashboard.sh` | `infra/data-dashboard` Terraform destroy. 1번 Data/Dashboard VPC 전용 |
 
 ## 기본 전체 삭제
 
@@ -111,6 +118,20 @@ Hub만:
 ```bash
 scripts/destroy/destroy-hub.sh
 ```
+
+Data/Dashboard VPC만:
+
+```bash
+scripts/destroy/destroy-data-dashboard.sh --domain aegis-pi.cloud
+```
+
+MFA 세션이 없으면 OTP를 전달한다.
+
+```bash
+scripts/destroy/destroy-data-dashboard.sh --domain aegis-pi.cloud --otp <MFA_OTP>
+```
+
+RDS final snapshot 이름은 Terraform random suffix를 포함하므로 반복 destroy 시 snapshot 이름이 충돌하지 않는다. 오래된 snapshot은 복구 필요 여부 확인 후 수동 삭제한다.
 
 Hub destroy는 `infra/hub`가 foundation output을 읽는 구조라 `infra/foundation/terraform.tfstate`가 있어야 한다. foundation state가 이미 사라졌다면 먼저 state를 복구하거나, Hub 리소스가 이미 삭제된 상태에서 `destroy-all.sh`를 실행할 때는 `DESTROY_HUB=false`로 제외한다.
 
