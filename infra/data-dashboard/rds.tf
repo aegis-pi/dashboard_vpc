@@ -12,6 +12,10 @@ resource "aws_db_subnet_group" "this" {
   })
 }
 
+resource "random_id" "rds_final_snapshot" {
+  byte_length = 4
+}
+
 # ===========================================================================
 # RDS PostgreSQL — db.t4g.micro, Single-AZ, gp3 20 GiB
 # ADR 0017: PostgreSQL for relational metadata (factories, users, alerts)
@@ -40,7 +44,7 @@ resource "aws_db_instance" "this" {
   deletion_protection = false
 
   skip_final_snapshot       = false
-  final_snapshot_identifier = "${local.name_prefix_lc}-pg-final"
+  final_snapshot_identifier = "${local.name_prefix_lc}-pg-final-${random_id.rds_final_snapshot.hex}"
 
   backup_retention_period = 7
   apply_immediately       = true

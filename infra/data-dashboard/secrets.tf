@@ -21,7 +21,7 @@ resource "random_password" "redis_auth_token" {
 resource "aws_secretsmanager_secret" "rds" {
   name                    = "${local.name_prefix_lc}-rds-master"
   description             = "RDS PostgreSQL master credentials for ${local.naming_prefix}"
-  recovery_window_in_days = 7
+  recovery_window_in_days = 0
 
   tags = merge(local.tags, {
     Name = "${local.naming_prefix}-Secret-RDS"
@@ -48,7 +48,7 @@ resource "aws_secretsmanager_secret_version" "rds" {
 resource "aws_secretsmanager_secret" "redis_auth" {
   name                    = "${local.name_prefix_lc}-redis-auth"
   description             = "ElastiCache Redis AUTH token for ${local.naming_prefix}"
-  recovery_window_in_days = 7
+  recovery_window_in_days = 0
 
   tags = merge(local.tags, {
     Name = "${local.naming_prefix}-Secret-RedisAuth"
