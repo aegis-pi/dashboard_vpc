@@ -80,9 +80,9 @@ Authorization: Bearer <Cognito Access Token>
 | --- | --- | --- | --- |
 | GET | `/factories` | 공장 목록과 latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) |
 | GET | `/factories/{factory_id}` | 단일 공장 latest 전체 | DDB GetItem |
-| GET | `/factories/{factory_id}/risk-history?window=1h` | Risk 그래프 | DDB Query (sk begins_with HISTORY#RISK#) |
-| GET | `/factories/{factory_id}/factory-history?window=1h` | 환경 그래프 | DDB Query (sk begins_with HISTORY#FACTORY#) |
-| GET | `/factories/{factory_id}/infra-history?window=1h` | 노드 그래프 | DDB Query (sk begins_with HISTORY#INFRA#) |
+| GET | `/factories/{factory_id}/risk-history?window=1h` | Risk 그래프 | DDB Query (`sk begins_with HISTORY#STATE#`, `risk` 추출) |
+| GET | `/factories/{factory_id}/factory-history?window=1h` | 환경 그래프 | DDB Query (`sk begins_with HISTORY#STATE#`, `factory_state` 추출) |
+| GET | `/factories/{factory_id}/infra-history?window=1h` | 노드 그래프 | DDB Query (`sk begins_with HISTORY#STATE#`, `infra_state` 추출) |
 | GET | `/factories/{factory_id}/processed/{path}` | 장기 이력 단건 조회 (감사) | S3 GetObject (processed/...) |
 | GET | `/reports?date=YYYY-MM-DD` | 날짜 기준 보고서 목록 | DDB Query (`aegis-daily-report`) |
 | GET | `/reports/{factory_id}?date=YYYY-MM-DD` | 공장별 Markdown 보고서 | DDB GetItem + S3 GetObject (reports/...) |

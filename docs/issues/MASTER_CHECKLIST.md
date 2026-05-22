@@ -91,7 +91,7 @@
 - [ ] Step 0 - [도메인] Gabia 신규 도메인 구매 + DNS 전파
 - [ ] Step 1 - [Frontend] Vite + React 마이그레이션, Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
 - [ ] Step 2 - [Terraform] 1번 VPC 골격 (`infra/data-dashboard/`): Public/Private App/Private Data subnet × 2 AZ, IGW, NAT GW × 1, ALB, Route53, ACM, CloudFront, S3 SPA, Cognito
-- [ ] Step 3 - [Terraform] 데이터 저장소: DDB `aegis-factory-status`(Streams), `aegis-daily-report`, S3 prefix, RDS PostgreSQL, ElastiCache Redis, Secrets Manager
+- [ ] Step 3 - [Terraform] 데이터 저장소: 기존 DDB `AEGIS-DynamoDB-FactoryStatus`(Streams), `aegis-daily-report`, S3 prefix, RDS PostgreSQL, ElastiCache Redis, Secrets Manager
 - [ ] Step 4 - [협의] Lambda data processor IoT Rule trigger 방식 워크스트림 A와 합의 (ADR 0018~ 후보) — **합류 지점**
 - [ ] Step 5 - [Lambda] notifier 구현 (DDB Streams → VPC-attach → Redis PUBLISH)
 - [ ] Step 6 - [Backend] FastAPI Dashboard Backend (REST + WebSocket + 4 데이터소스 조합)

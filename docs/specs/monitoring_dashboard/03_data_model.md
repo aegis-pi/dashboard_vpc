@@ -123,8 +123,8 @@ AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipel
 
 | 저장소 | 사용처 |
 | --- | --- |
-| DynamoDB `aegis-factory-status` LATEST | 공장 카드, 현재 상태 화면 |
-| DynamoDB `aegis-factory-status` HISTORY | 최근 1~2시간 그래프 |
+| DynamoDB `AEGIS-DynamoDB-FactoryStatus` LATEST | 공장 카드, 현재 상태 화면 |
+| DynamoDB `AEGIS-DynamoDB-FactoryStatus` HISTORY | 최근 1~2시간 그래프 |
 | S3 `aegis-bucket-data/processed/...` | 장기 이력 / 감사 / drill-down |
 | S3 `aegis-bucket-data/raw/...` | 원본 보존 (Dashboard 직접 조회 제한) |
 
@@ -138,10 +138,10 @@ AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipel
 | 장치 상태 (BME/Camera/Mic) | `LATEST.infra_state.device_summary` | 위와 동일 |
 | 워크로드 상태 | `LATEST.infra_state.workload_summary` | 위와 동일 |
 | 파이프라인 상태 | `LATEST.pipeline_status` | 위와 동일 |
-| Risk 그래프 (1h) | `HISTORY#RISK#*` (30초 last-value) | `sk begins_with HISTORY#RISK#` |
-| 환경 그래프 (1h) | `HISTORY#FACTORY#*` (30초 last-value) | `sk begins_with HISTORY#FACTORY#` |
-| 노드 그래프 (1h) | `HISTORY#INFRA#*` (20초 수신값) | `sk begins_with HISTORY#INFRA#` |
-| 장기 이력 / 감사 | S3 processed | `processed/{type}/{factory_id}/yyyy=.../...` |
+| Risk 그래프 (1h) | `HISTORY#STATE#*`의 `risk` | `sk begins_with HISTORY#STATE#` |
+| 환경 그래프 (1h) | `HISTORY#STATE#*`의 `factory_state` | `sk begins_with HISTORY#STATE#` |
+| 노드 그래프 (1h) | `HISTORY#STATE#*`의 `infra_state` | `sk begins_with HISTORY#STATE#` |
+| 장기 이력 / 감사 | S3 processed | `processed/{factory_id}/{dataset}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.json` |
 
 ### Risk Twin 상태 매핑 (LATEST.risk.level)
 

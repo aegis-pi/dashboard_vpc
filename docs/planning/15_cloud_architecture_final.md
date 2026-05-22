@@ -252,7 +252,7 @@ DynamoDB와 S3는 VPC 밖 managed service로 유지한다. 1번 VPC에는 S3/Dyn
 - Lambda report-generator (EventBridge schedule)
 - Bedrock Claude 3 Haiku
 - EventBridge Scheduler
-- DynamoDB aegis-factory-status (LATEST + HISTORY + Streams)
+- DynamoDB AEGIS-DynamoDB-FactoryStatus (LATEST + HISTORY + Streams)
 - DynamoDB aegis-daily-report
 - S3 aegis-bucket-data raw/processed/reports prefix
 ```
@@ -344,7 +344,7 @@ VPC 외부 / 글로벌 (1번 VPC와 한 영역으로 다이어그램 표기)
   - Lambda data processor (IoT Rule trigger)
   - Lambda report-generator + EventBridge Scheduler
   - Bedrock Claude 3 Haiku
-  - DynamoDB LATEST/HISTORY (`aegis-factory-status`)
+  - DynamoDB LATEST/HISTORY (`AEGIS-DynamoDB-FactoryStatus`)
   - DynamoDB daily report metadata (`aegis-daily-report`)
   - S3 raw / S3 processed (단일 bucket `aegis-bucket-data` + prefix, ADR 0009)
   - Cognito User Pool (관리자 전용, MFA Required)
@@ -409,7 +409,7 @@ Hub EKS / Prometheus Agent / Edge Agent metrics
   - 영역: 1번 Data / Dashboard VPC
   - 마일스톤: M4, M6
   - 리소스: IoT Core 이후 Lambda data processor 라우팅,
-           DynamoDB LATEST/HISTORY (aegis-factory-status),
+           DynamoDB LATEST/HISTORY (AEGIS-DynamoDB-FactoryStatus),
            S3 processed (aegis-bucket-data prefix, ADR 0009),
            Dashboard Web (정적 SPA + S3 + CloudFront, ADR 0006),
            Dashboard Backend (ECS Fargate + ALB, ADR 0012),
@@ -462,7 +462,7 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
             ├ IoT Rule → S3 raw (aegis-bucket-data/raw/...)
             └ IoT Rule → Lambda data processor (VPC 밖)
                         ├ DynamoDB LATEST overwrite
-                        ├ DynamoDB HISTORY (TTL 24h)
+                        ├ DynamoDB HISTORY
                         └ S3 processed (aegis-bucket-data/processed/...)
                            └ DynamoDB Streams → Lambda notifier → Redis → WebSocket
 

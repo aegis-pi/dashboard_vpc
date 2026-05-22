@@ -285,7 +285,7 @@ Terraform locals 권장:
 - Lambda report-generator (EventBridge schedule, Bedrock 호출)
 - Bedrock Claude 3 Haiku
 - EventBridge Scheduler (매일 09:00 KST 일간 보고서)
-- DynamoDB aegis-factory-status (LATEST + HISTORY, TTL 24h, Streams 활성화)
+- DynamoDB AEGIS-DynamoDB-FactoryStatus (LATEST + HISTORY, Streams 활성화)
 - DynamoDB aegis-daily-report (PK: report_date, SK: factory_id)
 - S3 aegis-bucket-data (raw/ + processed/ + reports/, 단일 bucket prefix 분리, ADR 0009)
 - Route53 hosted zone (신규 도메인, Admin UI minsoo-tech.cloud와 분리)
@@ -433,7 +433,7 @@ event
    - VPC Endpoint (S3, DynamoDB)
    - 신규 리소스 이름은 `KJW-AEGIS-Data-*` 또는 lowercase 제약 시 `kjw-aegis-data-*`
 8. 데이터 저장소·처리 (Lambda data processor는 팀 합의 영역, 변경 없음):
-   - DynamoDB `aegis-factory-status` (LATEST + HISTORY + Streams)
+   - DynamoDB `AEGIS-DynamoDB-FactoryStatus` (LATEST + HISTORY + Streams)
    - DynamoDB `aegis-daily-report`
    - S3 `aegis-bucket-data` prefix (`processed/`, `reports/`)
    - RDS PostgreSQL

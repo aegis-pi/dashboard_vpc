@@ -368,7 +368,7 @@
 - IoT 메시지 스키마 source of truth: `docs/specs/iot_data_format.md`
 - 표준 처리 파이프라인: `docs/specs/data_storage_pipeline.md`
 - DynamoDB 키 (요약 — 상세는 `data_storage_pipeline.md` 우선):
-  - `AEGIS-DynamoDB-FactoryStatus` (LATEST + HISTORY 통합): PK `pk` (e.g., `FACTORY#<factory_id>`), SK `sk` (e.g., `LATEST` 또는 `HISTORY#RISK#<ISO timestamp>` / `HISTORY#FACTORY#<ISO timestamp>` / `HISTORY#INFRA#<ISO timestamp>`), Streams `NEW_AND_OLD_IMAGES` 필요. `aegis-factory-status` 신규 사용 금지(ADR 0022)
+  - `AEGIS-DynamoDB-FactoryStatus` (LATEST + HISTORY 통합): PK `pk` (e.g., `FACTORY#<factory_id>`), SK `sk` (e.g., `LATEST` 또는 `HISTORY#STATE#<ISO timestamp>`), Streams `NEW_AND_OLD_IMAGES` 필요. `aegis-factory-status` 신규 사용 금지(ADR 0022)
   - `aegis-daily-report`: PK `report_date` (YYYY-MM-DD), SK `factory_id`
 - S3 prefix: `raw/`, `processed/`, `reports/` (ADR 0009)
 - IoT Rule 트리거: § 5 Phase 1 Step 4 결정 ADR 에 따른다

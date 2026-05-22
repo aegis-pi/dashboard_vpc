@@ -4,6 +4,7 @@
 기준일: 2026-05-21
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-21 v1.3  Step 5.5 apply 완료 (ADR 0022). AEGIS-DynamoDB-FactoryStatus Streams 활성화. Lambda data processor env / IAM / notifier ESM을 공식 table로 재정렬. aegis-factory-status DEPRECATED 태그 추가(삭제 대기).
   - 2026-05-21 v1.2  Step 5 apply 완료. Lambda notifier/SQS DLQ 추가 (7 resources 추가, 누적 73). 리소스 상태 표 갱신.
   - 2026-05-21 v1.1  Step 3 apply 완료. DynamoDB 2개/RDS PostgreSQL/ElastiCache Redis/Secrets Manager 2개 생성(12 resources 추가, 누적 59). 리소스 상태 표 갱신.
   - 2026-05-21 v1.0  Step 2 전체 apply 완료. 47 resources 생성 (3회 apply 누적). ACM ISSUED(ALB ap-south-1 / CloudFront us-east-1). CloudFront 배포/HTTPS listener/S3 bucket policy/Route53 web_cloudfront 레코드 활성. terraform plan No changes 확인. 리소스 상태 표 갱신.
@@ -52,8 +53,8 @@
 | Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | active | active (2026-05-21 apply) |
 | Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 2 certs | **ISSUED** — DNS validation 완료 |
 | Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | active | active (2026-05-21 full apply) |
-| Data/Dashboard VPC | DynamoDB `AEGIS-DynamoDB-FactoryStatus` | 1 table | **active**. 공식 hot store(ADR 0022), 실제 dummy/sensor 데이터 적재 중. Streams 활성화 필요 |
-| Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 1 table | **active but deprecated** (2026-05-21). Step 3~5 중복 생성 table, 신규 사용 중단 예정. 삭제는 별도 승인 필요 |
+| Data/Dashboard VPC | DynamoDB `AEGIS-DynamoDB-FactoryStatus` | 1 table | **active**. 공식 hot store(ADR 0022), Streams NEW_AND_OLD_IMAGES 활성(2026-05-21). Lambda data processor write 대상 |
+| Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 1 table | **active DEPRECATED** (ADR 0022, 2026-05-21). Step 3~5 중복 table, Terraform prevent_destroy. 사용자 삭제 승인 완료, cleanup 대기 |
 | Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 1 table | **active** (2026-05-21). on-demand |
 | Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | db.t4g.micro, gp3 20GiB | **available** (2026-05-21). Single-AZ, maxStorage 100GiB |
 | Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | cache.t4g.micro | **available** (2026-05-21). transit_encryption=true, auth_token=true, single node |
@@ -63,7 +64,7 @@
 | Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 1 rule | **active** (2026-05-21). topic: aegis/+/infra_state |
 | Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 function | **active** (2026-05-21). Python 3.12, 256MB, 30s timeout, VPC-attach |
 | Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 queue | **active** (2026-05-21). 14일 보존 |
-| Data/Dashboard VPC | DDB Streams ESM (factory-status → Lambda notifier) | 1 mapping | **Enabled** (2026-05-21) but currently points to deprecated `aegis-factory-status`; ADR 0022 정렬 필요 |
+| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 mapping | **Enabled** (2026-05-21, ADR 0022 재정렬 완료). UUID dd047019-5dd9-4a89-9995-b33da97a581f |
 | Data/Dashboard VPC | ECS Fargate / Lambda report-generator | 0 | not deployed — Phase 1 Step 6~8 |
 
 현재 확인된 비활성 또는 미생성 항목:

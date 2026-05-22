@@ -149,7 +149,7 @@ Step 3 - Terraform 데이터 저장소 ✅ 완료 (2026-05-21)
   + outputs.tf: Step 3 output 블록 추가 (secret value 미노출)
   + 누적 리소스: 47(Step 2) + 12(Step 3) = 59 resources
 
-Step 4 사전 정렬 ✅ 완료 후 재정렬 필요 (2026-05-21, ADR 0020 → ADR 0022)
+Step 4 사전 정렬 ✅ 완료 (2026-05-21, ADR 0020 → ADR 0022로 table 기준 보정)
   + apps/data-processor: 팀원 원격 코드(aegis-pi/Aegis-pi main) 동기화 완료
     - lambda_function.py / processor/{dynamo,envelope,normalizer,pipeline_status,risk,s3_writer}.py
     - tests/{test_dynamo,test_envelope,test_pipeline_status,test_risk,test_s3_writer}.py
@@ -160,7 +160,7 @@ Step 4 사전 정렬 ✅ 완료 후 재정렬 필요 (2026-05-21, ADR 0020 → A
   + 2026-05-21 재확인: 실제 dummy/sensor 데이터는 기존 AEGIS-DynamoDB-FactoryStatus에 적재 중
     - AEGIS-DynamoDB-FactoryStatus: pk/sk schema, item count 10,380, factory-a LATEST/HISTORY 존재
     - aegis-factory-status: item count 4, Step 4/5 테스트 데이터만 존재
-    - ADR 0022에 따라 공식 hot store를 AEGIS-DynamoDB-FactoryStatus로 재정렬 필요
+    - ADR 0022에 따라 공식 hot store를 AEGIS-DynamoDB-FactoryStatus로 재정렬 완료
   + S3 processed 경로: processed/{factory_id}/{dataset}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.json
     - dataset: factory_state / risk_score / infra_state / state_snapshot (underscore, 팀원 코드/실제 S3 기준)
   + pytest: 20 passed
@@ -185,7 +185,7 @@ Step 4 본 구현 ✅ 완료 (2026-05-21, ADR 0021)
   + outputs.tf: lambda_data_processor_name / iot_rule_factory_state_processor / iot_rule_infra_state_processor
   + ADR: docs/changes/0021-data-processor-iot-rule-trigger.md
 
-Step 5 본 구현 ✅ 완료 후 재정렬 필요 (2026-05-21, ADR 0022)
+Step 5 본 구현 ✅ 완료 (2026-05-21, ADR 0022로 table 기준 보정)
   + Lambda notifier KJW-AEGIS-Data-Lambda-notifier: active (Python 3.12, 256MB, 30s, VPC-attach)
     - VPC: private_app subnet × 2 (Azone/Czone), SG: KJW-AEGIS-Data-SG-LambdaNotifier
     - env: REDIS_HOST=master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com REDIS_PORT=6379 REDIS_AUTH_SECRET_NAME=kjw-aegis-data-redis-auth
@@ -206,24 +206,36 @@ Step 5 본 구현 ✅ 완료 후 재정렬 필요 (2026-05-21, ADR 0022)
   + versions.tf: null provider ~> 3.2 추가
   + outputs.tf: lambda_notifier_name / lambda_notifier_dlq_url / lambda_notifier_event_source_mapping_uuid
   + .gitignore: apps/**/.build/ 추가
-  + 주의: 현재 ESM은 신규 aegis-factory-status Stream 기준. 실제 데이터 table인 AEGIS-DynamoDB-FactoryStatus는 Streams 비활성 상태
-  + 다음: Step 6 전에 ADR 0022 정렬 작업 선행
+  + Step 5.5에서 ESM을 AEGIS-DynamoDB-FactoryStatus Stream 기준으로 재정렬 완료
 ```
 
 다음 세션 최우선 실행 순서 (본 환경):
 
 ```text
-Step 5.5 — DynamoDB 공식 hot store 재정렬 (새 Claude Code 세션, ADR 0022)
-  - 공식 table: AEGIS-DynamoDB-FactoryStatus
-  - 신규 aegis-factory-status 사용 중단
-  - Lambda data processor env / IAM / outputs / docs 정렬
-  - notifier를 유지하려면 AEGIS-DynamoDB-FactoryStatus Streams NEW_AND_OLD_IMAGES 활성화 및 ESM 재연결
-  - aegis-factory-status 삭제는 사용자 별도 승인 전 금지
+Step 5.5 — DynamoDB 공식 hot store 재정렬 + aegis-factory-status 삭제 ✅ 완료 (2026-05-21, ADR 0022)
+  + AEGIS-DynamoDB-FactoryStatus Streams NEW_AND_OLD_IMAGES 활성화 (aws dynamodb update-table 직접 적용)
+  + dynamodb.tf: aws_dynamodb_table.factory_status(aegis-factory-status) resource 블록 완전 제거
+  + dynamodb.tf: data "aws_dynamodb_table" "official_factory_status" → AEGIS-DynamoDB-FactoryStatus 참조
+  + lambda_data_processor.tf: DYNAMODB_TABLE_NAME = AEGIS-DynamoDB-FactoryStatus
+  + apps/data-processor/processor/dynamo.py: 폴백 기본값 aegis-factory-status → AEGIS-DynamoDB-FactoryStatus
+  + iam_data_processor.tf: DynamoDB policy ARN → AEGIS-DynamoDB-FactoryStatus
+  + lambda_notifier.tf: DDB Streams IAM + ESM → AEGIS-DynamoDB-FactoryStatus Stream
+  + outputs.tf: dynamodb_factory_status_name / stream_arn → 공식 table 기준
+  + terraform apply (5.5 정렬): 1 added, 4 changed, 1 destroyed (ESM replace)
+  + terraform apply (5.5 cleanup): 0 added, 1 changed (Lambda code hash), 1 destroyed (aegis-factory-status)
+  + terraform plan (post-cleanup): No changes
+  + aegis-factory-status: ResourceNotFoundException 확인 (삭제 완료)
+  + AEGIS-DynamoDB-FactoryStatus: ACTIVE, StreamSpec NEW_AND_OLD_IMAGES 확인
+  + Lambda data processor env DYNAMODB_TABLE_NAME = AEGIS-DynamoDB-FactoryStatus 확인
+  + notifier ESM UUID dd047019-5dd9-4a89-9995-b33da97a581f, source = AEGIS-DynamoDB-FactoryStatus stream, State=Enabled
+  + AEGIS-DynamoDB-FactoryStatus factory-a LATEST 조회 확인 (updated_at 2026-05-21T07:59:05.956Z)
+  + AEGIS-DynamoDB-FactoryStatus factory-a HISTORY count: 3,616
 
-Step 6 — Dashboard Backend FastAPI 구현 (Step 5.5 완료 후 새 Claude Code 세션)
+Step 6 — Dashboard Backend FastAPI 구현 (새 Claude Code 세션)
   - apps/dashboard-backend/ 신설 (FastAPI, routers/factories.py / routers/ws.py / deps/*)
   - ECR: aegis/dashboard-backend 신규 repo
   - 로컬 docker-compose 검증 (/healthz, /factories, /ws/factories/{id})
+  - DDB_TABLE_STATUS = AEGIS-DynamoDB-FactoryStatus (공식 hot store)
   - 허용 파일: apps/dashboard-backend/**, .github/workflows/dashboard-backend.yml
 
 3. Step 1 Frontend 마이그레이션은 Step 6 이후 진행 가능
@@ -292,21 +304,21 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 5 완료 → Step 5.5 DynamoDB 공식 hot store 재정렬 필요 (ADR 0022)
+현재 단계: Phase 1 Step 5.5 완료 → Step 6 Dashboard Backend FastAPI 구현 준비 (ADR 0022 재정렬 완료)
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
 진행 중(워크스트림 A): M3 Issue 2 ECR 범위는 edge-agent로 확정, ECR repository 생성/스캔 설정 검증 완료
 Phase 1 Step 2: 2026-05-21 전체 apply 완료. 47 resources. terraform plan No changes 확인.
 Phase 1 Step 3: 2026-05-21 apply 완료. 12 resources 추가. terraform plan No changes 확인.
-Phase 1 Step 4 사전 정렬: 2026-05-21 완료 (ADR 0020). apps/data-processor 동기화, DDB pk/sk 교체, S3 경로 스펙 정렬. 단, ADR 0022에 따라 공식 hot store는 기존 AEGIS-DynamoDB-FactoryStatus로 재정렬 필요.
+Phase 1 Step 4 사전 정렬: 2026-05-21 완료 (ADR 0020). apps/data-processor 동기화, DDB pk/sk 교체, S3 경로 스펙 정렬. ADR 0022에 따라 공식 hot store는 기존 AEGIS-DynamoDB-FactoryStatus로 재정렬 완료.
 Phase 1 Step 4 본 구현: 2026-05-21 완료 (ADR 0021). Lambda KJW-AEGIS-Data-Lambda-data-processor active. IoT Rule 2개 active. DDB/S3 end-to-end 검증 완료.
 Phase 1 Step 5 본 구현: 2026-05-21 완료. Lambda notifier KJW-AEGIS-Data-Lambda-notifier active. DDB Streams ESM Enabled. DDB write → Redis PUBLISH 0.45초 검증. DLQ=0.
 backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
 S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
 Data/Dashboard VPC 핵심 리소스: VPC/subnets/NAT GW/IGW/route tables/SGs/ALB/CloudFront/Cognito/S3-web/ACM/Route53 전체 활성
-공식 DynamoDB hot store: AEGIS-DynamoDB-FactoryStatus (실제 dummy/sensor 데이터 적재 중, pk/sk, Streams 비활성 → notifier 사용 시 활성화 필요)
-중복 DynamoDB table: aegis-factory-status (Step 3~5 테스트 데이터만 존재, 신규 사용 중단 예정, 삭제는 별도 승인 필요)
+공식 DynamoDB hot store: AEGIS-DynamoDB-FactoryStatus (Streams NEW_AND_OLD_IMAGES 활성, Lambda data processor write, notifier ESM 연결 완료)
+중복 DynamoDB table: aegis-factory-status 삭제 완료 (2026-05-21, ADR 0022 cleanup)
 DynamoDB aegis-daily-report: ACTIVE, on-demand
 RDS PostgreSQL kjw-aegis-data-pg: available, db.t4g.micro, Single-AZ, gp3 20GiB
 ElastiCache Redis kjw-aegis-data-redis: available, transit_encryption=true, auth_token=true
@@ -314,7 +326,7 @@ Secrets Manager: kjw-aegis-data-rds-master / kjw-aegis-data-redis-auth
 RDS endpoint: kjw-aegis-data-pg.c7ou2qkgi4nf.ap-south-1.rds.amazonaws.com:5432
 Redis primary endpoint: master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com
 apps/data-processor: 팀원 코드 동기화 완료. S3 경로 processed/{factory_id}/{dataset}/... 형식 (팀원 코드/실제 S3 기준)
-다음 작업: Phase 1 Step 5.5 DynamoDB 공식 hot store 재정렬 — 새 Claude Code 세션에서 시작
+다음 작업: Phase 1 Step 6 Dashboard Backend FastAPI 구현 — 새 Claude Code 세션에서 시작
 현재 AWS 상태: Hub/Foundation/IoT/Admin UI 리소스 재생성 완료. ECR `aegis/edge-agent` repository 활성 상태
 남음(워크스트림 A): GitHub Actions OIDC push role, Spoke K3s imagePullSecret 갱신, image push/pull 검증
 완료: M0 factory-a Safe-Edge 기준선
