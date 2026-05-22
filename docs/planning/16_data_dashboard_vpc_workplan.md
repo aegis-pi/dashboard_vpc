@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-21
 수정 이력:
+  - 2026-05-22 v0.8  Data/Dashboard VPC build/destroy wrapper 스크립트 구현. RDS final snapshot 이름을 random suffix로 충돌 방지하고, Secrets Manager는 재생성 사이클을 위해 즉시 삭제 기준으로 변경.
   - 2026-05-21 v0.7  Claude Code 세션 운영 기준 추가. 같은 Step은 기존 세션, Step/Phase 전환은 새 세션으로 시작하고 문서 재확인 후 작업.
   - 2026-05-21 v0.6  VPC 1 Terraform 신규 리소스 이름에 개인 작업 prefix `KJW` 적용. 기본 이름을 `KJW-AEGIS-Data-*`, lowercase 제약 리소스를 `kjw-aegis-data-*`로 고정.
   - 2026-05-21 v0.5  Claude Code Terraform handoff guard 추가. 원격 `aegis-pi/Aegis-pi` main의 VPC 2/Foundation/Factory Terraform은 참고 전용으로 고정하고, VPC 1 root/state/CIDR/공유 리소스 충돌 방지 기준 보강.
@@ -97,7 +98,7 @@
 
 - 데모 운영(월 2회 × 8h) 시 ~$8~10/월
 - 상시 운영 시 ~$125/월
-- destroy 후 ~$2~3/월 (Route53 hosted zone + RDS snapshot 잔존)
+- destroy 후 잔여 비용은 Terraform backend S3 + RDS snapshot storage 중심. Route53 hosted zone / S3 web bucket / Secrets Manager는 destroy 대상
 
 ## 확정 진입 순서 (Phase 1 구현 Step)
 
@@ -325,4 +326,4 @@
 - ECS Backend p95 응답시간 < 500ms (캐시 hit 시 < 100ms)
 - RDS PostgreSQL connection pool overflow 0
 - Bedrock 일간 보고서 매일 09:00 KST 자동 생성 확인
-- destroy 사이클 후 잔존 자원: Route53 hosted zone, S3 bucket, RDS PostgreSQL snapshot만 (NAT GW / ALB / ECS / RDS PostgreSQL instance / Redis / Lambda 모두 0)
+- destroy 사이클 후 잔존 자원: Terraform backend S3 bucket, RDS PostgreSQL snapshot만 (Route53 hosted zone / S3 web bucket / Secrets Manager / NAT GW / ALB / ECS / RDS PostgreSQL instance / Redis / Lambda 모두 0)

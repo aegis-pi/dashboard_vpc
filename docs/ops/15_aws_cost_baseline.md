@@ -1,9 +1,10 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-21
+기준일: 2026-05-22
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-22 v1.4  `infra/data-dashboard` destroy 완료(73 destroyed). Data/Dashboard VPC active 리소스 삭제, backend state bucket + RDS final snapshot만 잔존. build/destroy wrapper와 snapshot/secret 재생성 기준 반영.
   - 2026-05-21 v1.3  Step 5.5 apply 완료 (ADR 0022). AEGIS-DynamoDB-FactoryStatus Streams 활성화. Lambda data processor env / IAM / notifier ESM을 공식 table로 재정렬. aegis-factory-status DEPRECATED 태그 추가(삭제 대기).
   - 2026-05-21 v1.2  Step 5 apply 완료. Lambda notifier/SQS DLQ 추가 (7 resources 추가, 누적 73). 리소스 상태 표 갱신.
   - 2026-05-21 v1.1  Step 3 apply 완료. DynamoDB 2개/RDS PostgreSQL/ElastiCache Redis/Secrets Manager 2개 생성(12 resources 추가, 누적 59). 리소스 상태 표 갱신.
@@ -26,7 +27,7 @@
 
 ## 현재 Aegis 리소스 상태
 
-2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 2026-05-21 Data/Dashboard VPC Step 5 apply 결과 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard VPC는 Step 2의 VPC/ALB/CloudFront/Cognito/Route53 기반, Step 3의 DynamoDB/RDS PostgreSQL/ElastiCache Redis/Secrets Manager, Step 4의 Lambda data processor/IoT Rule, Step 5의 Lambda notifier/SQS DLQ까지 배포 완료됐다.
+2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 2026-05-22 Data/Dashboard VPC destroy 결과 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard VPC는 `scripts/destroy/destroy-data-dashboard.sh`와 동일한 절차로 73개 리소스가 삭제됐다. 현재 Data/Dashboard 측 잔여 리소스는 Terraform backend S3 bucket과 RDS final snapshot이다.
 
 | 영역 | 리소스 | 수량/크기 | 상태 |
 | --- | --- | ---: | --- |
@@ -47,24 +48,24 @@
 | Route53 | public hosted zone `minsoo-tech.cloud` | 1 zone | active |
 | ACM | public certificate for Admin UI hosts | 1 regional certificate set | active / ISSUED |
 | ALB | `aegis-admin-ui` | 1 | active |
-| Data/Dashboard VPC | `infra/data-dashboard/` Terraform (14 tf files) | 47 resources | 전체 apply 완료 (2026-05-21). terraform plan No changes 확인 |
-| Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | apply 완료 |
-| Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 1 zone | active. Gabia NS 위임 완료 |
-| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | active | active (2026-05-21 apply) |
-| Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 2 certs | **ISSUED** — DNS validation 완료 |
-| Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | active | active (2026-05-21 full apply) |
+| Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 0 managed resources in state | destroy 완료 (2026-05-22). `terraform state list` empty |
+| Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | active, 유지 |
+| Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | DynamoDB `AEGIS-DynamoDB-FactoryStatus` | 1 table | **active**. 공식 hot store(ADR 0022), Streams NEW_AND_OLD_IMAGES 활성(2026-05-21). Lambda data processor write 대상 |
-| Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 1 table | **active DEPRECATED** (ADR 0022, 2026-05-21). Step 3~5 중복 table, Terraform prevent_destroy. 사용자 삭제 승인 완료, cleanup 대기 |
-| Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 1 table | **active** (2026-05-21). on-demand |
-| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | db.t4g.micro, gp3 20GiB | **available** (2026-05-21). Single-AZ, maxStorage 100GiB |
-| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | cache.t4g.micro | **available** (2026-05-21). transit_encryption=true, auth_token=true, single node |
-| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 2 secrets | **active** (2026-05-21) |
-| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 1 function | **active** (2026-05-21). Python 3.12, 256MB, 30s timeout |
-| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 1 rule | **active** (2026-05-21). topic: aegis/+/factory_state |
-| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 1 rule | **active** (2026-05-21). topic: aegis/+/infra_state |
-| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 function | **active** (2026-05-21). Python 3.12, 256MB, 30s timeout, VPC-attach |
-| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 queue | **active** (2026-05-21). 14일 보존 |
-| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 mapping | **Enabled** (2026-05-21, ADR 0022 재정렬 완료). UUID dd047019-5dd9-4a89-9995-b33da97a581f |
+| Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 0 | deleted |
+| Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | 0 instance | deleted. final snapshot `kjw-aegis-data-pg-final` available |
+| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 0 | deleted. Terraform now uses immediate deletion for future cycles |
+| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 0 | deleted with notifier (2026-05-22 destroy) |
 | Data/Dashboard VPC | ECS Fargate / Lambda report-generator | 0 | not deployed — Phase 1 Step 6~8 |
 
 현재 확인된 비활성 또는 미생성 항목:
@@ -202,7 +203,7 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | --- | ---: | ---: | ---: |
 | 상시 가동 (24/7) | ~$123.08/월 | ~$1.85/월 | **`~$124.93 / month`** |
 | 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.85/월 | **`~$8.40 / month`** |
-| destroy 후 (Route53 + S3 SPA + RDS PostgreSQL snapshot만) | ~$2.40/월 | ~$0.10/월 | **`~$2.50 / month`** |
+| destroy 후 (Terraform backend S3 + RDS PostgreSQL snapshot만) | snapshot/storage 기준 | ~$0.10/월 | **사용량·snapshot 크기 기준** |
 
 factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write/Bedrock token이 메시지 수에 가장 민감.
 

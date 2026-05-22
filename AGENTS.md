@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > Aegis-Pi Risk Twin 작업 시 AI 코딩 에이전트가 따라야 할 표준 가이드.
-> 기준일: 2026-05-19 / 문서 언어: 한국어 (개조식 우선)
+> 기준일: 2026-05-22 / 문서 언어: 한국어 (개조식 우선)
 > Claude 전용 규칙은 `CLAUDE.md`. 본 문서는 도구 중립 기준.
 > **AI 에이전트 harness 단일 진입점**: `docs/AI_AGENT_HARNESS.md` (phase별 DoD · 허용/금지 파일 · 검증 명령 · 프롬프트 가이드)
 
@@ -13,11 +13,11 @@
 
 ## 현재 상태
 
-- 본 환경(워크스트림 B) 현재 단계: **Phase 1 Step 0~3 진입 준비** — 1번 Data / Dashboard VPC 통합 (`docs/planning/16_data_dashboard_vpc_workplan.md`)
+- 본 환경(워크스트림 B) 현재 단계: **Phase 1 Step 6 진입 준비** — Dashboard Backend FastAPI 구현 (`docs/planning/16_data_dashboard_vpc_workplan.md`)
 - 워크스트림 A(팀, 다른 환경) 진행 중: M3 Issue 2 — ECR push/pull 검증. **본 환경에서는 수정/실행하지 않는다**
 - 완료: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - 보류: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- AWS: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 VPC 미배포. 비용 기준은 `docs/ops/15_aws_cost_baseline.md`
+- AWS: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 Data/Dashboard VPC는 2026-05-22 destroy 완료(backend state bucket + RDS final snapshot만 잔존). 비용 기준은 `docs/ops/15_aws_cost_baseline.md`
 - 시점별 정확한 스냅샷은 항상 `docs/issues/SESSION_STATE.md` 가 우선
 
 ## 디렉터리
@@ -96,8 +96,10 @@ Edge Agent -> IoT Core
 scripts/build/build-all.sh                # 전체 재생성
 scripts/build/build-all.sh --admin-ui     # Admin UI 포함
 scripts/build/build-hub.sh                # Hub만 재생성
+scripts/build/build-data-dashboard.sh     # 1번 Data/Dashboard VPC만 재생성
 scripts/build/build-admin-ui-after-ns.sh  # ACM ISSUED 이후 Admin UI 활성
 scripts/destroy/destroy-hub.sh            # Hub만 삭제
+scripts/destroy/destroy-data-dashboard.sh # 1번 Data/Dashboard VPC만 삭제
 scripts/destroy/destroy-all.sh            # IoT/Hub/foundation 전체 삭제
 scripts/ops/argocd-port-forward.sh        # 로컬 fallback UI
 scripts/ops/grafana-port-forward.sh

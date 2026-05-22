@@ -1,9 +1,10 @@
 # 프로젝트 개요
 
 상태: source of truth
-기준일: 2026-05-20
+기준일: 2026-05-22
 
 수정 이력:
+- 2026-05-22 v0.5  워크스트림 B Phase 1 Step 2~5.5 완료 및 Data/Dashboard VPC destroy 상태, Step 6 진입 준비 반영.
 - 2026-05-20 v0.4  2026-05-15 rebuild, 워크스트림 B Phase 1 통합 목표, M3 Issue 1/4 완료 상태 반영.
 
 ## 목적
@@ -26,7 +27,7 @@ Aegis-Pi 프로젝트의 문제 정의, 목표, 사용자, 핵심 기능, 현재
 - M1 Issue 12에서 `configs/runtime/runtime-config.yaml`과 VM dummy data 추천값을 작성했다.
 - M2 Issue 1~6에서 Tailnet/tag/Auth Key 정책 수립, `factory-a-master` Tailscale 참여, EKS Hub Tailscale Operator/egress 구성, `factory-a` kubeconfig/ArgoCD cluster 등록, `factory-a-podinfo-smoke` Sync/Healthy, Tailscale egress 장애/복구 검증을 완료했다.
 - 워크스트림 A는 M3 Issue 2 ECR image push/pull 검증과 Spoke imagePullSecret 방식을 진행 중이다. 본 환경에서는 워크스트림 A 자산을 수정/실행하지 않는다.
-- 본 환경의 다음 작업은 1번 Data/Dashboard VPC Phase 1 Step 0~3 진입 준비다.
+- 본 환경의 다음 작업은 1번 Data/Dashboard VPC Phase 1 Step 6 Dashboard Backend FastAPI 구현 준비다.
 - `factory-b`, `factory-c`, Edge Agent 송신 측, 일부 CI/CD 마무리는 워크스트림 A 또는 후속 확장 단계다.
 
 ## 프로젝트명

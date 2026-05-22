@@ -1,7 +1,7 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-21
+기준일: 2026-05-22
 
 ## 목적
 
@@ -81,7 +81,7 @@ Phase 1 (확정 배포 목표)
   + 1번 VPC Public/Private App/Private Data 3-tier + NAT GW × 1 (ADR 0011 supersede)
   + CloudFront + S3 SPA + Cognito (변경 없음)
 
-데모 운영 패턴 (build/destroy 사이클): 월 ~$8~10, destroy 후 ~$2~3
+데모 운영 패턴 (build/destroy 사이클): 월 ~$8~10, destroy 후 잔여 비용은 Terraform backend S3 + RDS snapshot storage 중심
 상시 가동 시: 월 ~$125
 ```
 
@@ -316,15 +316,11 @@ Phase 1 Step 4 본 구현: 2026-05-21 완료 (ADR 0021). Lambda KJW-AEGIS-Data-L
 Phase 1 Step 5 본 구현: 2026-05-21 완료. Lambda notifier KJW-AEGIS-Data-Lambda-notifier active. DDB Streams ESM Enabled. DDB write → Redis PUBLISH 0.45초 검증. DLQ=0.
 backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
 S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
-Data/Dashboard VPC 핵심 리소스: VPC/subnets/NAT GW/IGW/route tables/SGs/ALB/CloudFront/Cognito/S3-web/ACM/Route53 전체 활성
+Data/Dashboard VPC 핵심 리소스: 2026-05-22 destroy 완료(73 destroyed). Terraform state empty. VPC/subnets/NAT GW/ALB/CloudFront/Cognito/S3-web/ACM/Route53/RDS/Redis/Lambda/SQS/aegis-daily-report 삭제 완료
 공식 DynamoDB hot store: AEGIS-DynamoDB-FactoryStatus (Streams NEW_AND_OLD_IMAGES 활성, Lambda data processor write, notifier ESM 연결 완료)
 중복 DynamoDB table: aegis-factory-status 삭제 완료 (2026-05-21, ADR 0022 cleanup)
-DynamoDB aegis-daily-report: ACTIVE, on-demand
-RDS PostgreSQL kjw-aegis-data-pg: available, db.t4g.micro, Single-AZ, gp3 20GiB
-ElastiCache Redis kjw-aegis-data-redis: available, transit_encryption=true, auth_token=true
-Secrets Manager: kjw-aegis-data-rds-master / kjw-aegis-data-redis-auth
-RDS endpoint: kjw-aegis-data-pg.c7ou2qkgi4nf.ap-south-1.rds.amazonaws.com:5432
-Redis primary endpoint: master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com
+Data/Dashboard 잔여 리소스: kjw-aegis-terraform-state S3 backend bucket, RDS final snapshot kjw-aegis-data-pg-final
+Terraform 재생성 보강: RDS final snapshot 이름 random suffix 적용, Secrets Manager recovery_window_in_days=0 적용, build/destroy wrapper 신규 추가
 apps/data-processor: 팀원 코드 동기화 완료. S3 경로 processed/{factory_id}/{dataset}/... 형식 (팀원 코드/실제 S3 기준)
 다음 작업: Phase 1 Step 6 Dashboard Backend FastAPI 구현 — 새 Claude Code 세션에서 시작
 현재 AWS 상태: Hub/Foundation/IoT/Admin UI 리소스 재생성 완료. ECR `aegis/edge-agent` repository 활성 상태
@@ -854,9 +850,10 @@ ADR 0007 Dashboard API 부분 superseded by 0012, ADR 0011 superseded by 0012
   docs/architecture/README.md
   docs/planning/16_data_dashboard_vpc_workplan.md (Step 0~10 구현 순서)
   docs/ops/15_aws_cost_baseline.md (Phase 1 비용 + 데모 운영 패턴)
+  docs/ops/22_data_dashboard_vpc_runbook.md (Data/Dashboard apply/destroy 절차)
 
 운영 패턴 확정: 데모 직전 build-data-dashboard.sh / 직후 destroy-data-dashboard.sh
-  데모 운영 ~$8~10/월, 상시 운영 ~$125/월, destroy 후 ~$2~3/월
+  데모 운영 ~$8~10/월, 상시 운영 ~$125/월, destroy 후 잔여 비용은 Terraform backend S3 + RDS snapshot storage 중심
 
 본 환경(워크스트림 B) 다음 작업: Phase 1 Step 0~1 시작
   - Gabia 도메인 구매 + Frontend Vite + React 마이그레이션 (병행)

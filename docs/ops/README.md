@@ -28,6 +28,7 @@
 | `19_factory_c_windows_virtualbox_k3s.md` | Windows VirtualBox 기반 `factory-c` K3s 구축과 IoT 데이터 송신 검증 |
 | `20_tailscale_hub_spoke_runbook.md` | Tailscale 기반 Hub-Spoke 연결 실행 절차 |
 | `21_hub_admin_ui_ingress.md` | ArgoCD/Grafana 관리자 HTTPS Ingress 운영 절차 |
+| `22_data_dashboard_vpc_runbook.md` | 1번 Data/Dashboard VPC apply/destroy 절차 |
 
 ## 기준
 
