@@ -4,6 +4,8 @@
 결정일: 2026-05-21
 관련 범위: M4 데이터 플레인, apps/data-processor, DynamoDB aegis-factory-status, S3 processed prefix, 워크스트림 B
 
+후속 보정: ADR 0022에서 공식 hot store를 기존 실데이터 table `AEGIS-DynamoDB-FactoryStatus`로 변경했다. 본 문서의 `aegis-factory-status` 내용은 Step 3~5 당시의 중간 결정으로만 남긴다.
+
 ## 기존 계획
 
 - `apps/lambda-data-processor` 또는 별도 디렉터리로 Lambda 코드를 작성 예정
@@ -99,6 +101,8 @@ processed/factory-a/state_snapshot/yyyy=2026/mm=05/dd=21/hh=10/{updated_at}.json
 ### DynamoDB
 
 `aegis-factory-status` 테이블이 재생성되었다. Stream ARN이 변경되었으므로 DDB Streams 기반 notifier Lambda(Step 5)는 새 Stream ARN을 참조해야 한다.
+
+후속 ADR 0022에 따라 이 table은 deprecated 되었고, 공식 LATEST/HISTORY hot store는 `AEGIS-DynamoDB-FactoryStatus`다.
 
 ### 테스트
 

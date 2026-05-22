@@ -35,7 +35,7 @@ resource "aws_lambda_function" "data_processor" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE_NAME = aws_dynamodb_table.factory_status.name
+      DYNAMODB_TABLE_NAME = data.aws_dynamodb_table.official_factory_status.name
       S3_BUCKET_NAME      = "aegis-bucket-data"
       HISTORY_TTL_HOURS   = "48"
     }

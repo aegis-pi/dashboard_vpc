@@ -4,6 +4,8 @@
 결정일: 2026-05-21
 관련 범위: Phase 1 Step 4, apps/data-processor, infra/data-dashboard, M4 데이터 플레인 합류 지점
 
+후속 보정: ADR 0022에서 `DYNAMODB_TABLE_NAME`과 IAM 대상 table을 `AEGIS-DynamoDB-FactoryStatus`로 변경했다. 아래 `aegis-factory-status` 값은 Step 4 당시 중간 적용값이다.
+
 ## 기존 계획
 
 `docs/AI_AGENT_HARNESS.md` § 5.4 Step 4는 기존 Rule `AEGIS_IoTRule_factory_a_raw_s3` 확장(옵션 A) 또는 신규 IoT Rule 추가(옵션 B) 중 하나를 ADR로 결정하도록 명시했다.
@@ -38,7 +40,7 @@ action: Lambda data processor (`KJW-AEGIS-Data-Lambda-data-processor`) invoke
 | Source | `apps/data-processor/` |
 | Timeout | 30초 |
 | Memory | 256 MB |
-| DYNAMODB_TABLE_NAME | `aegis-factory-status` |
+| DYNAMODB_TABLE_NAME | `AEGIS-DynamoDB-FactoryStatus` |
 | S3_BUCKET_NAME | `aegis-bucket-data` |
 | HISTORY_TTL_HOURS | `48` |
 
@@ -47,7 +49,7 @@ action: Lambda data processor (`KJW-AEGIS-Data-Lambda-data-processor`) invoke
 - 이름: `KJW-AEGIS-Data-IAMRole-Lambda-data-processor`
 - Managed: `AWSLambdaBasicExecutionRole`
 - Inline:
-  - `dynamodb:GetItem/PutItem/UpdateItem` on `aegis-factory-status`
+  - `dynamodb:GetItem/PutItem/UpdateItem` on `AEGIS-DynamoDB-FactoryStatus`
   - `s3:PutObject` on `aegis-bucket-data/processed/*`
 
 ### IoT Rules

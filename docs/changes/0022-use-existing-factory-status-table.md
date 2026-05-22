@@ -37,7 +37,7 @@ Dashboard LATEST/HISTORY의 공식 hot store는 기존 실데이터 table `AEGIS
 - Lambda data processor는 `AEGIS-DynamoDB-FactoryStatus`에 write해야 한다.
 - Lambda notifier는 `AEGIS-DynamoDB-FactoryStatus` Streams를 event source로 사용해야 한다.
 - `AEGIS-DynamoDB-FactoryStatus`는 현재 Streams가 비활성이다. Step 5 WebSocket notifier를 유지하려면 `NEW_AND_OLD_IMAGES` Streams 활성화가 필요하다.
-- `aegis-factory-status` 삭제는 Terraform 참조 제거와 검증 후 별도 사용자 승인 아래 진행한다. 사용자 승인 전 destroy/delete를 실행하지 않는다.
+- `aegis-factory-status` 삭제는 Terraform 참조 제거와 검증 후 진행한다. 2026-05-21 사용자 삭제 승인을 받았으므로, cleanup plan이 해당 table 1개 destroy만 포함하는 경우에만 apply한다.
 - `AEGIS-DynamoDB-FactoryStatus`는 워크스트림 합류 지점이므로 변경은 문서화하고 워크스트림 A 금지 영역을 수정하지 않는다.
 
 ## 업데이트 필요한 문서
@@ -65,3 +65,14 @@ Dashboard LATEST/HISTORY의 공식 hot store는 기존 실데이터 table `AEGIS
 - Lambda data processor env가 `AEGIS-DynamoDB-FactoryStatus`를 가리키는지 확인
 - notifier event source mapping이 `AEGIS-DynamoDB-FactoryStatus` Stream을 가리키는지 확인
 - 기존 실데이터 LATEST/HISTORY 조회가 Dashboard Backend Step 6 입력으로 사용 가능한지 확인
+
+## Cleanup 완료 (2026-05-21)
+
+- `dynamodb.tf`에서 `aws_dynamodb_table.factory_status` resource 블록 제거 (prevent_destroy 포함)
+- `apps/data-processor/processor/dynamo.py` 폴백 기본값 수정 (`aegis-factory-status` → `AEGIS-DynamoDB-FactoryStatus`)
+- `terraform apply`: 0 added, 1 changed (Lambda code hash), 1 destroyed (`aegis-factory-status`)
+- `terraform plan` (post-apply): No changes
+- `aws dynamodb describe-table --table-name aegis-factory-status` → ResourceNotFoundException 확인
+- `aws dynamodb describe-table --table-name AEGIS-DynamoDB-FactoryStatus` → ACTIVE, StreamViewType NEW_AND_OLD_IMAGES 확인
+- Lambda data processor `DYNAMODB_TABLE_NAME = AEGIS-DynamoDB-FactoryStatus` 확인
+- notifier ESM source = `AEGIS-DynamoDB-FactoryStatus` stream 확인

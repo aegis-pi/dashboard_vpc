@@ -1,38 +1,14 @@
 # ===========================================================================
-# DynamoDB — aegis-factory-status (LATEST + HISTORY unified table)
+# DynamoDB — 공식 hot store: AEGIS-DynamoDB-FactoryStatus (ADR 0022)
+# 기존 실데이터 table. data source로만 참조 (Terraform 관리 대상 아님).
 # PK: pk (S)  SK: sk (S)
 # LATEST item   pk = "FACTORY#{factory_id}", sk = "LATEST"
-# HISTORY items pk = "FACTORY#{factory_id}", sk = "HISTORY#STATE#{ISO8601}"
-# TTL: 48h for HISTORY items (ttl attribute)
+# HISTORY items pk = "FACTORY#{factory_id}", sk = "HISTORY#*#{ISO8601}"
+# Streams: NEW_AND_OLD_IMAGES (활성화 2026-05-21, aws dynamodb update-table 직접 적용)
 # ===========================================================================
 
-resource "aws_dynamodb_table" "factory_status" {
-  name         = "aegis-factory-status"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "pk"
-  range_key    = "sk"
-
-  attribute {
-    name = "pk"
-    type = "S"
-  }
-
-  attribute {
-    name = "sk"
-    type = "S"
-  }
-
-  stream_enabled   = true
-  stream_view_type = "NEW_AND_OLD_IMAGES"
-
-  ttl {
-    attribute_name = "ttl"
-    enabled        = true
-  }
-
-  tags = merge(local.tags, {
-    Name = "${local.naming_prefix}-DDB-FactoryStatus"
-  })
+data "aws_dynamodb_table" "official_factory_status" {
+  name = "AEGIS-DynamoDB-FactoryStatus"
 }
 
 # ===========================================================================

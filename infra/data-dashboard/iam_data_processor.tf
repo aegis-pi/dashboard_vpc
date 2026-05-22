@@ -1,7 +1,7 @@
 # ===========================================================================
 # IAM — Lambda data processor
 # Trust: lambda.amazonaws.com
-# Permissions: CloudWatch Logs, DynamoDB (aegis-factory-status), S3 processed/*
+# Permissions: CloudWatch Logs, DynamoDB (AEGIS-DynamoDB-FactoryStatus), S3 processed/*
 # ===========================================================================
 
 data "aws_caller_identity" "current" {}
@@ -57,7 +57,7 @@ data "aws_iam_policy_document" "lambda_data_processor_inline" {
     ]
 
     resources = [
-      "arn:aws:dynamodb:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/aegis-factory-status",
+      data.aws_dynamodb_table.official_factory_status.arn,
     ]
   }
 

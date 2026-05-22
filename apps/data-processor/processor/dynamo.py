@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 import boto3
 
 _dynamodb = boto3.resource("dynamodb")
-TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "aegis-factory-status")
+TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "AEGIS-DynamoDB-FactoryStatus")
 HISTORY_TTL_SECONDS = int(os.environ.get("HISTORY_TTL_HOURS", "48")) * 3600
 LATEST_SK = "LATEST"
 HISTORY_STATE_PREFIX = "HISTORY#STATE#"

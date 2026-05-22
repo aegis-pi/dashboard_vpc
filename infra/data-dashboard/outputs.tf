@@ -179,13 +179,13 @@ output "dashboard_web_url" {
 # ---------------------------------------------------------------------------
 
 output "dynamodb_factory_status_name" {
-  description = "DynamoDB table name: aegis-factory-status (LATEST + HISTORY)."
-  value       = aws_dynamodb_table.factory_status.name
+  description = "DynamoDB table name: AEGIS-DynamoDB-FactoryStatus (공식 hot store, ADR 0022)."
+  value       = data.aws_dynamodb_table.official_factory_status.name
 }
 
 output "dynamodb_factory_status_stream_arn" {
-  description = "DynamoDB Streams ARN for aegis-factory-status (used by Lambda notifier in Step 5)."
-  value       = aws_dynamodb_table.factory_status.stream_arn
+  description = "DynamoDB Streams ARN for AEGIS-DynamoDB-FactoryStatus (used by Lambda notifier ESM)."
+  value       = data.aws_dynamodb_table.official_factory_status.stream_arn
 }
 
 output "dynamodb_daily_report_name" {

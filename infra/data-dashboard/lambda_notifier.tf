@@ -61,14 +61,14 @@ data "aws_iam_policy_document" "lambda_notifier_inline" {
       "dynamodb:GetShardIterator",
       "dynamodb:DescribeStream",
     ]
-    resources = [aws_dynamodb_table.factory_status.stream_arn]
+    resources = [data.aws_dynamodb_table.official_factory_status.stream_arn]
   }
 
   statement {
     sid       = "DDBListStreams"
     effect    = "Allow"
     actions   = ["dynamodb:ListStreams"]
-    resources = [aws_dynamodb_table.factory_status.arn]
+    resources = [data.aws_dynamodb_table.official_factory_status.arn]
   }
 
   statement {
@@ -160,7 +160,7 @@ resource "aws_lambda_function" "notifier" {
 # ---------------------------------------------------------------------------
 
 resource "aws_lambda_event_source_mapping" "ddb_streams_notifier" {
-  event_source_arn               = aws_dynamodb_table.factory_status.stream_arn
+  event_source_arn               = data.aws_dynamodb_table.official_factory_status.stream_arn
   function_name                  = aws_lambda_function.notifier.arn
   starting_position              = "LATEST"
   batch_size                     = 10
