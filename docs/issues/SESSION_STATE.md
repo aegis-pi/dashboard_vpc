@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 9.5 이후 비용 절감을 위해 infra/data-dashboard destroy 완료 반영. 73 resources destroyed, state empty. permanent/dns root는 유지. dashboard 웹은 HTTP 200, API DNS 제거는 정상 상태.
   - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설(25 resources import). data-dashboard state rm 20개. 양쪽 plan No destroy. HTTP 200 엔드포인트 확인. 다음: post-migration plan diff 정리 후 Step 10 운영 자동화/데모 준비.
   - 2026-05-26  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. 의존성 분석, migration 순서 문서화. 다음: Step 9.5 migration 실행 (다음 세션, infra/data-dashboard-permanent/ 신설 + import/state rm/apply).
   - 2026-05-26  Step 9 Part 2 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. 다음: Step 10(LLM 보고서, 팀원) 또는 데모 준비.
@@ -339,7 +340,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent resource split migration 완료(2026-05-26). infra/data-dashboard-permanent/ 신규 root 생성, 25 resources import, data-dashboard state rm 20개 완료. permanent plan: 0 destroy. data-dashboard plan: ECS task def 교체만(영구 리소스 없음). https://dashboard.aegis-pi.cloud/ HTTP 200, https://api.aegis-pi.cloud/healthz HTTP 200 확인. 다음: post-migration plan diff 정리 후 Step 10 운영 자동화/데모 준비.
+현재 단계: Phase 1 Step 9.5 permanent resource split migration 완료 후 임시 root destroy 완료(2026-05-26). infra/data-dashboard-permanent/ 25 resources와 infra/data-dashboard-dns/ hosted zone은 유지. infra/data-dashboard/는 73 resources destroyed, state empty. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz는 API/ALB/DNS 제거로 미응답이 정상. 다음: post-migration permanent 3 in-place diff 정리 후 Step 10 운영 자동화/데모 준비.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -351,10 +352,10 @@ Phase 1 Step 4 본 구현: 2026-05-21 완료 (ADR 0021). Lambda KJW-AEGIS-Data-L
 Phase 1 Step 5 본 구현: 2026-05-21 완료. Lambda notifier KJW-AEGIS-Data-Lambda-notifier active. DDB Streams ESM Enabled. DDB write → Redis PUBLISH 0.45초 검증. DLQ=0.
 backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
 S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
-Data/Dashboard VPC 핵심 리소스: 2026-05-22 destroy 완료(73 destroyed). Terraform state empty. VPC/subnets/NAT GW/ALB/CloudFront/Cognito/S3-web/ACM/Route53/RDS/Redis/Lambda/SQS/aegis-daily-report 삭제 완료
-공식 DynamoDB hot store: AEGIS-DynamoDB-FactoryStatus (Streams NEW_AND_OLD_IMAGES 활성, Lambda data processor write, notifier ESM 연결 완료)
+Data/Dashboard VPC 일시 root: 2026-05-26 destroy 완료(73 destroyed). Terraform state empty. VPC/subnets/NAT GW/ALB/RDS/Redis/Lambda/SQS/API DNS/ALB ACM/런타임 Secrets 삭제 완료. CloudFront/Cognito/S3-web/CF ACM/aegis-daily-report/ECR/OIDC roles는 permanent root로 유지.
+공식 DynamoDB hot store: AEGIS-DynamoDB-FactoryStatus (Streams NEW_AND_OLD_IMAGES 활성. data-dashboard 재생성 시 Lambda data processor write / notifier ESM 연결)
 중복 DynamoDB table: aegis-factory-status 삭제 완료 (2026-05-21, ADR 0022 cleanup)
-Data/Dashboard 잔여 리소스: kjw-aegis-terraform-state S3 backend bucket, RDS final snapshot kjw-aegis-data-pg-final
+Data/Dashboard 잔여 리소스: kjw-aegis-terraform-state S3 backend bucket, infra/data-dashboard-dns hosted zone, infra/data-dashboard-permanent 리소스 25개, RDS final snapshot
 Terraform 재생성 보강: RDS final snapshot 이름 random suffix 적용, Secrets Manager recovery_window_in_days=0 적용, build/destroy wrapper 신규 추가
 apps/data-processor: 팀원 코드 동기화 완료. S3 경로 processed/{factory_id}/{dataset}/... 형식 (팀원 코드/실제 S3 기준)
 Phase 1 Step 6: 2026-05-26 완료. apps/dashboard-backend/ 신설. pytest 18 passed. docker build 통과.
@@ -692,6 +693,28 @@ secret exists, DATA=4
     - generate_secret = false: ForceNew 속성 — permanent root에서 제거
       (Cognito client는 항상 public client로 생성됨)
   + ADR 0024 작성 완료 (docs/changes/0024-data-dashboard-permanent-resource-split.md)
+```
+
+### 0.1 완료: Phase 1 Step 9.5 — 임시 root destroy (2026-05-26)
+
+```text
+완료 내용:
+  + terraform -chdir=infra/data-dashboard plan -destroy:
+    - Plan: 0 to add, 0 to change, 73 to destroy
+    - 영구 root 리소스 삭제 계획 없음 확인
+  + terraform -chdir=infra/data-dashboard apply:
+    - Apply complete: 0 added, 0 changed, 73 destroyed
+  + Lambda VPC ENI 2개가 available 상태로 남아 수동 삭제 후 destroy 완료
+  + infra/data-dashboard state list: 0
+  + infra/data-dashboard-permanent state list: 25
+  + infra/data-dashboard-dns state list: 1
+  + https://dashboard.aegis-pi.cloud/ → HTTP 200, CloudFront Hit
+  + https://api.aegis-pi.cloud/healthz → DNS 미해결. API/ALB destroy 후 정상
+  + RDS final snapshot: available 확인
+
+남은 비용 기준:
+  + Route53 hosted zone, ECR 이미지 스토리지, S3/CloudFront 소량 사용량, RDS final snapshot storage
+  + NAT Gateway, ALB, ECS, RDS instance, Redis, Lambda, Secrets Manager 런타임 비용은 중지
 ```
 
 ### 1. 완료: Phase 1 Step 9 Part 2 end-to-end 통합 검증 (2026-05-26)

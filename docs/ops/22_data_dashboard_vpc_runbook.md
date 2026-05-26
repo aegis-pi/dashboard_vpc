@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.7  Step 9.5 이후 infra/data-dashboard destroy 완료 기준 반영. permanent/dns root 유지와 API DNS 제거 상태 명시.
   - 2026-05-26 v0.6  Step 9.5 migration 완료 결과 반영. checklist 체크 완료. 엔드포인트 검증 확인.
   - 2026-05-26 v0.5  Step 9.5 permanent resource split migration checklist 추가. ADR 0024 참조.
   - 2026-05-26 v0.4  Step 9 end-to-end 통합 검증 결과 섹션 추가. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료 항목과 미검증 항목 분리 기록.
@@ -18,6 +19,7 @@
 ```text
 infra/data-dashboard/      # 재생성 자원
 infra/data-dashboard-dns/  # Route53 Hosted Zone 영구 자원
+infra/data-dashboard-permanent/  # Cognito/ECR/DDB report/S3 web/CloudFront 영구 자원
 ```
 
 손대지 않는 영역:
@@ -37,19 +39,19 @@ scripts/destroy/destroy-all.sh
 
 - `kjw-aegis-terraform-state` S3 bucket: Terraform backend. 유지.
 - Route53 hosted zone `aegis-pi.cloud`: Step 7.5 이후 `infra/data-dashboard-dns/`가 영구 관리. 유지.
+- Cognito, ECR, DynamoDB `aegis-daily-report`, S3 web bucket, CloudFront, CloudFront ACM, dashboard alias record, GitHub OIDC roles: Step 9.5 이후 `infra/data-dashboard-permanent/`가 영구 관리. 유지.
 - RDS final snapshot `kjw-aegis-data-pg-final-*`: 복구용 snapshot. 필요 시 수동 정리.
 - Secrets Manager secret은 `recovery_window_in_days = 0` 기준으로 즉시 삭제.
 
 삭제 대상:
 
 - Data/Dashboard VPC, subnet, route table, NAT Gateway, ALB, security group
-- CloudFront, S3 dashboard web bucket, ACM certificate
-- Route53 records: ACM validation record, `api`, `dashboard` alias record
-- Cognito User Pool
+- ALB ACM certificate
+- Route53 records: ALB ACM validation record, `api` alias record
 - RDS PostgreSQL instance, ElastiCache Redis
 - Lambda data processor, Lambda notifier, SQS DLQ
 - 신규 IoT Rule `KJW_AEGIS_Data_*`
-- DynamoDB `aegis-daily-report`
+- ECS Cluster/TaskDef/Service, CloudWatch Logs, runtime Secrets
 
 삭제하지 않는 공유 리소스:
 
@@ -57,6 +59,18 @@ scripts/destroy/destroy-all.sh
 - S3 `aegis-bucket-data`
 - 기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3`
 - Hub/Foundation/EKS/Admin UI 리소스
+
+2026-05-26 실제 destroy 결과:
+
+```text
+infra/data-dashboard apply destroy: 73 destroyed
+infra/data-dashboard state list: 0
+infra/data-dashboard-permanent state list: 25
+infra/data-dashboard-dns state list: 1
+dashboard.aegis-pi.cloud: HTTP 200
+api.aegis-pi.cloud: DNS 미해결 (API/ALB destroy 후 정상)
+RDS final snapshot: available
+```
 
 ## Route53 Hosted Zone 영구 분리
 
@@ -523,6 +537,7 @@ tfplan.destroy 삭제
 ```
 
 RDS는 final snapshot을 생성한다. snapshot 이름은 Terraform `random_id`를 포함해 매 apply/destroy 사이클마다 충돌하지 않는다.
+Lambda VPC ENI가 `available` 상태로 남아 보안 그룹/서브넷 삭제가 지연될 수 있다. AWS가 자동 정리하지 않으면 해당 destroy 대상 VPC ENI만 확인 후 정리한다.
 
 ## 수동 확인
 
