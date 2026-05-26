@@ -3,7 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
-  - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 end-to-end 통합 검증.
+  - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공, Node 24 workflow runtime 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 end-to-end 통합 검증.
   - 2026-05-26  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. TL;DR·현재 구현 상태·Known Gaps 갱신. 다음 작업 Step 9로 전환.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 완료 반영. infra/data-dashboard-dns/ allowlist 추가. TL;DR 갱신.
@@ -305,10 +305,11 @@
 
 - **Part 1 — S3+CloudFront 배포 CI/CD (2026-05-26 구현 및 배포 완료)**:
   - GitHub Actions `.github/workflows/dashboard-web.yml` 신설 (push main + workflow_dispatch 트리거)
+  - Workflow Node runtime: `node-version: "24"` + `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`
   - IAM role `KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy` 신설 (ADR 0023, 별도 role, 최소권한)
   - Terraform apply: 2 added, 0 changed, 0 destroyed
   - 등록 완료: repo-level Secret `AWS_OIDC_DASHBOARD_WEB_ROLE_ARN`, repo-level Variables 9종 (`DASHBOARD_WEB_BUCKET`, `DASHBOARD_CLOUDFRONT_DISTRIBUTION_ID`, `VITE_*` 7종)
-  - 배포 확인: dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료, dashboard/API health HTTP 200 확인
+  - 배포 확인: dashboard-web workflow 성공(Node 24 기준), S3 sync + CloudFront invalidation 완료, dashboard/API health HTTP 200 확인
 - **Part 2 — End-to-end 통합 검증** (SPA 배포 후 진행):
   - 목표: factory-a → IoT Core → Lambda data processor → DDB LATEST → Streams → notifier → Redis → WebSocket push 의 전체 경로 측정
   - DoD (수치 목표, `16_data_dashboard_vpc_workplan.md` § Step 9):
@@ -569,4 +570,4 @@
 | 2026-05-26 | v1.1 | Step 6 완료 반영. TL;DR·§ 2·§ 10.1 갱신. Step 1 frontend/ vs apps/dashboard-web/ 경로 구분 추가. Known Gaps에서 apps/dashboard-backend/ 완료 처리. |
 | 2026-05-26 | v1.2 | Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거. |
 | 2026-05-26 | v1.3 | Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현 완료. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 S3+CloudFront 배포 CI/CD. |
-| 2026-05-26 | v1.4 | Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. |
+| 2026-05-26 | v1.4 | Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공, Node 24 workflow runtime 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. |

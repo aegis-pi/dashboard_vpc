@@ -3,7 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
-  - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions dashboard-web.yml, IAM OIDC web deploy role(ADR 0023), Terraform plan 2 add 0 change 확인.
+  - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions dashboard-web.yml, IAM OIDC web deploy role(ADR 0023), Terraform plan 2 add 0 change 확인. Workflow Node runtime은 Node 24 기준으로 확정.
   - 2026-05-26  Step 8 운영용 Frontend Vite + React 마이그레이션 완료 반영. apps/dashboard-web/ SPA 구현. npm run build/lint/test 통과.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. Organization secret 등록(사용자 확인), ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인.
   - 2026-05-26  Step 7 apply 완료 반영 (92 resources, ECS desired_count=0). Step 7.5 Route53 Hosted Zone 영구 분리 완료 반영 (infra/data-dashboard-dns/ 신설, state 이전 절차 문서화).
@@ -692,6 +692,8 @@ Step 9 CI/CD 구현 완료 내용 (2026-05-26):
       - repo-level variables 9종 등록 완료
   + 실제 배포:
       - dashboard-web workflow push run 성공
+      - workflow Node runtime: Node 24 기준 성공 (FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true)
+      - Node 20 deprecation annotation은 사용 action 내부 target 경고로 남아 있으며, Node 20으로 rollback하지 않음
       - test job: 성공
       - build-and-deploy job: 성공
       - S3 sync + CloudFront invalidation 완료
@@ -714,7 +716,7 @@ Step 9 CI/CD 구현 완료 내용 (2026-05-26):
 
 다음 작업:
   1. Step 9 end-to-end 통합 검증 (IoT → DDB → WebSocket → Dashboard SPA 전체 경로)
-  2. GitHub Actions Node 24 전환 경고/호환성 추적
+  2. GitHub Actions action version의 Node 24 native 전환 추적
 ```
 
 ### 2. 완료: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션

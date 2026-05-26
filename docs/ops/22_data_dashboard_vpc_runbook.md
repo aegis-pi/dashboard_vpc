@@ -109,6 +109,14 @@ Terraform state에서만 추적을 해제한다.
   build-and-deploy:  npm ci → build (VITE_* env) → OIDC configure → S3 sync → CF invalidate
 ```
 
+### Node runtime 기준
+
+- `actions/setup-node@v4`의 앱 빌드 runtime은 `node-version: "24"`로 고정한다.
+- `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`를 유지한다.
+- GitHub Actions가 2026-06-02부터 Node 24 강제 전환, 2026-09-16부터 Node 20 제거를 예고했으므로 Node 20으로 되돌리지 않는다.
+- 남는 Node 20 deprecation annotation은 `actions/checkout@v4`, `actions/setup-node@v4`, `aws-actions/configure-aws-credentials@v4` 액션 내부 target 경고다. 현재 workflow는 Node 24 강제 실행 상태에서 성공했다.
+- 후속 조치: 각 action의 Node 24 native major/version이 공개되면 action version을 갱신한다.
+
 ### IAM role
 
 - `KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy` (ADR 0023, 별도 role)
@@ -172,6 +180,7 @@ aws s3 sync apps/dashboard-web/dist/ s3://kjw-aegis-data-web/ \
 - Terraform apply: 2 added, 0 changed, 0 destroyed
 - Terraform post-apply plan: No changes
 - GitHub Actions `dashboard-web` push run: 성공
+- Workflow Node runtime: Node 24 기준 성공 (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`)
 - `test` job: 성공
 - `build-and-deploy` job: 성공
 - S3 sync: 성공
