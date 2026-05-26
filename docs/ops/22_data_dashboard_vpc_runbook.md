@@ -1,7 +1,9 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-05-22
+기준일: 2026-05-26
+수정 이력:
+  - 2026-05-26 v0.2  Step 7.5 Route53 Hosted Zone 영구 분리 반영. `infra/data-dashboard-dns/`와 state 이전 절차 추가.
 
 ## 목적
 
@@ -10,7 +12,8 @@
 대상 Terraform root:
 
 ```text
-infra/data-dashboard/
+infra/data-dashboard/      # 재생성 자원
+infra/data-dashboard-dns/  # Route53 Hosted Zone 영구 자원
 ```
 
 손대지 않는 영역:
@@ -29,13 +32,15 @@ scripts/destroy/destroy-all.sh
 `scripts/destroy/destroy-data-dashboard.sh` 이후 남는 리소스:
 
 - `kjw-aegis-terraform-state` S3 bucket: Terraform backend. 유지.
+- Route53 hosted zone `aegis-pi.cloud`: Step 7.5 이후 `infra/data-dashboard-dns/`가 영구 관리. 유지.
 - RDS final snapshot `kjw-aegis-data-pg-final-*`: 복구용 snapshot. 필요 시 수동 정리.
 - Secrets Manager secret은 `recovery_window_in_days = 0` 기준으로 즉시 삭제.
 
 삭제 대상:
 
 - Data/Dashboard VPC, subnet, route table, NAT Gateway, ALB, security group
-- CloudFront, S3 dashboard web bucket, Route53 hosted zone, ACM certificate
+- CloudFront, S3 dashboard web bucket, ACM certificate
+- Route53 records: ACM validation record, `api`, `dashboard` alias record
 - Cognito User Pool
 - RDS PostgreSQL instance, ElastiCache Redis
 - Lambda data processor, Lambda notifier, SQS DLQ
@@ -48,6 +53,50 @@ scripts/destroy/destroy-all.sh
 - S3 `aegis-bucket-data`
 - 기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3`
 - Hub/Foundation/EKS/Admin UI 리소스
+
+## Route53 Hosted Zone 영구 분리
+
+목적:
+
+```text
+infra/data-dashboard destroy/apply 반복 시 Gabia NS 위임이 바뀌지 않게 한다.
+```
+
+구조:
+
+```text
+infra/data-dashboard-dns/
+  - aws_route53_zone.dashboard
+  - lifecycle prevent_destroy = true
+  - backend key: data-dashboard-dns/terraform.tfstate
+
+infra/data-dashboard/
+  - data.aws_route53_zone.dashboard 로 기존 zone 조회
+  - ACM validation record와 api/dashboard record만 관리
+```
+
+state 이전 절차:
+
+```bash
+terraform -chdir=infra/data-dashboard-dns init
+
+ZONE_ID=$(terraform -chdir=infra/data-dashboard output -raw route53_zone_id)
+terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard "$ZONE_ID"
+
+terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
+
+terraform -chdir=infra/data-dashboard plan -var="dashboard_domain_name=aegis-pi.cloud"
+terraform -chdir=infra/data-dashboard-dns plan
+```
+
+주의:
+
+```text
+terraform state rm은 AWS 리소스를 삭제하지 않는다.
+Terraform state에서만 추적을 해제한다.
+
+이 절차 중 destroy 명령은 실행하지 않는다.
+```
 
 ## Apply
 

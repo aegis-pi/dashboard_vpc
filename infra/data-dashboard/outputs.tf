@@ -85,13 +85,13 @@ output "alb_target_group_backend_arn" {
 # ---------------------------------------------------------------------------
 
 output "route53_zone_id" {
-  description = "Route53 Hosted Zone ID for the Dashboard domain."
-  value       = aws_route53_zone.dashboard.zone_id
+  description = "Route53 Hosted Zone ID for the Dashboard domain (read from permanent zone in infra/data-dashboard-dns)."
+  value       = data.aws_route53_zone.dashboard.zone_id
 }
 
 output "route53_name_servers" {
-  description = "Name servers to configure in Gabia DNS delegation (Step 0)."
-  value       = aws_route53_zone.dashboard.name_servers
+  description = "Name servers for the Dashboard domain (permanent — must match Gabia delegation)."
+  value       = data.aws_route53_zone.dashboard.name_servers
 }
 
 # ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 완료 반영. infra/data-dashboard-dns/ allowlist 추가. TL;DR 갱신.
   - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거.
   - 2026-05-26  Step 6 완료 반영. TL;DR·현재 구현 상태·Known Gaps 갱신. Step 1 frontend prototype/reference vs apps/dashboard-web/ 공식 경로 구분 추가. 변경 이력 추가.
 대상: Claude Code, Codex, 또는 동급의 AI 코딩 에이전트
@@ -18,7 +19,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 7 ECS Fargate / ALB / ECR / Route53 Terraform 배포 (`infra/data-dashboard/`)
+- **본 환경의 다음 작업**: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 (Step 7 apply 완료, Step 7.5 Route53 영구 분리 완료)
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -46,7 +47,7 @@
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
 - **진행 중(워크스트림 B · 본 환경)**: Phase 1 Step 7 진입 준비 (Step 6 Dashboard Backend FastAPI 구현 완료)
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 Data/Dashboard VPC는 2026-05-22 destroy 완료(backend state bucket + RDS final snapshot만 잔존). ECS/ECR/ALB는 Step 7 배포 전으로 미생성
+- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 apply 완료(92 resources, ECS desired_count=0). Route53 hosted zone aegis-pi.cloud 활성 (infra/data-dashboard-dns가 영구 관리). ECR 이미지 push 대기 중
 
 본 환경의 시점별 정확한 상태 스냅샷은 항상 `docs/issues/SESSION_STATE.md`를 우선한다. 본 harness 본문은 phase 경계와 책임 경계만 정의한다.
 
@@ -69,6 +70,7 @@
 | 분류 | 경로 | 본 환경 권한 |
 | --- | --- | --- |
 | 허용 | `infra/data-dashboard/**` *(신설, Phase 1 Step 2)* | 자유 |
+| 허용 | `infra/data-dashboard-dns/**` *(신설, Phase 1 Step 7.5 — Route53 영구 자원 전용 root)* | 자유 |
 | 허용 | `apps/dashboard-backend/**` *(신설, Phase 1 Step 6)* | 자유 |
 | 허용 | `apps/dashboard-web/**` *(신설, Phase 1 Step 8)* | 자유 |
 | 허용 | `apps/data-processor/**` *(ADR 0020, Phase 1 Step 4 사전 정렬 완료)* | 자유 (IoT Rule 트리거 라우팅은 ADR 합의 후) |
@@ -259,6 +261,36 @@
   - `aws ecs describe-services` → desiredCount==runningCount
   - `curl -I https://api.<도메인>/healthz` → 200
   - `wscat -c wss://api.<도메인>/ws/factories/factory-a` → handshake OK
+
+#### Phase 1 Step 7.5 — Route53 Hosted Zone 영구 분리 ✅ 완료 (2026-05-26)
+
+- 목표: `infra/data-dashboard destroy/apply` 반복 시 Gabia NS 위임이 깨지지 않도록 Route53 hosted zone을 별도 영구 Terraform root로 분리한다.
+- DoD:
+  - `infra/data-dashboard-dns/` 신규 Terraform root 생성 (S3 backend key `data-dashboard-dns/terraform.tfstate`)
+  - `aws_route53_zone.dashboard` 에 `lifecycle { prevent_destroy = true }` 적용
+  - `infra/data-dashboard/route53.tf` 에서 `resource "aws_route53_zone"` 제거 → `data "aws_route53_zone"` 대체
+  - `infra/data-dashboard/acm.tf`, `outputs.tf` zone_id 참조 → data source
+  - `terraform validate`, `fmt -check` 양쪽 통과
+  - state 이전 절차 (import → state rm) 문서화
+- 완료 내용:
+  - `infra/data-dashboard-dns/` 5개 파일 생성 (main.tf, providers.tf, versions.tf, variables.tf, outputs.tf)
+  - `infra/data-dashboard/route53.tf`, `acm.tf`, `outputs.tf` 수정
+  - state 이전은 사용자가 직접 실행 (ZONE_ID 확인 후 import → state rm)
+- 사용자가 실행해야 할 state 이전 절차:
+  ```bash
+  # 1. data-dashboard-dns init (backend 연결)
+  terraform -chdir=infra/data-dashboard-dns init
+  # 2. 현재 hosted zone을 data-dashboard-dns state로 import (ZONE_ID는 terraform output route53_zone_id 또는 aws route53 확인)
+  terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard <ZONE_ID>
+  # 3. data-dashboard state에서 hosted zone 추적 해제 (AWS 리소스는 삭제되지 않음)
+  terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
+  # 4. data-dashboard plan으로 zone destroy/create 없음 확인
+  terraform -chdir=infra/data-dashboard plan
+  # 5. data-dashboard-dns plan으로 No changes 확인
+  terraform -chdir=infra/data-dashboard-dns plan
+  ```
+- 허용 파일: `infra/data-dashboard-dns/**`, `infra/data-dashboard/route53.tf`, `infra/data-dashboard/acm.tf`, `infra/data-dashboard/outputs.tf`
+- 금지: infra/foundation으로 hosted zone 이전 금지 (워크스트림 A 영역). destroy 실행 금지
 
 #### Phase 1 Step 8 — 운영용 Frontend Vite + React 마이그레이션
 

@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 7 apply 완료 반영 (92 resources, ECS desired_count=0). Step 7.5 Route53 Hosted Zone 영구 분리 완료 반영 (infra/data-dashboard-dns/ 신설, state 이전 절차 문서화).
   - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리.
   - 2026-05-26  Step 7 Terraform 구현 완료 반영. ecr.tf/ecs.tf 신설, secrets.tf/variables.tf/outputs.tf 갱신. terraform validate/plan(92 add) 통과. apply 사용자 승인 대기.
   - 2026-05-26  Step 6 Dashboard Backend FastAPI 구현 완료 반영. Step 7 ECS Fargate/ALB/ECR 배포 진입 준비 갱신. frontend/ prototype/reference vs apps/dashboard-web/ 공식 경로 구분 명확화.
@@ -333,7 +334,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 7 Terraform 구현 완료 → apply 사용자 승인 후 배포
+현재 단계: Phase 1 Step 7 apply 완료 (92 resources, ECS desired_count=0). Step 7.5 Route53 Hosted Zone 영구 분리 완료. 다음: ECR 이미지 push → desired_count=1 apply → Step 8 Frontend 마이그레이션
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -352,8 +353,25 @@ Data/Dashboard 잔여 리소스: kjw-aegis-terraform-state S3 backend bucket, RD
 Terraform 재생성 보강: RDS final snapshot 이름 random suffix 적용, Secrets Manager recovery_window_in_days=0 적용, build/destroy wrapper 신규 추가
 apps/data-processor: 팀원 코드 동기화 완료. S3 경로 processed/{factory_id}/{dataset}/... 형식 (팀원 코드/실제 S3 기준)
 Phase 1 Step 6: 2026-05-26 완료. apps/dashboard-backend/ 신설. pytest 18 passed. docker build 통과.
-Phase 1 Step 7 Terraform 구현: 2026-05-26 완료. infra/data-dashboard/ecr.tf / ecs.tf 신설. secrets.tf/variables.tf/outputs.tf 갱신. terraform validate 통과. terraform plan 92 to add, 0 to change, 0 to destroy. apply 사용자 승인 대기. 첫 apply 기본 desired_count=0으로 ECR/인프라 생성 후 이미지 push, 이후 desired_count=1로 서비스 활성화한다.
-다음 작업: terraform apply 승인(desired_count=0) 후 ECR 이미지 push → desired_count=1 apply → ECS 서비스 동작 검증 → GitHub Secret AWS_OIDC_DASHBOARD_ROLE_ARN 등록
+Phase 1 Step 7 apply: 2026-05-26 완료. 92 resources 생성 (ECR aegis/dashboard-backend, ECS Cluster/TaskDef/Service, CloudWatch Logs, IAM, ALB listener rule, Route53 A-record). ECS desired_count=0으로 시작 (ECR 이미지 push 전 task 기동 방지).
+Phase 1 Step 7.5 Route53 Hosted Zone 영구 분리: 2026-05-26 완료.
+  + infra/data-dashboard-dns/ 신규 Terraform root 생성 (main.tf/providers.tf/versions.tf/variables.tf/outputs.tf)
+  + aws_route53_zone.dashboard lifecycle prevent_destroy = true
+  + backend: kjw-aegis-terraform-state / data-dashboard-dns/terraform.tfstate
+  + infra/data-dashboard/route53.tf: resource 블록 → data "aws_route53_zone" "dashboard" 대체
+  + infra/data-dashboard/acm.tf: zone_id 참조 → data source
+  + infra/data-dashboard/outputs.tf: route53_zone_id/route53_name_servers → data source
+  + terraform validate: infra/data-dashboard-dns 통과, infra/data-dashboard 통과
+  + terraform fmt -check: 양쪽 통과
+  + git diff --check: 통과
+  + 사용자가 직접 실행해야 할 state 이전 절차 (infra/data-dashboard-dns init → import → state rm):
+      a. terraform -chdir=infra/data-dashboard-dns init
+      b. terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard <ZONE_ID>
+      c. terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
+      d. terraform -chdir=infra/data-dashboard plan (zone destroy/create 없어야 함)
+      e. terraform -chdir=infra/data-dashboard-dns plan (No changes)
+      state rm은 AWS 리소스를 삭제하지 않는다 (Terraform state에서만 추적 해제)
+  + Route53 hosted zone은 infra/data-dashboard destroy 대상에서 제외됨 ($0.50/월 영구 비용 유지)
 현재 AWS 상태: Hub/Foundation/IoT/Admin UI 리소스 재생성 완료. ECR `aegis/edge-agent` repository 활성 상태
 남음(워크스트림 A): GitHub Actions OIDC push role, Spoke K3s imagePullSecret 갱신, image push/pull 검증
 완료: M0 factory-a Safe-Edge 기준선
@@ -629,42 +647,32 @@ secret exists, DATA=4
 
 ## 다음에 할 일
 
-### 1. 현재 작업: Phase 1 Step 7 ECS Fargate / ALB / ECR / Route53 apply 준비
+### 1. 현재 작업: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 (Step 7/7.5 완료)
 
-Phase 1 Step 7 Terraform 구현은 완료됐다. 다음 작업은 `infra/data-dashboard` apply와 이미지 push/Secret 등록 절차다.
+Phase 1 Step 7 apply (92 resources) 와 Step 7.5 Route53 Hosted Zone 영구 분리가 완료됐다.
 
 ```text
-Step 7 작업 목표 (infra/data-dashboard/):
-  - ECS Cluster (Fargate, capacity provider: FARGATE)
-  - Task Definition (0.5 vCPU / 1 GB, awsvpc, FARGATE_LATEST)
-  - ECS Service (첫 apply 기본 desired_count=0, 이미지 push 이후 desired_count=1, deployment circuit breaker)
-  - Task Execution Role: ECR pull, CloudWatch Logs
-  - Task Role: DDB Get/Query/PutItem, S3 GetObject, Secrets Manager
-  - ECR repository: aegis/dashboard-backend (Step 7 신설)
-  - ALB HTTPS 443 listener rule + /ws/* sticky session 옵션
-  - Route53 A-record alias: api.<도메인> → ALB
-  - GitHub Secret AWS_OIDC_DASHBOARD_ROLE_ARN 등록 (ECR push용 OIDC role)
+Step 7 완료 내용:
+  + ECR aegis/dashboard-backend, ECS Cluster/TaskDef/Service (desired_count=0)
+  + ALB HTTPS 443 listener rule + /ws/* sticky session
+  + Route53 A-record alias: api.<도메인> → ALB
+  + Task Execution Role (ECR pull + CWLogs) / Task Role (DDB/S3/Secrets)
+  + GitHub Actions OIDC role (KJW-AEGIS-Data-IAMRole-OIDC-ECRPush): apply 완료
 
-Step 7 현재 상태:
-  + Terraform 구현 완료: ecr.tf / ecs.tf / secrets.tf / variables.tf / outputs.tf
-  + terraform validate 통과
-  + terraform plan: 92 to add, 0 to change, 0 to destroy
-  + 첫 apply 기본 desired_count=0 — ECR 이미지 push 전 ECS task 시작 방지
-  + github_repo_for_oidc 기본값: aegis-pi/dashboard_vpc
+Step 7.5 완료 내용:
+  + infra/data-dashboard-dns/ 신규 Terraform root (prevent_destroy=true)
+  + infra/data-dashboard/route53.tf: data source로 전환 (aws_route53_zone.dashboard resource 제거)
+  + ACM/outputs.tf route53 참조 → data source
+  + Terraform validate/fmt-check: 양쪽 통과
+  + state 이전: 사용자가 직접 실행 대기 (terraform import → state rm)
 ```
 
-완료된 것:
-- apps/dashboard-backend/ 로컬 구현 완료 (pytest 18 passed, docker build 통과)
-- .github/workflows/dashboard-backend.yml 골격 완료 (AWS_OIDC_DASHBOARD_ROLE_ARN Secret 등록 대기)
-- AEGIS-DynamoDB-FactoryStatus 기준 DDB 조회 로직 구현
-- ECR/ECS/ALB Terraform 정의 완료
-
-아직 남은 것:
-- `infra/data-dashboard` apply
-- apply 후 ECR `aegis/dashboard-backend` 이미지 push
-- GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 등록 후 GHA CI/CD 파이프라인 활성화
-- 이미지 push 후 `ecs_backend_desired_count=1` 활성화 apply
-- Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션
+사용자가 직접 실행해야 할 것:
+- State 이전: `terraform -chdir=infra/data-dashboard-dns init` → import → state rm
+- GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 등록 (ECR push용 OIDC role ARN)
+- ECR `aegis/dashboard-backend` 이미지 push (docker build → ecr login → push)
+- `ecs_backend_desired_count=1` 로 `infra/data-dashboard` apply → ECS 서비스 동작 검증
+- Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 진입
 
 2026-05-15 기준 최근 검증 완료 전제:
 
@@ -898,7 +906,7 @@ AWS 비용 기준은 `docs/ops/15_aws_cost_baseline.md`에 반영했고, AWS 리
 현재 세션 정리 내용:
 
 ```text
-2026-05-26 세션 저장 기준 (Phase 1 Step 7 구현 완료 / apply 전)
+2026-05-26 세션 저장 기준 (Phase 1 Step 7 apply 완료 + Step 7.5 완료)
 Step 6 Dashboard Backend FastAPI 구현 완료:
   + apps/dashboard-backend/ 신설 (FastAPI 0.1.0)
   + REST: /healthz, /factories, /factories/{id}, /factories/{id}/history, /reports, /reports/{date}/{id}
@@ -912,13 +920,19 @@ Step 6 Dashboard Backend FastAPI 구현 완료:
   + pytest -q: 18 passed / docker build: 통과 / git diff --check: 통과
   + ECS/ECR/ALB 미배포 — Step 7 apply 전, AWS 비용 미발생
 
-Step 7 ECS Fargate / ALB / ECR Terraform 구현 완료:
-  + infra/data-dashboard/ecr.tf, ecs.tf 신설
-  + secrets.tf / variables.tf / outputs.tf 갱신
-  + ECR aegis/dashboard-backend, ECS Cluster/TaskDef/Service, CloudWatch Logs, IAM, ALB listener rule 정의
-  + 첫 apply 기본 desired_count=0, 이미지 push 후 desired_count=1 활성화
+Step 7 ECS Fargate / ALB / ECR apply 완료 (2026-05-26):
+  + 92 resources 생성: ECR aegis/dashboard-backend, ECS Cluster/TaskDef/Service, CloudWatch Logs, IAM, ALB listener rule, Route53 A-record
+  + ECS desired_count=0 (ECR 이미지 push 전 task 기동 방지)
   + Backend ECS Task Role에서 Bedrock InvokeModel 권한 제외 (LLM 보고서는 팀원/후속)
-  + terraform validate 통과 / plan: 92 to add, 0 to change, 0 to destroy
+  + GitHub Actions OIDC role: apply로 생성됨. ARN은 GitHub Secret 등록 대기
+
+Step 7.5 Route53 Hosted Zone 영구 분리 완료 (2026-05-26):
+  + infra/data-dashboard-dns/ 신규 Terraform root 생성 (5개 파일)
+  + aws_route53_zone.dashboard lifecycle { prevent_destroy = true }
+  + infra/data-dashboard route53.tf → data source 전환 (resource 블록 제거)
+  + acm.tf, outputs.tf route53 참조 → data source
+  + terraform fmt-check, validate: 양쪽 통과 / git diff --check: 통과
+  + state 이전(import + state rm)은 사용자가 직접 실행 대기
 
 frontend 경로 정리:
   + frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ 정리됨)
@@ -926,7 +940,7 @@ frontend 경로 정리:
   + frontend/ → S3/CloudFront 직접 배포 금지
 
 다음 작업 (워크스트림 B):
-  Phase 1 Step 7 apply 절차 진행 후 Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션
+  State 이전 실행 → GitHub Secret 등록 → ECR 이미지 push → ECS 활성화 → Phase 1 Step 8 Frontend 마이그레이션
 
 워크스트림 A 잔여 (본 환경 실행 안 함):
   M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정

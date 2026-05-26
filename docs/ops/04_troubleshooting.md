@@ -1,7 +1,7 @@
 # 트러블슈팅
 
 상태: source of truth
-기준일: 2026-05-08
+기준일: 2026-05-26
 원본: `/home/vicbear/Aegis/safe-edge/troubleshooting.md`
 
 ## 목적
@@ -2147,3 +2147,69 @@ nmcli con up eth0의 eth0는 device가 아니라 connection profile 이름이다
 wlan0가 끊기면 인터넷, DNS, Tailscale control plane, image pull은 실패할 수 있다.
 하지만 eth0 static profile과 K3s 내부망은 독립적으로 유지되어야 한다.
 ```
+
+## 41. Data/Dashboard VPC 재생성 때 Route53 Hosted Zone NS가 바뀌는 문제
+
+날짜: 2026-05-26
+
+증상/상황
+
+`infra/data-dashboard`를 destroy 후 다시 apply하면 `aegis-pi.cloud` Route53 Hosted Zone이 새로 생성되고 NS 4개가 바뀐다.
+
+이 상태에서는 Gabia 네임서버 위임을 매번 수동으로 다시 입력해야 하며, 위임 전에는 ACM DNS validation이 대기 상태로 오래 멈출 수 있다.
+
+원인
+
+Route53 Hosted Zone이 VPC/App stack과 같은 Terraform root/state(`infra/data-dashboard`)에 포함되어 있었다. 따라서 데모 비용 절감을 위해 Data/Dashboard VPC를 destroy할 때 hosted zone도 같이 삭제됐다.
+
+해결/판단
+
+Hosted Zone은 월 고정 비용이 낮고 NS 위임 안정성이 중요하므로 영구 자원으로 분리한다.
+
+```text
+infra/data-dashboard-dns/ = Route53 Hosted Zone 영구 관리
+infra/data-dashboard/     = VPC, ALB, ECS, ACM, CloudFront, DNS record 등 재생성 자원 관리
+```
+
+`infra/data-dashboard-dns`의 hosted zone에는 `prevent_destroy = true`를 적용한다. `infra/data-dashboard`는 hosted zone을 생성하지 않고 data source로 조회한 뒤 ACM validation record와 `api`, `dashboard` alias record만 관리한다.
+
+state 이전 절차
+
+```bash
+terraform -chdir=infra/data-dashboard-dns init
+
+ZONE_ID=$(terraform -chdir=infra/data-dashboard output -raw route53_zone_id)
+terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard "$ZONE_ID"
+
+terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
+
+terraform -chdir=infra/data-dashboard plan -var="dashboard_domain_name=aegis-pi.cloud"
+terraform -chdir=infra/data-dashboard-dns plan
+```
+
+주의
+
+```text
+state rm은 AWS Route53 Hosted Zone을 삭제하지 않는다.
+기존 Terraform state에서 추적만 해제한다.
+
+import 전에 infra/data-dashboard-dns backend key가 data-dashboard와 다른지 확인한다.
+잘못된 state에 import하면 소유권이 꼬일 수 있다.
+
+이 절차 중 destroy 명령은 실행하지 않는다.
+```
+
+검증 기준
+
+```text
+infra/data-dashboard plan:
+  - aws_route53_zone.dashboard create/destroy가 없어야 함
+  - ACM validation record, api/dashboard record만 기존 zone을 참조해야 함
+
+infra/data-dashboard-dns plan:
+  - import 후 No changes
+```
+
+재발 방지/주의
+
+Hosted Zone은 Data/Dashboard destroy 대상이 아니다. destroy 후에도 남는 영구 자원으로 간주하고, 비용 기준에는 Route53 hosted zone `$0.50/월`을 계속 반영한다.

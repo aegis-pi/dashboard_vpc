@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v1.8  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 반영. Route53 hosted zone을 영구 자원으로 재분류. destroy 후 잔여 비용 설명 갱신. $0.50/월 영구 비용 명시.
   - 2026-05-26 v1.7  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM report-generator/Bedrock 비용은 팀원/후속 작업 예상치로 분리. Backend ECS Task Role의 Bedrock 권한 제거 반영.
   - 2026-05-26 v1.6  Step 7 Terraform 구현 완료 반영. ECR `aegis/dashboard-backend` 신설, ECS Fargate Cluster/TaskDef/Service/CloudWatch Logs/IAM 추가. Secrets Manager 2개 추가(database_url/redis_url, 합계 4개). 리소스 상태 표 갱신. 비용 표 갱신(Secrets 4개로 수정).
   - 2026-05-26 v1.5  Step 6 완료(로컬 구현) 반영. apps/dashboard-backend/ 신설, ECS/ECR/ALB는 Step 7 배포 전으로 AWS 비용 미발생. 리소스 상태 표 Step 6 항목 갱신.
@@ -53,7 +54,7 @@
 | ALB | `aegis-admin-ui` | 1 | active |
 | Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 0 managed resources in state | destroy 완료 (2026-05-22). `terraform state list` empty |
 | Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | active, 유지 |
-| Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 1 zone | **active (영구 자원)**. Step 7.5 이후 `infra/data-dashboard-dns/` root가 관리. `infra/data-dashboard` destroy 대상에서 제외. `$0.50/월` 상시 발생 |
 | Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | 0 | deleted (2026-05-22 destroy) |
@@ -214,7 +215,7 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | --- | ---: | ---: | ---: |
 | 상시 가동 (24/7) | ~$123.08/월 | ~$1.85/월 | **`~$124.93 / month`** |
 | 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.85/월 | **`~$8.40 / month`** |
-| destroy 후 (Terraform backend S3 + RDS PostgreSQL snapshot만) | snapshot/storage 기준 | ~$0.10/월 | **사용량·snapshot 크기 기준** |
+| destroy 후 (Terraform backend S3 + RDS PostgreSQL snapshot + Route53 hosted zone) | snapshot/storage 기준 + hosted zone $0.50/월 | ~$0.60/월 | **Route53 hosted zone은 영구 자원 (Step 7.5 분리). snapshot 크기에 따라 추가** |
 
 factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write/Bedrock token이 메시지 수에 가장 민감.
 
