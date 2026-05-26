@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v2.0  Step 8 Frontend SPA 로컬 구현 완료 반영. 신규 AWS 리소스 없음, 기존 S3/CloudFront 배포는 Step 9에서 진행.
   - 2026-05-26 v1.9  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. 리소스 상태 표를 active로 갱신.
   - 2026-05-26 v1.8  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 반영. Route53 hosted zone을 영구 자원으로 재분류. destroy 후 잔여 비용 설명 갱신. $0.50/월 영구 비용 명시.
   - 2026-05-26 v1.7  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM report-generator/Bedrock 비용은 팀원/후속 작업 예상치로 분리. Backend ECS Task Role의 Bedrock 권한 제거 반영.

@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v1.3  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. npm build/lint/test 통과. Step 9 배포 CI/CD 방향 명시.
   - 2026-05-26 v1.2  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26 v1.1  Step 7 apply 완료 반영. Step 7.5 Route53 Hosted Zone 영구 분리 추가. Route53 hosted zone을 destroy 대상에서 제외, $0.50/월 영구 비용으로 분리. infra/data-dashboard-dns/ allowlist 추가.
   - 2026-05-26 v1.0  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리.
@@ -313,17 +314,39 @@ Step 1 진행 시:
   - destroy 명령은 사용자 명시 승인 없이 실행 금지
 ```
 
-### Step 8 — 운영용 Frontend Vite + React 마이그레이션
+### Step 8 — 운영용 Frontend Vite + React 마이그레이션 ✅ 완료 (2026-05-26)
 
 ```text
-- frontend/ prototype reference의 화면 설계를 apps/dashboard-web/ 공식 Vite + React SPA로 이전
-- S3 + CloudFront 배포 가능한 dist/ 산출물 생성
-- Cognito Hosted UI 연동(oidc-client-ts 또는 aws-amplify/auth)
-- WebSocket client 추가 (`react-use-websocket` 또는 직접 WebSocket API)
-  JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약, backend 구현과 정렬)
-- API base URL / WebSocket base URL / Cognito 값은 Vite 환경변수로 분리
-- .env* 는 commit 금지, .env.example 만 commit
-- 보고서 탭은 skeleton 상태로 유지하거나 후속 LLM 보고서와 연결 가능한 placeholder로 둔다
+완료된 구현:
+- apps/dashboard-web/ 신설 (Vite 6 + React 18 + TypeScript strict)
+- 라우트: / (FleetPage), /factory/:id (FactoryPage), /callback, /reports, /login
+- 인증: oidc-client-ts@3.1 (Cognito PKCE Hosted UI)
+    JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약, backend 정렬)
+- hooks: useFactories, useFactory, useFactoryHistory, useWebSocket (exponential backoff)
+    WS 재접속: base 2s, factor 1.5, MAX_RETRIES=5
+- 페이지:
+    FleetPage — Fleet Safety Pulse 트랙 + 공장 카드 그리드
+    FactoryPage — Overview/Environment/Infrastructure/Timeline 4탭 + WS 실시간
+    ReportsPage — LLM 일간 보고서 팀원/후속 작업 대기 skeleton
+    LoginPage / CallbackPage — Cognito PKCE 흐름
+- 컴포넌트:
+    Badge (LevelBadge, PipelineBadge, StaleBadge, riskColor, relTime)
+    Sparkline (SVG polyline)
+    ConnStatus (WS 연결 상태 표시)
+    Chart (recharts: RiskScoreChart, SensorChart, AIScoreChart, NodeResourceChart)
+    Layout (Shell = Sidebar + TopBar)
+- CSS: custom property 기반 design system (--bg, --surface, --ink, --crit, --warn, --safe, --accent)
+- 환경변수: VITE_API_BASE_URL / VITE_WS_BASE_URL / VITE_COGNITO_AUTHORITY / VITE_COGNITO_DOMAIN / VITE_COGNITO_CLIENT_ID / VITE_COGNITO_REDIRECT_URI
+    .env.example 만 commit, .env* git 추적 금지
+- 검증:
+    npm run build: dist/ 생성 (675 kB, 3.00s)
+    npm run lint: 0 errors
+    npm run test: 6 tests 통과 (Badge 단위 테스트)
+
+미배포 (Step 9에서 완성):
+- GitHub Actions: dist/ 빌드 → S3 sync → CloudFront invalidation
+- S3 dashboard-web bucket upload
+- CloudFront distribution invalidation
 
 LLM 일간 보고서(ADR 0016, Lambda report-generator + Bedrock)는 팀원/후속 작업으로 분리한다.
 ```

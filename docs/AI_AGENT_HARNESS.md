@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. TL;DR·현재 구현 상태·Known Gaps 갱신. 다음 작업 Step 9로 전환.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 완료 반영. infra/data-dashboard-dns/ allowlist 추가. TL;DR 갱신.
   - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거.
@@ -20,7 +21,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 (Step 7 Backend 활성화 완료, Step 7.5 Route53 영구 분리 완료)
+- **본 환경의 다음 작업**: Phase 1 Step 9 S3+CloudFront 배포 CI/CD (Step 8 Frontend SPA 구현 완료, npm build/lint/test 통과)
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -46,7 +47,7 @@
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
-- **진행 중(워크스트림 B · 본 환경)**: Phase 1 Step 8 진입 준비 (Step 7 Dashboard Backend ECS 배포 완료)
+- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 8 완료 (apps/dashboard-web/ Vite+React SPA, npm build/lint/test 통과). Step 9 S3+CloudFront 배포 CI/CD 대기
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
 - **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 Backend 활성화 완료(ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
 
@@ -289,14 +290,13 @@
 - 허용 파일: `infra/data-dashboard-dns/**`, `infra/data-dashboard/route53.tf`, `infra/data-dashboard/acm.tf`, `infra/data-dashboard/outputs.tf`
 - 금지: infra/foundation으로 hosted zone 이전 금지 (워크스트림 A 영역). destroy 실행 금지
 
-#### Phase 1 Step 8 — 운영용 Frontend Vite + React 마이그레이션
+#### Phase 1 Step 8 — 운영용 Frontend Vite + React 마이그레이션 ✅ 완료 (2026-05-26)
 
 - 목표: `frontend/` prototype reference의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 정적 SPA로 이전하고 S3 + CloudFront 배포 가능한 `dist/` 산출물을 만든다.
 - DoD: `apps/dashboard-web/`에서 `npm run build` 성공, `dist/` 산출물 생성, Cognito Hosted UI / API base URL / WebSocket base URL이 환경변수로 분리됨, `frontend/` prototype과 주요 화면 흐름이 일치함
+- **완료된 결과**: `npm run build` → `dist/` 675 kB, `npm run lint` → 0 errors, `npm run test` → 6 passed. 6개 환경변수 VITE_* 모두 분리됨.
 - 허용 파일: `apps/dashboard-web/**`, `docs/specs/monitoring_dashboard/04_risk_twin_web_screen_design.md`, 필요한 문서
-- 금지: `frontend/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다. 백엔드 endpoint, Cognito client id, domain을 코드에 하드코드하지 않는다. `.env*` 는 `.env.example` 만 commit
-- 환경변수 계약 (Frontend): `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`
-- 검증: `npm run build`, `npm run lint`, `npm run test`(구성 시), prototype 기준 주요 화면 수기 비교
+- 환경변수 계약 (Frontend): `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`, `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`
 
 > LLM 일간 보고서(ADR 0016, Bedrock + Lambda report-generator)는 팀원/후속 작업으로 분리한다. 본 환경 Step 8에서는 구현하지 않는다.
 
@@ -477,10 +477,10 @@
 - M1 Issue 11 — Admin UI 운영 보안 강화 (WAF / Cognito / OIDC): 보류
 - EKS API endpoint public CIDR 축소: 보류
 - `apps/dashboard-backend/` — **완료** (Phase 1 Step 6~7, 2026-05-26). pytest 18 passed, docker build 통과, ECS Fargate 배포 및 `/healthz` 200 확인
-- `apps/dashboard-web/` 디렉터리 미존재 — Phase 1 Step 8 에서 신설 (`frontend/` prototype reference 참고)
+- `apps/dashboard-web/` — **완료** (Phase 1 Step 8, 2026-05-26). Vite+React SPA, npm build/lint/test 통과. S3+CloudFront 배포는 Step 9에서 진행
 - `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
-- `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (Step 8 미구현)
+- `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (**Step 8 완료**)
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` — `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
 - Markdown 린트 / 문서 테스트 도구 미설정 — § 7.1 수기 체크리스트로 대체
 
@@ -558,3 +558,4 @@
 | 2026-05-19 | v1.0 | 초안. 워크스트림 B Phase 1 통합 결정 (ADR 0012~0017) 반영, 마일스톤↔Phase 매핑 표 + 검증 명령 + 데이터/계약/Needs Decision 정리 |
 | 2026-05-26 | v1.1 | Step 6 완료 반영. TL;DR·§ 2·§ 10.1 갱신. Step 1 frontend/ vs apps/dashboard-web/ 경로 구분 추가. Known Gaps에서 apps/dashboard-backend/ 완료 처리. |
 | 2026-05-26 | v1.2 | Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거. |
+| 2026-05-26 | v1.3 | Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현 완료. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 S3+CloudFront 배포 CI/CD. |

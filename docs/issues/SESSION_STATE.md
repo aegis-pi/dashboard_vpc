@@ -3,10 +3,10 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 8 운영용 Frontend Vite + React 마이그레이션 완료 반영. apps/dashboard-web/ SPA 구현. npm run build/lint/test 통과.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. Organization secret 등록(사용자 확인), ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인.
   - 2026-05-26  Step 7 apply 완료 반영 (92 resources, ECS desired_count=0). Step 7.5 Route53 Hosted Zone 영구 분리 완료 반영 (infra/data-dashboard-dns/ 신설, state 이전 절차 문서화).
   - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리.
-  - 2026-05-26  Step 7 Terraform 구현 완료 반영. ecr.tf/ecs.tf 신설, secrets.tf/variables.tf/outputs.tf 갱신. terraform validate/plan(92 add) 통과. apply 사용자 승인 대기.
   - 2026-05-26  Step 6 Dashboard Backend FastAPI 구현 완료 반영. Step 7 ECS Fargate/ALB/ECR 배포 진입 준비 갱신. frontend/ prototype/reference vs apps/dashboard-web/ 공식 경로 구분 명확화.
 
 ## 목적
@@ -335,7 +335,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 7 Backend 활성화 완료 (ECR sha-9d2c200, ECS desired/running 1, /healthz 200). Step 7.5 Route53 Hosted Zone 영구 분리 완료. 다음: Step 8 Frontend 마이그레이션
+현재 단계: Phase 1 Step 8 완료 (apps/dashboard-web/ Vite+React SPA 구현, npm build/lint/test 통과). 다음: Step 9 S3+CloudFront 배포 CI/CD
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -655,7 +655,7 @@ secret exists, DATA=4
 
 ## 다음에 할 일
 
-### 1. 현재 작업: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 (Step 7/7.5 완료)
+### 1. 완료: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션
 
 Phase 1 Step 7 Backend 활성화와 Step 7.5 Route53 Hosted Zone 영구 분리가 완료됐다.
 
@@ -677,8 +677,22 @@ Step 7.5 완료 내용:
   + state 이전 완료: import → state rm → 양쪽 plan No changes
 ```
 
+Step 8 완료 내용:
+  + apps/dashboard-web/ 신설 (Vite 6 + React 18 + TypeScript strict)
+  + 인증: oidc-client-ts@3.1 (Cognito PKCE), JWT via ?token= WebSocket
+  + 라우트: / (FleetPage), /factory/:id (FactoryPage), /callback, /reports, /login
+  + 컴포넌트: Badge, Sparkline, ConnStatus, Chart (recharts), Layout (Shell/Sidebar/TopBar)
+  + hooks: useFactories, useFactory, useFactoryHistory, useWebSocket (exponential backoff)
+  + CSS: custom property 기반 design system (--bg, --crit, --warn, --safe 등)
+  + npm run build: dist/ 생성, 3.00s 빌드
+  + npm run lint: 0 errors
+  + npm run test: 6 tests 통과 (Badge riskColor/relTime 단위 테스트)
+  + VITE_COGNITO_AUTHORITY(User Pool issuer)와 VITE_COGNITO_DOMAIN(Hosted UI domain)을 분리해 OIDC discovery 404 방지
+  + .env.example only committed (VITE_COGNITO_CLIENT_ID 등 hardcode 금지)
+
 다음 작업:
-- Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 진입
+- Phase 1 Step 9: S3 + CloudFront 배포 CI/CD (GitHub Actions → S3 sync → CloudFront invalidation)
+- Phase 1 Step 10: LLM 일간 보고서 (Bedrock Claude 3 Haiku, 팀원/후속)
 
 2026-05-15 기준 최근 검증 완료 전제:
 
@@ -912,7 +926,7 @@ AWS 비용 기준은 `docs/ops/15_aws_cost_baseline.md`에 반영했고, AWS 리
 현재 세션 정리 내용:
 
 ```text
-2026-05-26 세션 저장 기준 (Phase 1 Step 7 Backend 활성화 완료 + Step 7.5 완료)
+2026-05-26 세션 저장 기준 (Phase 1 Step 8 Frontend 마이그레이션 완료)
 Step 6 Dashboard Backend FastAPI 구현 완료:
   + apps/dashboard-backend/ 신설 (FastAPI 0.1.0)
   + REST: /healthz, /factories, /factories/{id}, /factories/{id}/history, /reports, /reports/{date}/{id}
@@ -947,11 +961,12 @@ Step 7.5 Route53 Hosted Zone 영구 분리 완료 (2026-05-26):
 
 frontend 경로 정리:
   + frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ 정리됨)
-  + apps/dashboard-web/ = 운영 배포용 Vite + React SPA 예정 경로 (Step 8 미구현)
+  + apps/dashboard-web/ = 운영 배포용 Vite + React SPA 공식 경로 (Step 8 완료)
   + frontend/ → S3/CloudFront 직접 배포 금지
 
 다음 작업 (워크스트림 B):
-  Phase 1 Step 8 Frontend 마이그레이션
+  Phase 1 Step 9 S3+CloudFront 배포 CI/CD (GitHub Actions → S3 sync → CloudFront invalidation)
+  LLM 일간 보고서(Bedrock Claude 3 Haiku)는 팀원/후속 작업으로 유지
 
 워크스트림 A 잔여 (본 환경 실행 안 함):
   M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정
