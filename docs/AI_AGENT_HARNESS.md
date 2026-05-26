@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 7 Backend 활성화 검증 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 완료 반영. infra/data-dashboard-dns/ allowlist 추가. TL;DR 갱신.
   - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거.
   - 2026-05-26  Step 6 완료 반영. TL;DR·현재 구현 상태·Known Gaps 갱신. Step 1 frontend prototype/reference vs apps/dashboard-web/ 공식 경로 구분 추가. 변경 이력 추가.
@@ -19,7 +20,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 (Step 7 apply 완료, Step 7.5 Route53 영구 분리 완료)
+- **본 환경의 다음 작업**: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션 (Step 7 Backend 활성화 완료, Step 7.5 Route53 영구 분리 완료)
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -45,9 +46,9 @@
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
-- **진행 중(워크스트림 B · 본 환경)**: Phase 1 Step 7 진입 준비 (Step 6 Dashboard Backend FastAPI 구현 완료)
+- **진행 중(워크스트림 B · 본 환경)**: Phase 1 Step 8 진입 준비 (Step 7 Dashboard Backend ECS 배포 완료)
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 apply 완료(92 resources, ECS desired_count=0). Route53 hosted zone aegis-pi.cloud 활성 (infra/data-dashboard-dns가 영구 관리). ECR 이미지 push 대기 중
+- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 Backend 활성화 완료(ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
 
 본 환경의 시점별 정확한 상태 스냅샷은 항상 `docs/issues/SESSION_STATE.md`를 우선한다. 본 harness 본문은 phase 경계와 책임 경계만 정의한다.
 
@@ -475,12 +476,12 @@
 - M0 Issue 12 — `start_test` 자동화 부분 완료. Hot/Cold 티어링 자동화 미완
 - M1 Issue 11 — Admin UI 운영 보안 강화 (WAF / Cognito / OIDC): 보류
 - EKS API endpoint public CIDR 축소: 보류
-- `apps/dashboard-backend/` — **완료** (Phase 1 Step 6, 2026-05-26). pytest 18 passed, docker build 통과. ECS/ECR/ALB 배포는 Step 7
+- `apps/dashboard-backend/` — **완료** (Phase 1 Step 6~7, 2026-05-26). pytest 18 passed, docker build 통과, ECS Fargate 배포 및 `/healthz` 200 확인
 - `apps/dashboard-web/` 디렉터리 미존재 — Phase 1 Step 8 에서 신설 (`frontend/` prototype reference 참고)
 - `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
 - `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (Step 8 미구현)
-- GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 미등록 — Step 7 IAM 생성 후 등록
+- GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` — `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
 - Markdown 린트 / 문서 테스트 도구 미설정 — § 7.1 수기 체크리스트로 대체
 
 ### 10.2 Needs Decision (열린 결정)

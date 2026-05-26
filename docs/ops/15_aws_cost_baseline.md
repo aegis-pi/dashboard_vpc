@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v1.9  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. 리소스 상태 표를 active로 갱신.
   - 2026-05-26 v1.8  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 반영. Route53 hosted zone을 영구 자원으로 재분류. destroy 후 잔여 비용 설명 갱신. $0.50/월 영구 비용 명시.
   - 2026-05-26 v1.7  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM report-generator/Bedrock 비용은 팀원/후속 작업 예상치로 분리. Backend ECS Task Role의 Bedrock 권한 제거 반영.
   - 2026-05-26 v1.6  Step 7 Terraform 구현 완료 반영. ECR `aegis/dashboard-backend` 신설, ECS Fargate Cluster/TaskDef/Service/CloudWatch Logs/IAM 추가. Secrets Manager 2개 추가(database_url/redis_url, 합계 4개). 리소스 상태 표 갱신. 비용 표 갱신(Secrets 4개로 수정).
@@ -71,18 +72,17 @@
 | Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 0 | deleted with notifier (2026-05-22 destroy) |
 | Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과 |
-| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | Terraform 정의 완료 | Step 7 Terraform 구현 완료. apply 전 미생성. GitHub Actions OIDC role(KJW-AEGIS-Data-IAMRole-OIDC-ECRPush) 신설 |
-| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | Terraform 정의 완료 | Step 7 구현 완료. KJW-AEGIS-Data-ECSCluster / kjw-aegis-data-backend / KJW-AEGIS-Data-Service-Backend. 첫 apply 기본 desired_count=0, 이미지 push 후 desired_count=1로 활성화 |
-| Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | Terraform 정의 완료 | Step 7 구현 완료. 30일 보존. 비용 usage-based (소량) |
-| Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | Terraform 정의 완료 | Step 7 신규 2개 (ECS 컨테이너 시크릿 주입용). apply 후 생성 |
+| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active. Image tag `sha-9d2c200` push 확인. GitHub Actions OIDC role 신설, org secret 등록 완료(사용자 확인 기준) |
+| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | desired 1 / running 1 | active. `kjw-aegis-data-backend:2`, image `sha-9d2c200`, rollout completed, `/healthz` 200 |
+| Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active. 30일 보존. 비용 usage-based (소량) |
+| Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 secrets | active. ECS 컨테이너 시크릿 주입용 |
 | Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — LLM 일간 보고서 팀원/후속 작업 |
 
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- 1번 Data/Dashboard VPC Step 7 리소스(ECS Fargate Backend, Backend ECR)는 Terraform 정의 완료 / apply 전 미배포
+- 1번 Data/Dashboard VPC Step 7 Backend는 active. ECS desired/running 1, ECR image `sha-9d2c200`, `/healthz` 200 확인
 - Lambda report-generator / Bedrock 일간 보고서는 팀원/후속 작업으로 현재 Step 8 범위가 아님
-- Dashboard Backend용 ECR `aegis/dashboard-backend` 없음
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산
 
