@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v1.6  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설, 25 resources import, data-dashboard state rm 20개, 엔드포인트 HTTP 200 확인.
   - 2026-05-26 v1.5  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. Step 9.5 추가. 다음: Step 9.5 migration 실행 세션.
   - 2026-05-26 v1.4  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 완료 반영. GitHub Actions workflow, IAM OIDC web deploy role(ADR 0023), Terraform apply 2 add 0 change, repo-level Secret/Variable 등록, S3 sync + CloudFront invalidation 완료. Workflow Node runtime은 Node 24 기준으로 확정.
   - 2026-05-26 v1.3  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. npm build/lint/test 통과. Step 9 배포 CI/CD 방향 명시.
@@ -419,7 +420,7 @@ GitHub 설정:
 - 부하 테스트: k6/artillery WebSocket 100 concurrent connection
 ```
 
-### Step 9.5 — Permanent Resource Split (infra/data-dashboard-permanent/ 분리) — 설계 완료, migration 대기 (2026-05-26, ADR 0024)
+### Step 9.5 — Permanent Resource Split (infra/data-dashboard-permanent/ 분리) ✅ migration 완료 (2026-05-26, ADR 0024)
 
 ```text
 목적:
@@ -427,21 +428,28 @@ GitHub 설정:
   Cognito 도메인 유예 기간 충돌, ECR 이미지 이력 삭제, CloudFront ID 변경 등을 방지한다.
   Step 7.5의 Route53 Hosted Zone 분리와 동일한 "import → state rm" 패턴 적용.
 
-이번 세션에서 완료한 내용 (2026-05-26):
+설계 세션에서 완료한 내용 (2026-05-26):
   + ADR 0024 작성 (docs/changes/0024-data-dashboard-permanent-resource-split.md)
   + 의존성 분석 완료 (cross-root 참조 위치: ecs.tf 환경변수/IAM 5개 항목)
   + migration 순서 및 checklist 문서화
   + 허용 파일 및 금지 명령 정의
 
-다음 세션에서 실행할 내용:
-  1. infra/data-dashboard-permanent/ 신규 root 생성 (tf 파일 작성)
-     - backend: kjw-aegis-terraform-state / data-dashboard-permanent/terraform.tfstate
-     - providers: ap-south-1 (primary) + us-east-1 (ACM cloudfront cert)
-  2. terraform import (그룹 A 우선: Cognito → DynamoDB → ECR/OIDC → 그룹 B: S3 → CF → ACM → Route53)
-  3. terraform plan permanent → No changes 확인
-  4. terraform state rm (data-dashboard에서 영구 리소스 제거)
-  5. infra/data-dashboard/*.tf 수정: remote_state_permanent.tf 추가, resource 블록 제거, 참조 교체
-  6. terraform plan data-dashboard → No changes 확인
+migration 실행 결과:
+  + infra/data-dashboard-permanent/ 신규 root 생성 완료
+    - backend: kjw-aegis-terraform-state / data-dashboard-permanent/terraform.tfstate
+    - providers: ap-south-1 (primary) + us-east-1 (ACM cloudfront cert)
+  + terraform import: 25 resources import 완료
+  + terraform state rm: data-dashboard root에서 영구 리소스 20개 제거 완료
+  + infra/data-dashboard/*.tf 수정 완료
+    - remote_state_permanent.tf 추가
+    - permanent resource block 제거
+    - ECS/DDB/Cognito/ECR/S3/CloudFront outputs 참조 교체
+  + permanent plan: 0 to add, 3 to change, 0 to destroy
+    - destroy 없음
+    - 3개 in-place change 적용 여부는 다음 세션에서 최종 판단
+  + data-dashboard plan: ECS task definition diff만 존재, 영구 리소스 없음
+  + https://dashboard.aegis-pi.cloud/ HTTP 200
+  + https://api.aegis-pi.cloud/healthz HTTP 200
 
 영구 root (infra/data-dashboard-permanent/) 관리 리소스:
   그룹 A: Cognito User Pool / App Client / Hosted UI Domain
@@ -471,6 +479,11 @@ destroy 후 잔여 비용 추가:
 RDS 미영구화 결정:
   비용 절감 목적($15.33/월)으로 일시 자원 유지.
   Step 10에서 final snapshot restore runbook / automation을 별도 과제로 둔다.
+
+후속 확인:
+  1. permanent plan의 3개 in-place change 적용 여부 결정
+  2. data-dashboard plan의 ECS task definition diff 원인 정리
+  3. Step 10 build/destroy 자동화에 permanent/dns root 순서 반영
 ```
 
 ### Step 10 — 운영 문서화 + 자동화 스크립트

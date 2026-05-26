@@ -3,7 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
-  - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설(25 resources import). data-dashboard state rm 20개. 양쪽 plan No destroy. HTTP 200 엔드포인트 확인. 다음: Step 10 LLM 보고서(팀원/후속) 또는 데모 준비.
+  - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설(25 resources import). data-dashboard state rm 20개. 양쪽 plan No destroy. HTTP 200 엔드포인트 확인. 다음: post-migration plan diff 정리 후 Step 10 운영 자동화/데모 준비.
   - 2026-05-26  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. 의존성 분석, migration 순서 문서화. 다음: Step 9.5 migration 실행 (다음 세션, infra/data-dashboard-permanent/ 신설 + import/state rm/apply).
   - 2026-05-26  Step 9 Part 2 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. 다음: Step 10(LLM 보고서, 팀원) 또는 데모 준비.
   - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions dashboard-web.yml, IAM OIDC web deploy role(ADR 0023), Terraform plan 2 add 0 change 확인. Workflow Node runtime은 Node 24 기준으로 확정.
@@ -339,7 +339,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent resource split migration 완료(2026-05-26). infra/data-dashboard-permanent/ 신규 root 생성, 25 resources import, data-dashboard state rm 20개 완료. permanent plan: 0 destroy. data-dashboard plan: ECS task def 교체만(영구 리소스 없음). https://dashboard.aegis-pi.cloud/ HTTP 200, https://api.aegis-pi.cloud/healthz HTTP 200 확인. 다음: Step 10 LLM 일간 보고서(팀원/후속) 또는 데모 준비.
+현재 단계: Phase 1 Step 9.5 permanent resource split migration 완료(2026-05-26). infra/data-dashboard-permanent/ 신규 root 생성, 25 resources import, data-dashboard state rm 20개 완료. permanent plan: 0 destroy. data-dashboard plan: ECS task def 교체만(영구 리소스 없음). https://dashboard.aegis-pi.cloud/ HTTP 200, https://api.aegis-pi.cloud/healthz HTTP 200 확인. 다음: post-migration plan diff 정리 후 Step 10 운영 자동화/데모 준비.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -724,7 +724,8 @@ secret exists, DATA=4
 다음:
   1. factory-a Edge Agent 재활성화 시 IoT→DDB→Redis→WebSocket 경로 검증
   2. 브라우저에서 Cognito 로그인/콜백/로그아웃 수기 확인
-  3. Step 10 LLM 일간 보고서 (Bedrock Claude 3 Haiku, 팀원/후속 작업)
+  3. post-migration plan diff 정리 (permanent 3 in-place change, data-dashboard ECS task definition diff)
+  4. Step 10 운영 자동화/문서화. LLM 일간 보고서는 팀원/후속 작업으로 분리
 ```
 
 ### 1. 완료: Phase 1 Step 9 S3+CloudFront 배포 CI/CD (workflow + IAM apply)
