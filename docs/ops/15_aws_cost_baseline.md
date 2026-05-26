@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v1.6  Step 7 Terraform 구현 완료 반영. ECR `aegis/dashboard-backend` 신설, ECS Fargate Cluster/TaskDef/Service/CloudWatch Logs/IAM 추가. Secrets Manager 2개 추가(database_url/redis_url, 합계 4개). 리소스 상태 표 갱신. 비용 표 갱신(Secrets 4개로 수정).
   - 2026-05-26 v1.5  Step 6 완료(로컬 구현) 반영. apps/dashboard-backend/ 신설, ECS/ECR/ALB는 Step 7 배포 전으로 AWS 비용 미발생. 리소스 상태 표 Step 6 항목 갱신.
   - 2026-05-22 v1.4  `infra/data-dashboard` destroy 완료(73 destroyed). Data/Dashboard VPC active 리소스 삭제, backend state bucket + RDS final snapshot만 잔존. build/destroy wrapper와 snapshot/secret 재생성 기준 반영.
   - 2026-05-21 v1.3  Step 5.5 apply 완료 (ADR 0022). AEGIS-DynamoDB-FactoryStatus Streams 활성화. Lambda data processor env / IAM / notifier ESM을 공식 table로 재정렬. aegis-factory-status DEPRECATED 태그 추가(삭제 대기).
@@ -67,9 +68,11 @@
 | Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 0 | deleted with notifier (2026-05-22 destroy) |
-| Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과. ECS/ECR/ALB는 Step 7 Terraform 배포 전 — 현재 AWS 비용 미발생 |
-| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 0 | not deployed — Step 7에서 신설 |
-| Data/Dashboard VPC | ECS Fargate Dashboard Backend | 0 | not deployed — Step 7에서 배포 |
+| Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과 |
+| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | Terraform 정의 완료 | Step 7 Terraform 구현 완료. apply 전 미생성. GitHub Actions OIDC role(KJW-AEGIS-Data-IAMRole-OIDC-ECRPush) 신설 |
+| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | Terraform 정의 완료 | Step 7 구현 완료. KJW-AEGIS-Data-ECSCluster / kjw-aegis-data-backend / KJW-AEGIS-Data-Service-Backend. 첫 apply 기본 desired_count=0, 이미지 push 후 desired_count=1로 활성화 |
+| Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | Terraform 정의 완료 | Step 7 구현 완료. 30일 보존. 비용 usage-based (소량) |
+| Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | Terraform 정의 완료 | Step 7 신규 2개 (ECS 컨테이너 시크릿 주입용). apply 후 생성 |
 | Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — Phase 1 Step 8 |
 
 현재 확인된 비활성 또는 미생성 항목:
@@ -155,8 +158,10 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | RDS PostgreSQL `db.t4g.micro` Single-AZ | 1 | `$0.021 / hour` | `$0.0210` | `$15.33` |
 | RDS PostgreSQL gp3 storage (20GiB) | 20 GiB | `$0.131 / GB-month` | `$0.0036` | `$2.62` |
 | ElastiCache Redis (cache.t4g.micro) | 1 | `$0.016 / hour` | `$0.0160` | `$11.68` |
-| Secrets Manager (RDS PostgreSQL + Redis AUTH) | 2 | `$0.40 / secret-month` | `$0.0011` | `$0.80` |
-| **고정 합계 (상시 가동)** | | | `~$0.1686 / hour` | **`~$123.08 / month`** |
+| Secrets Manager (RDS + Redis AUTH + DATABASE_URL + REDIS_URL) | 4 | `$0.40 / secret-month` | `$0.0022` | `$1.60` |
+| ECR `aegis/dashboard-backend` 이미지 스토리지 | ~0.5 GB 추정 | `$0.10 / GB-month` | `~$0.0001` | `~$0.05` |
+| CloudWatch Logs ECS ingest (usage) | usage-based | `$0.76 / GB` | usage | usage |
+| **고정 합계 (상시 가동)** | | | `~$0.1699 / hour` | **`~$123.90 / month`** |
 
 > 상시 가동은 ~$125/월이지만, **데모 운영 패턴(build/destroy 사이클)** 으로 실비를 ~$8~10/월 수준으로 낮출 수 있다.
 

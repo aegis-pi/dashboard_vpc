@@ -278,3 +278,56 @@ output "lambda_notifier_event_source_mapping_uuid" {
   description = "Event source mapping UUID: DDB Streams → Lambda notifier."
   value       = aws_lambda_event_source_mapping.ddb_streams_notifier.uuid
 }
+
+# ---------------------------------------------------------------------------
+# ECR (Step 7)
+# ---------------------------------------------------------------------------
+
+output "dashboard_backend_ecr_repository_url" {
+  description = "ECR repository URL for aegis/dashboard-backend. GHA pushes sha-<7char> tags here."
+  value       = aws_ecr_repository.dashboard_backend.repository_url
+}
+
+output "github_oidc_ecr_push_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC ECR push. Set as AWS_OIDC_DASHBOARD_ROLE_ARN GitHub Secret."
+  value       = aws_iam_role.github_oidc_ecr_push.arn
+}
+
+# ---------------------------------------------------------------------------
+# ECS (Step 7)
+# ---------------------------------------------------------------------------
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name for Dashboard Backend."
+  value       = aws_ecs_cluster.this.name
+}
+
+output "ecs_service_name" {
+  description = "ECS service name for Dashboard Backend."
+  value       = aws_ecs_service.backend.name
+}
+
+output "ecs_task_definition_family" {
+  description = "ECS task definition family name."
+  value       = aws_ecs_task_definition.backend.family
+}
+
+output "ecs_task_role_arn" {
+  description = "ECS task role ARN (applied to running container; DDB/S3/Bedrock)."
+  value       = aws_iam_role.ecs_task.arn
+}
+
+output "ecs_task_execution_role_arn" {
+  description = "ECS task execution role ARN (ECR pull + CWLogs + Secrets injection)."
+  value       = aws_iam_role.ecs_task_execution.arn
+}
+
+output "cloudwatch_log_group_backend" {
+  description = "CloudWatch log group for ECS backend tasks (/ecs/kjw-aegis-data-backend)."
+  value       = aws_cloudwatch_log_group.ecs_backend.name
+}
+
+output "backend_target_group_arn" {
+  description = "ALB target group ARN wired to the ECS backend service (port 8000, /healthz)."
+  value       = aws_lb_target_group.backend.arn
+}

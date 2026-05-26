@@ -97,3 +97,37 @@ variable "shared_data_bucket_name" {
   type        = string
   default     = "aegis-bucket-data"
 }
+
+# ---------------------------------------------------------------------------
+# Step 7 — ECS / ECR / Bedrock
+# ---------------------------------------------------------------------------
+
+variable "ecs_backend_desired_count" {
+  description = "Desired number of running ECS backend tasks. Set to 0 before first ECR image push to avoid failed deployments."
+  type        = number
+  default     = 0
+}
+
+variable "backend_container_image" {
+  description = "Full ECR image URI (e.g. <account>.dkr.ecr.ap-south-1.amazonaws.com/aegis/dashboard-backend:sha-abc1234). Defaults to the repository URL with :latest when empty."
+  type        = string
+  default     = ""
+}
+
+variable "bedrock_region" {
+  description = "AWS region for Bedrock InvokeModel calls. Claude 3 Haiku requires us-east-1 if ap-south-1 is unsupported."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "github_repo_for_oidc" {
+  description = "GitHub repository path (org/repo) trusted in the OIDC assume-role condition for ECR push."
+  type        = string
+  default     = "aegis-pi/dashboard_vpc"
+}
+
+variable "github_oidc_provider_arn" {
+  description = "ARN of the GitHub Actions OIDC provider created by infra/foundation. If empty, looked up by URL (requires foundation to be applied first)."
+  type        = string
+  default     = ""
+}
