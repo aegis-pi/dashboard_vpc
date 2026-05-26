@@ -5,6 +5,7 @@
 관련 범위: M6 Dashboard, 실시간 통신, 1번 Data/Dashboard VPC
 
 > 2026-05-18 갱신: 초안에서는 Phase 1.5(포트폴리오 확장 단계)로 표기했으나, Phase 1 통합 결정에 따라 Phase 1 배포 목표의 일부다.
+> 2026-05-21 후속 보정: ADR 0022에 따라 DynamoDB Streams source table은 `aegis-factory-status`가 아니라 공식 hot store `AEGIS-DynamoDB-FactoryStatus`다.
 
 ## 기존 계획
 
@@ -44,7 +45,7 @@ factory-a/b/c
 
 | 컴포넌트 | 역할 |
 | --- | --- |
-| DynamoDB Streams | `aegis-factory-status` LATEST 테이블에 활성화. NEW_AND_OLD_IMAGES |
+| DynamoDB Streams | `AEGIS-DynamoDB-FactoryStatus` LATEST/HISTORY 테이블에 활성화. NEW_AND_OLD_IMAGES |
 | Lambda notifier | Streams trigger, VPC-attach, Redis publish 전담 |
 | Redis Pub/Sub | ECS task 간 fan-out 채널 (ADR 0014) |
 | ECS Fargate Backend | WebSocket endpoint 호스팅, Redis subscribe |
@@ -110,7 +111,7 @@ Phase 1 통합 결정과 함께 다음이 충족됨:
 
 ### Terraform IaC
 
-- DynamoDB `aegis-factory-status` 테이블 정의에 Streams 활성화:
+- DynamoDB `AEGIS-DynamoDB-FactoryStatus` 공식 hot store에 Streams 활성화(ADR 0022):
   ```hcl
   stream_enabled   = true
   stream_view_type = "NEW_AND_OLD_IMAGES"
