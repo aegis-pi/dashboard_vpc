@@ -23,6 +23,8 @@ ENV/
 # Local environment files
 .env
 .env.*
+!.env.example
+!apps/**/.env.example
 secret/
 
 # Terraform
