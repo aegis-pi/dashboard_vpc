@@ -1,8 +1,9 @@
 # 목표 확장 아키텍처
 
 상태: draft
-기준일: 2026-05-21
+기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.7  Step 6 완료 반영. Dashboard Backend 구현 완료/미배포 상태 명시. frontend/ prototype/reference와 apps/dashboard-web/ 운영 SPA 경로 구분 추가.
   - 2026-05-21 v0.6  VPC 1 Terraform 구현 가드 추가. 신규 Data/Dashboard 리소스는 `KJW-AEGIS-Data-*` prefix를 사용하고, `infra/data-dashboard/` root에서 목표 아키텍처 기준으로만 생성하도록 명시.
   - 2026-05-19 v0.5  ADR 0017 반영. 1번 VPC 메타 저장소를 RDS PostgreSQL로 변경.
   - 2026-05-18 v0.4  ADR 0012~0016 반영. Phase 1 통합 결정으로 1번 VPC에 ECS Fargate Backend + 관계형 메타 저장소 + Redis + WebSocket + Bedrock 추가. ADR 0011 NAT GW 제거 결정은 ADR 0012로 supersede.
@@ -499,3 +500,37 @@ Bedrock Claude 3 Haiku 일간 보고서           ADR 0016
 ADR 0007 Dashboard API 부분과 ADR 0011 NAT GW 제거 결정은 ADR 0012로 supersede된다. ADR 0007 Lambda data processor 부분은 그대로 유효하다.
 
 운영 패턴은 데모 직전 `scripts/build/build-data-dashboard.sh`, 직후 `scripts/destroy/destroy-data-dashboard.sh` 사이클로 진행하며, 미가동 시 비용은 0에 수렴한다 (`docs/ops/15_aws_cost_baseline.md`).
+
+## 2026-05-26 수정 방향 (Step 6 완료 / Frontend 경로 구분)
+
+### Dashboard Backend 구현 상태
+
+```text
+완료 (로컬 구현):
+  apps/dashboard-backend/ — FastAPI (pytest 18 passed, docker build 통과)
+  REST: /healthz / /factories / /factories/{id} / /factories/{id}/history / /reports / /reports/{date}/{id}
+  WebSocket: /ws/factories/{factory_id} (JWT via ?token= 파라미터)
+  Cognito JWT 앱 레벨 검증, AEGIS-DynamoDB-FactoryStatus 기준 DDB 조회
+
+미배포 (Step 7 Terraform에서 완성):
+  ECR aegis/dashboard-backend repo
+  ECS Fargate Task Definition / Service
+  ALB HTTPS listener rule (api.<도메인>)
+  현재 ECS/ECR/ALB 비용 미발생
+```
+
+### Frontend 경로 구분 (필수)
+
+```text
+frontend/           = 화면 설계 prototype/reference
+                      기존 Aegis-pi/, Aegis-pi2/ prototype 정리 경로
+                      S3/CloudFront 배포 source로 직접 사용하지 않는다
+
+apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA (예정)
+                      Phase 1 Step 1 마이그레이션에서 신설
+                      S3 dashboard-web bucket 빌드 산출물(dist/) 배포 대상
+
+Step 1 작업 방향:
+  frontend/ prototype을 참고해 apps/dashboard-web/ Vite + React로 공식 구현
+  WebSocket JWT는 ?token= 파라미터로 전달 (backend 구현과 정렬)
+```

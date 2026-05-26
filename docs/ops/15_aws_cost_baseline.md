@@ -1,9 +1,10 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-22
+기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v1.5  Step 6 완료(로컬 구현) 반영. apps/dashboard-backend/ 신설, ECS/ECR/ALB는 Step 7 배포 전으로 AWS 비용 미발생. 리소스 상태 표 Step 6 항목 갱신.
   - 2026-05-22 v1.4  `infra/data-dashboard` destroy 완료(73 destroyed). Data/Dashboard VPC active 리소스 삭제, backend state bucket + RDS final snapshot만 잔존. build/destroy wrapper와 snapshot/secret 재생성 기준 반영.
   - 2026-05-21 v1.3  Step 5.5 apply 완료 (ADR 0022). AEGIS-DynamoDB-FactoryStatus Streams 활성화. Lambda data processor env / IAM / notifier ESM을 공식 table로 재정렬. aegis-factory-status DEPRECATED 태그 추가(삭제 대기).
   - 2026-05-21 v1.2  Step 5 apply 완료. Lambda notifier/SQS DLQ 추가 (7 resources 추가, 누적 73). 리소스 상태 표 갱신.
@@ -66,7 +67,10 @@
 | Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 0 | deleted (2026-05-22 destroy) |
 | Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 0 | deleted with notifier (2026-05-22 destroy) |
-| Data/Dashboard VPC | ECS Fargate / Lambda report-generator | 0 | not deployed — Phase 1 Step 6~8 |
+| Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과. ECS/ECR/ALB는 Step 7 Terraform 배포 전 — 현재 AWS 비용 미발생 |
+| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 0 | not deployed — Step 7에서 신설 |
+| Data/Dashboard VPC | ECS Fargate Dashboard Backend | 0 | not deployed — Step 7에서 배포 |
+| Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — Phase 1 Step 8 |
 
 현재 확인된 비활성 또는 미생성 항목:
 

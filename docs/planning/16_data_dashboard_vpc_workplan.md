@@ -1,8 +1,9 @@
 # Data / Dashboard VPC Workplan (이 작업 환경)
 
 상태: source of truth
-기준일: 2026-05-21
+기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.9  Step 6 완료 반영. frontend/ prototype/reference와 apps/dashboard-web/ 공식 SPA 경로 구분 명확화. Step 1 Aegis-pi2/ 참조를 frontend/ 기준으로 통일.
   - 2026-05-22 v0.8  Data/Dashboard VPC build/destroy wrapper 스크립트 구현. RDS final snapshot 이름을 random suffix로 충돌 방지하고, Secrets Manager는 재생성 사이클을 위해 즉시 삭제 기준으로 변경.
   - 2026-05-21 v0.7  Claude Code 세션 운영 기준 추가. 같은 Step은 기존 세션, Step/Phase 전환은 새 세션으로 시작하고 문서 재확인 후 작업.
   - 2026-05-21 v0.6  VPC 1 Terraform 신규 리소스 이름에 개인 작업 prefix `KJW` 적용. 기본 이름을 `KJW-AEGIS-Data-*`, lowercase 제약 리소스를 `kjw-aegis-data-*`로 고정.
@@ -115,16 +116,26 @@
 ### Step 1 — Frontend 마이그레이션 (병행 가능)
 
 ```text
-- 현재 prototype reference는 `Aegis-pi2/` 로 둔다
-- 공식 프론트엔드 소스 경로는 `apps/dashboard-web/` 로 고정한다
-- Step 1 진행 시 `Aegis-pi2/` 화면 설계를 `apps/dashboard-web/` Vite + React 프로젝트로 마이그레이션
-- `Aegis-pi2/` 는 배포/CI/S3 source path로 직접 사용하지 않는다
-- 컴포넌트(`fleet/factory/alerts/charts/sidebar/topbar`) 그대로 재사용
+경로 구분 (필수):
+- frontend/           = 화면 설계 prototype/reference
+                        기존 Aegis-pi/, Aegis-pi2/ prototype이 정리된 경로
+                        배포/CI/S3 source path로 직접 사용하지 않는다
+- apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA
+                        Step 1의 구현 대상
+
+Step 1 진행 시:
+- frontend/ 화면 설계를 참고해 apps/dashboard-web/ Vite + React 프로젝트로 공식 구현
+- 컴포넌트(fleet/factory/alerts/charts/sidebar/topbar) 그대로 재사용
 - import 기반 모듈 구조로 전환, ReactDOM.createRoot은 main.jsx로 분리
 - Cognito Hosted UI 연동(oidc-client-ts 또는 aws-amplify/auth)
 - WebSocket client 추가 (`react-use-websocket` 또는 직접 WebSocket API)
+  JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약, backend 구현과 정렬)
 - 보고서 탭에 react-markdown 렌더링 추가
-- 빌드 산출물 `dist/` 확인
+- 빌드 산출물 dist/ 확인
+
+금지:
+- frontend/ 코드를 S3/CloudFront 배포 source로 직접 사용
+- apps/dashboard-web/ 구현을 Step 1 이전에 시작 (Step 6 이후 가능)
 ```
 
 ### Step 2 — Terraform 1번 VPC 골격 (`infra/data-dashboard/`)
@@ -219,24 +230,34 @@
 - CloudWatch Logs + retry / DLQ
 ```
 
-### Step 6 — Dashboard Backend 컨테이너 구현 (ADR 0012)
+### Step 6 — Dashboard Backend 컨테이너 구현 (ADR 0012) ✅ 완료 (2026-05-26)
 
 ```text
-- 신규 ECR repository: aegis/dashboard-backend
-- FastAPI 프로젝트 골격:
-    routers/factories.py (REST: 목록, 상세, 시계열)
-    routers/reports.py (REST: 일간 보고서)
-    routers/ws.py (WebSocket: /ws/factories/{factory_id})
-    deps/auth.py (Cognito JWT 앱 레벨 검증)
-    deps/db.py (RDS PostgreSQL SQLAlchemy async + asyncpg)
-    deps/ddb.py (boto3 async)
-    deps/redis.py (redis.asyncio + pubsub)
-    deps/s3.py (boto3 async)
-- 단위 테스트 + moto (DDB/S3) + testcontainers (Postgres) + fakeredis
-- Lambda Powertools 호환 logging + structured JSON
-- X-Ray ADOT collector sidecar 또는 SDK 직접
-- Dockerfile (multi-stage, slim, non-root)
-- GitHub Actions: build/test/push sha-<7chars> to ECR
+완료된 구현:
+- apps/dashboard-backend/ 신설 (FastAPI 0.1.0)
+- REST endpoints (모두 Cognito JWT 앱 레벨 검증 — /healthz 제외):
+    GET /healthz (인증 불필요, 헬스체크)
+    GET /factories
+    GET /factories/{factory_id}
+    GET /factories/{factory_id}/history?window=1h  (HISTORY#STATE#* 조회)
+    GET /reports  (skeleton — Step 8 lambda-report-generator 이후 구현)
+    GET /reports/{report_date}/{factory_id}  (skeleton — S3 reports/ Step 8 이후)
+- WebSocket: /ws/factories/{factory_id}
+    JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약)
+    Redis Pub/Sub factory:update:{factory_id} subscribe
+- DDB hot store: AEGIS-DynamoDB-FactoryStatus (pk/sk, HISTORY#STATE#*)
+    HISTORY#RISK / HISTORY#FACTORY / HISTORY#INFRA 미사용 (ADR 0022)
+- Dockerfile (python:3.12-slim 단일 stage, non-root appuser)
+- .env.example (gitignore 예외로 commit)
+- GitHub Actions: .github/workflows/dashboard-backend.yml (pytest CI + ECR sha-<7char> push 골격)
+  AWS_OIDC_DASHBOARD_ROLE_ARN GitHub Secret은 Step 7 IAM 생성 후 등록 필요
+- pytest -q: 18 passed / docker build: 통과
+
+미배포 (Step 7에서 완성):
+- ECR aegis/dashboard-backend repo 신설 — Step 7
+- ECS Fargate Task Definition / Service 배포 — Step 7
+- ALB listener rule 연결 (api.<도메인>) — Step 7
+- 현재 ECS/ECR/ALB 비용 미발생
 ```
 
 ### Step 7 — ECS Service / ALB 배포 (`infra/data-dashboard/`)

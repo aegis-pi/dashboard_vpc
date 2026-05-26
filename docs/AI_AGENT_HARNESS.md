@@ -1,7 +1,9 @@
 # AI Agent Harness — Aegis-Pi Risk Twin
 
 상태: source of truth
-기준일: 2026-05-22
+기준일: 2026-05-26
+수정 이력:
+  - 2026-05-26  Step 6 완료 반영. TL;DR·현재 구현 상태·Known Gaps 갱신. Step 1 frontend prototype/reference vs apps/dashboard-web/ 공식 경로 구분 추가. 변경 이력 추가.
 대상: Claude Code, Codex, 또는 동급의 AI 코딩 에이전트
 언어: 한국어 (개조식 우선) / 코드·식별자는 원문 유지
 
@@ -15,7 +17,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 6 Dashboard Backend FastAPI 구현 준비
+- **본 환경의 다음 작업**: Phase 1 Step 7 ECS Fargate / ALB / ECR / Route53 Terraform 배포 (`infra/data-dashboard/`)
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -41,9 +43,9 @@
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
-- **진행 중(워크스트림 B · 본 환경)**: Phase 1 Step 6 진입 준비
+- **진행 중(워크스트림 B · 본 환경)**: Phase 1 Step 7 진입 준비 (Step 6 Dashboard Backend FastAPI 구현 완료)
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 Data/Dashboard VPC는 2026-05-22 destroy 완료(backend state bucket + RDS final snapshot만 잔존)
+- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 Data/Dashboard VPC는 2026-05-22 destroy 완료(backend state bucket + RDS final snapshot만 잔존). ECS/ECR/ALB는 Step 7 배포 전으로 미생성
 
 본 환경의 시점별 정확한 상태 스냅샷은 항상 `docs/issues/SESSION_STATE.md`를 우선한다. 본 harness 본문은 phase 경계와 책임 경계만 정의한다.
 
@@ -163,13 +165,18 @@
 
 #### Phase 1 Step 1 — Frontend Vite + React 마이그레이션
 
-- 목표: `Aegis-pi2/` prototype reference의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 모듈 구조로 이전 + Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
+- 목표: `frontend/` prototype reference(기존 `Aegis-pi/`, `Aegis-pi2/` 정리 경로)의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 모듈 구조로 이전 + Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
+- **경로 구분 (필수)**:
+  - `frontend/` = 화면 설계 prototype/reference. 기존 `Aegis-pi/`, `Aegis-pi2/` prototype이 정리된 경로
+  - `apps/dashboard-web/` = 운영 배포용 공식 Vite + React SPA. Step 1의 구현 대상
+  - `frontend/`를 배포/CI/S3 source path로 직접 사용하지 않는다
+  - Step 1에서 `frontend/` prototype을 참고해 `apps/dashboard-web/`로 공식 구현한다
 - DoD: `npm run build` 성공, `dist/` 산출물 검증, prototype 의 시각·UX 회귀 없음, Cognito 콜백 URL 와 WebSocket endpoint는 환경변수로 추상화
 - 허용 파일: `apps/dashboard-web/**`(신설), `docs/specs/monitoring_dashboard/04_risk_twin_web_screen_design.md` 갱신
-- 금지: `Aegis-pi2/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다. 마이그레이션 도중 백엔드 endpoint 를 hardcode 하지 않는다. `.env*` 는 `.env.example` 만 commit
+- 금지: `frontend/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다. 마이그레이션 도중 백엔드 endpoint 를 hardcode 하지 않는다. `.env*` 는 `.env.example` 만 commit
 - 환경변수 계약 (Frontend): `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`
 - 검증: `npm run build`, `npm run lint`, `npm run test`, prototype 스크린샷 diff
-- 롤백: `apps/dashboard-web/` 디렉터리 삭제. `Aegis-pi2/` prototype reference 는 그대로 유지
+- 롤백: `apps/dashboard-web/` 디렉터리 삭제. `frontend/` prototype reference 는 그대로 유지
 
 #### Phase 1 Step 2 — Terraform 1번 VPC 골격 (`infra/data-dashboard/`)
 
@@ -233,7 +240,7 @@
 #### Phase 1 Step 6 — Dashboard Backend (FastAPI on ECS Fargate)
 
 - 목표: REST + WebSocket 단일 FastAPI 서비스. Cognito JWT 앱 레벨 검증, RDS(PostgreSQL via SQLAlchemy async + asyncpg), DDB, S3, Redis Pub/Sub 통합
-- DoD: 로컬 `docker compose up` 으로 healthcheck `/healthz` 200, 단위 테스트(moto + testcontainers + fakeredis) 통과, GitHub Actions 가 `sha-<7chars>` 태그로 신규 ECR repo `aegis/dashboard-backend` 에 push
+- DoD: 로컬 FastAPI 테스트와 컨테이너 빌드로 `/healthz` 200 가능 상태 확인, 단위 테스트(moto + fakeredis/JWKS mock) 통과, GitHub Actions가 `sha-<7chars>` 태그로 신규 ECR repo `aegis/dashboard-backend`에 push할 수 있는 workflow 골격 준비. 실제 ECR repo/IAM/OIDC Secret과 이미지 push는 Step 7에서 완료
 - API 계약: § 8.2 참조
 - 허용 파일: `apps/dashboard-backend/**`, `.github/workflows/dashboard-backend.yml` (신설)
 - 금지: 환경변수 외 비밀 정보 하드코드, Cognito JWKS 검증 생략, RDS 직접 root user 사용
@@ -375,7 +382,7 @@
 
 ### 8.2 Dashboard Backend HTTP / WebSocket API
 
-> 본 절은 **계약 초안**이다. Step 6 구현 시 OpenAPI / asyncapi 스펙을 `apps/dashboard-backend/docs/` 에 함께 commit 한다.
+> 본 절은 **Step 6 구현 기준 계약**이다. OpenAPI / AsyncAPI 문서 산출물은 Step 7 배포 전후 실제 ALB/WebSocket endpoint 검증과 함께 보강한다.
 
 | Endpoint | Method | 인증 | 설명 | 응답 |
 | --- | --- | --- | --- | --- |
@@ -442,8 +449,12 @@
 - M0 Issue 12 — `start_test` 자동화 부분 완료. Hot/Cold 티어링 자동화 미완
 - M1 Issue 11 — Admin UI 운영 보안 강화 (WAF / Cognito / OIDC): 보류
 - EKS API endpoint public CIDR 축소: 보류
-- `apps/dashboard-backend/`, `apps/dashboard-web/`, `apps/lambda-report-generator/` 디렉터리 미존재 — 각각 Phase 1 Step 6/1/8 의 첫 PR 가 신설
+- `apps/dashboard-backend/` — **완료** (Phase 1 Step 6, 2026-05-26). pytest 18 passed, docker build 통과. ECS/ECR/ALB 배포는 Step 7
+- `apps/dashboard-web/` 디렉터리 미존재 — Phase 1 Step 1 에서 신설 (`frontend/` prototype reference 참고)
+- `apps/lambda-report-generator/` 디렉터리 미존재 — Phase 1 Step 8 에서 신설
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
+- `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (Step 1 미구현)
+- GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 미등록 — Step 7 IAM 생성 후 등록
 - Markdown 린트 / 문서 테스트 도구 미설정 — § 7.1 수기 체크리스트로 대체
 
 ### 10.2 Needs Decision (열린 결정)
@@ -518,3 +529,4 @@
 | 날짜 | 버전 | 요약 |
 | --- | --- | --- |
 | 2026-05-19 | v1.0 | 초안. 워크스트림 B Phase 1 통합 결정 (ADR 0012~0017) 반영, 마일스톤↔Phase 매핑 표 + 검증 명령 + 데이터/계약/Needs Decision 정리 |
+| 2026-05-26 | v1.1 | Step 6 완료 반영. TL;DR·§ 2·§ 10.1 갱신. Step 1 frontend/ vs apps/dashboard-web/ 경로 구분 추가. Known Gaps에서 apps/dashboard-backend/ 완료 처리. |

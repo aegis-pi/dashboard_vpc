@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: draft
-기준일: 2026-05-20
+기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 6 구현 결과 반영. history endpoint 3개 분리 → 1개 통합(/history?window=). reports endpoint path 구조 갱신. WebSocket JWT 전달 방식 ?token= 파라미터로 확정. skeleton 항목 명시.
   - 2026-05-20  Phase 1 통합 결정(ADR 0012~0017) 반영. API Gateway/Lambda API 초안을 ALB + ECS Fargate Backend + 앱 레벨 JWT 검증 + WebSocket 기준으로 갱신.
   - 2026-05-15  ADR 0007/0008로 API Gateway + Lambda + Cognito Authorizer 확정. 후속 API 후보를 확정 경로로 갱신.
   - 2026-04-28  초안
@@ -72,26 +73,28 @@ Authorization: Bearer <Cognito Access Token>
 - FastAPI backend가 JWKS 기반으로 서명/만료/audience를 앱 레벨에서 검증
 - 사용자-공장 권한은 RDS PostgreSQL의 메타데이터를 기준으로 필터링
 
-### REST Endpoint 후보 (Phase 1)
+### REST Endpoint (Phase 1 Step 6 구현 완료)
 
 기준 데이터 모델은 `docs/specs/data_storage_pipeline.md`의 DynamoDB schema를 따른다.
 
-| Method | Path | 동작 | 백엔드 조회 |
-| --- | --- | --- | --- |
-| GET | `/factories` | 공장 목록과 latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) |
-| GET | `/factories/{factory_id}` | 단일 공장 latest 전체 | DDB GetItem |
-| GET | `/factories/{factory_id}/risk-history?window=1h` | Risk 그래프 | DDB Query (`sk begins_with HISTORY#STATE#`, `risk` 추출) |
-| GET | `/factories/{factory_id}/factory-history?window=1h` | 환경 그래프 | DDB Query (`sk begins_with HISTORY#STATE#`, `factory_state` 추출) |
-| GET | `/factories/{factory_id}/infra-history?window=1h` | 노드 그래프 | DDB Query (`sk begins_with HISTORY#STATE#`, `infra_state` 추출) |
-| GET | `/factories/{factory_id}/processed/{path}` | 장기 이력 단건 조회 (감사) | S3 GetObject (processed/...) |
-| GET | `/reports?date=YYYY-MM-DD` | 날짜 기준 보고서 목록 | DDB Query (`aegis-daily-report`) |
-| GET | `/reports/{factory_id}?date=YYYY-MM-DD` | 공장별 Markdown 보고서 | DDB GetItem + S3 GetObject (reports/...) |
+| Method | Path | 인증 | 동작 | 백엔드 조회 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/healthz` | 없음 | liveness | `{"status":"ok"}` | 구현 완료 |
+| GET | `/factories` | Cognito JWT | 공장 목록 + latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) | 구현 완료 |
+| GET | `/factories/{factory_id}` | Cognito JWT | 단일 공장 latest 전체 | DDB GetItem | 구현 완료 |
+| GET | `/factories/{factory_id}/history?window=1h` | Cognito JWT | 시계열 (risk/factory_state/infra_state 통합) | DDB Query (`sk begins_with HISTORY#STATE#`) | 구현 완료 |
+| GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — Step 8 이후 | skeleton |
+| GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — Step 8 이후 | skeleton |
 
-### WebSocket Endpoint 후보 (Phase 1)
+**Note**: history endpoint는 `HISTORY#STATE#*` sk pattern으로 통합 조회한다. `HISTORY#RISK`, `HISTORY#FACTORY`, `HISTORY#INFRA` prefix는 사용하지 않는다 (ADR 0022).
 
-| Method | Path | 동작 | 백엔드 경로 |
-| --- | --- | --- | --- |
-| WS | `/ws/factories/{factory_id}` | 공장 상태 변경 push | Redis Pub/Sub `factory:update:<factory_id>` subscribe |
+### WebSocket Endpoint (Phase 1 Step 6 구현 완료)
+
+| Method | Path | 인증 | 동작 | 백엔드 경로 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| WS | `/ws/factories/{factory_id}` | Cognito JWT (?token= 파라미터) | 공장 상태 변경 push | Redis Pub/Sub `factory:update:<factory_id>` subscribe | 구현 완료 |
+
+**Note**: WebSocket JWT는 `Authorization` 헤더 대신 `?token=<JWT>` 쿼리 파라미터로 전달한다. 브라우저 WebSocket API는 커스텀 헤더를 지원하지 않기 때문이다.
 
 ### ALB / Backend 정책
 
