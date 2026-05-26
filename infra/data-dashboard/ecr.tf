@@ -121,3 +121,52 @@ resource "aws_iam_role_policy" "github_oidc_ecr_push" {
   role   = aws_iam_role.github_oidc_ecr_push.id
   policy = data.aws_iam_policy_document.github_oidc_ecr_push_inline.json
 }
+
+# ---------------------------------------------------------------------------
+# GitHub Actions OIDC role — S3 web deploy + CloudFront invalidation (Step 9)
+# Separated from ECR push role for least-privilege isolation (ADR 0023).
+# AWS_OIDC_DASHBOARD_WEB_ROLE_ARN GitHub Secret = aws_iam_role.github_oidc_web_deploy.arn
+# ---------------------------------------------------------------------------
+
+resource "aws_iam_role" "github_oidc_web_deploy" {
+  name               = "${local.naming_prefix}-IAMRole-OIDC-WebDeploy"
+  assume_role_policy = data.aws_iam_policy_document.github_oidc_ecr_push_assume.json
+
+  tags = merge(local.tags, {
+    Name = "${local.naming_prefix}-IAMRole-OIDC-WebDeploy"
+    Step = "9"
+  })
+}
+
+data "aws_iam_policy_document" "github_oidc_web_deploy_inline" {
+  statement {
+    sid       = "S3WebBucketList"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.web.arn]
+  }
+
+  statement {
+    sid    = "S3WebBucketObjects"
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:GetObject",
+    ]
+    resources = ["${aws_s3_bucket.web.arn}/*"]
+  }
+
+  statement {
+    sid       = "CloudFrontInvalidate"
+    effect    = "Allow"
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = [aws_cloudfront_distribution.web.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "github_oidc_web_deploy" {
+  name   = "${local.naming_prefix}-Policy-OIDC-WebDeploy"
+  role   = aws_iam_role.github_oidc_web_deploy.id
+  policy = data.aws_iam_policy_document.github_oidc_web_deploy_inline.json
+}

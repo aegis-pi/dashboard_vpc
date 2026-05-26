@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.3  Step 9 S3+CloudFront 배포 CI/CD 구현 반영. GitHub Actions workflow, IAM role, GitHub Secret/Variable 목록 추가.
   - 2026-05-26 v0.2  Step 7.5 Route53 Hosted Zone 영구 분리 반영. `infra/data-dashboard-dns/`와 state 이전 절차 추가.
 
 ## 목적
@@ -97,6 +98,73 @@ Terraform state에서만 추적을 해제한다.
 
 이 절차 중 destroy 명령은 실행하지 않는다.
 ```
+
+## Step 9 CI/CD — Dashboard Web S3+CloudFront 배포
+
+### 구조
+
+```text
+.github/workflows/dashboard-web.yml
+  test job:          npm ci → lint → test
+  build-and-deploy:  npm ci → build (VITE_* env) → OIDC configure → S3 sync → CF invalidate
+```
+
+### IAM role
+
+- `KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy` (ADR 0023, 별도 role)
+- 권한: s3:ListBucket + s3:PutObject/DeleteObject/GetObject + cloudfront:CreateInvalidation
+- apply 후 ARN 확인: `terraform -chdir=infra/data-dashboard output github_oidc_web_deploy_role_arn`
+
+### Step 9 적용 절차
+
+```bash
+# 1. IAM role apply (infra/data-dashboard)
+terraform -chdir=infra/data-dashboard apply \
+  -var="dashboard_domain_name=aegis-pi.cloud" \
+  -var="ecs_backend_desired_count=1" \
+  -var="backend_container_image=<account>.dkr.ecr.ap-south-1.amazonaws.com/aegis/dashboard-backend:sha-9d2c200"
+
+# 2. apply 후 output 확인 (ARN/ID만, 실제 값 문서 기록 금지)
+terraform -chdir=infra/data-dashboard output github_oidc_web_deploy_role_arn
+terraform -chdir=infra/data-dashboard output cloudfront_distribution_id
+terraform -chdir=infra/data-dashboard output cognito_app_client_id
+```
+
+### GitHub Secret / Variable 등록 목록
+
+2026-05-26 기준 실제 등록 위치:
+- `aegis-pi/dashboard_vpc` repo-level secret/variables 등록 완료
+- org-level 등록은 gh token의 `admin:org` 권한 부족으로 미실행
+- workflow의 `secrets.*`, `vars.*` 참조는 repo-level 값으로도 동작한다
+
+| 종류 | 이름 | 값 출처 |
+| --- | --- | --- |
+| Secret | `AWS_OIDC_DASHBOARD_WEB_ROLE_ARN` | `terraform output github_oidc_web_deploy_role_arn` |
+| Variable | `DASHBOARD_WEB_BUCKET` | `kjw-aegis-data-web` (fixed) |
+| Variable | `DASHBOARD_CLOUDFRONT_DISTRIBUTION_ID` | `terraform output cloudfront_distribution_id` |
+| Variable | `VITE_API_BASE_URL` | `https://api.aegis-pi.cloud` |
+| Variable | `VITE_WS_BASE_URL` | `wss://api.aegis-pi.cloud` |
+| Variable | `VITE_COGNITO_AUTHORITY` | `https://cognito-idp.ap-south-1.amazonaws.com/<user-pool-id>` |
+| Variable | `VITE_COGNITO_DOMAIN` | `https://kjw-aegis-data-auth.auth.ap-south-1.amazoncognito.com` |
+| Variable | `VITE_COGNITO_CLIENT_ID` | `terraform output cognito_app_client_id` |
+| Variable | `VITE_COGNITO_REDIRECT_URI` | `https://dashboard.aegis-pi.cloud/callback` |
+| Variable | `VITE_COGNITO_LOGOUT_URI` | `https://dashboard.aegis-pi.cloud/` |
+
+비밀번호/token/private key/전체 ARN/account 세부정보는 문서에 기록하지 않는다.
+
+### 수동 dry-run (배포 전 확인용)
+
+```bash
+aws s3 sync apps/dashboard-web/dist/ s3://kjw-aegis-data-web/ \
+  --delete \
+  --region ap-south-1 \
+  --dryrun
+```
+
+### 실제 배포 방법
+
+- GitHub Actions workflow_dispatch 또는 push to main (apps/dashboard-web/** 변경)
+- 배포 후 `https://dashboard.aegis-pi.cloud` 접속 수기 확인
 
 ## Apply
 

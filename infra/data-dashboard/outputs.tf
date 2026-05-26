@@ -293,6 +293,11 @@ output "github_oidc_ecr_push_role_arn" {
   value       = aws_iam_role.github_oidc_ecr_push.arn
 }
 
+output "github_oidc_web_deploy_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC web deploy (S3 sync + CloudFront invalidation). Set as AWS_OIDC_DASHBOARD_WEB_ROLE_ARN GitHub Secret."
+  value       = aws_iam_role.github_oidc_web_deploy.arn
+}
+
 # ---------------------------------------------------------------------------
 # ECS (Step 7)
 # ---------------------------------------------------------------------------

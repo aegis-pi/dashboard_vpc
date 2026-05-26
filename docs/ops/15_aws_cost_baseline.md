@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v2.1  Step 9 CI/CD 구현 반영. IAM role 1개 추가(상시 비용 없음). S3 PUT/GET/DELETE + CloudFront invalidation: usage-based 소량. 고정 비용 변화 없음.
   - 2026-05-26 v2.0  Step 8 Frontend SPA 로컬 구현 완료 반영. 신규 AWS 리소스 없음, 기존 S3/CloudFront 배포는 Step 9에서 진행.
   - 2026-05-26 v1.9  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. 리소스 상태 표를 active로 갱신.
   - 2026-05-26 v1.8  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 반영. Route53 hosted zone을 영구 자원으로 재분류. destroy 후 잔여 비용 설명 갱신. $0.50/월 영구 비용 명시.
@@ -11,7 +12,7 @@
   - 2026-05-26 v1.6  Step 7 Terraform 구현 완료 반영. ECR `aegis/dashboard-backend` 신설, ECS Fargate Cluster/TaskDef/Service/CloudWatch Logs/IAM 추가. Secrets Manager 2개 추가(database_url/redis_url, 합계 4개). 리소스 상태 표 갱신. 비용 표 갱신(Secrets 4개로 수정).
   - 2026-05-26 v1.5  Step 6 완료(로컬 구현) 반영. apps/dashboard-backend/ 신설, ECS/ECR/ALB는 Step 7 배포 전으로 AWS 비용 미발생. 리소스 상태 표 Step 6 항목 갱신.
   - 2026-05-22 v1.4  `infra/data-dashboard` destroy 완료(73 destroyed). Data/Dashboard VPC active 리소스 삭제, backend state bucket + RDS final snapshot만 잔존. build/destroy wrapper와 snapshot/secret 재생성 기준 반영.
-  - 2026-05-21 v1.3  Step 5.5 apply 완료 (ADR 0022). AEGIS-DynamoDB-FactoryStatus Streams 활성화. Lambda data processor env / IAM / notifier ESM을 공식 table로 재정렬. aegis-factory-status DEPRECATED 태그 추가(삭제 대기).
+  - 2026-05-21 v1.3  Step 5.5 apply 완료 (ADR 0022). AEGIS-DynamoDB-FactoryStatus Streams 활성화. Lambda data processor env / IAM / notifier ESM을 공식 table로 재정렬. 중복 aegis-factory-status 삭제 완료.
   - 2026-05-21 v1.2  Step 5 apply 완료. Lambda notifier/SQS DLQ 추가 (7 resources 추가, 누적 73). 리소스 상태 표 갱신.
   - 2026-05-21 v1.1  Step 3 apply 완료. DynamoDB 2개/RDS PostgreSQL/ElastiCache Redis/Secrets Manager 2개 생성(12 resources 추가, 누적 59). 리소스 상태 표 갱신.
   - 2026-05-21 v1.0  Step 2 전체 apply 완료. 47 resources 생성 (3회 apply 누적). ACM ISSUED(ALB ap-south-1 / CloudFront us-east-1). CloudFront 배포/HTTPS listener/S3 bucket policy/Route53 web_cloudfront 레코드 활성. terraform plan No changes 확인. 리소스 상태 표 갱신.
@@ -54,29 +55,32 @@
 | Route53 | public hosted zone `minsoo-tech.cloud` | 1 zone | active |
 | ACM | public certificate for Admin UI hosts | 1 regional certificate set | active / ISSUED |
 | ALB | `aegis-admin-ui` | 1 | active |
-| Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 0 managed resources in state | destroy 완료 (2026-05-22). `terraform state list` empty |
+| Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 112 state objects | active (Step 7~9 apply 완료). `terraform plan` No changes |
 | Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | active, 유지 |
 | Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 1 zone | **active (영구 자원)**. Step 7.5 이후 `infra/data-dashboard-dns/` root가 관리. `infra/data-dashboard` destroy 대상에서 제외. `$0.50/월` 상시 발생 |
-| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | 0 | deleted (2026-05-22 destroy) |
+| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | 1 set | active (Step 7 apply 이후) |
+| Data/Dashboard VPC | ACM alb (ap-south-1) / cloudfront (us-east-1) | 2 certificates | active / ISSUED |
+| Data/Dashboard VPC | CloudFront 배포 / HTTPS listener / S3 bucket policy / Route53 web_cloudfront | 1 set | active |
 | Data/Dashboard VPC | DynamoDB `AEGIS-DynamoDB-FactoryStatus` | 1 table | **active**. 공식 hot store(ADR 0022), Streams NEW_AND_OLD_IMAGES 활성(2026-05-21). Lambda data processor write 대상 |
 | Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 0 | deleted |
-| Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | 0 instance | deleted. final snapshot `kjw-aegis-data-pg-final` available |
-| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 0 | deleted. Terraform now uses immediate deletion for future cycles |
-| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 0 | deleted (2026-05-22 destroy) |
-| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 0 | deleted with notifier (2026-05-22 destroy) |
+| Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 1 table | active, on-demand |
+| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | 1 instance | active |
+| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | 1 replication group | active |
+| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 2 secrets | active |
+| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 1 function | active |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 1 rule | active |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 1 rule | active |
+| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 function | active |
+| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 queue | active |
+| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 mapping | active |
 | Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과 |
 | Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active. Image tag `sha-9d2c200` push 확인. GitHub Actions OIDC role 신설, org secret 등록 완료(사용자 확인 기준) |
 | Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | desired 1 / running 1 | active. `kjw-aegis-data-backend:2`, image `sha-9d2c200`, rollout completed, `/healthz` 200 |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active. 30일 보존. 비용 usage-based (소량) |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 secrets | active. ECS 컨테이너 시크릿 주입용 |
+| Data/Dashboard VPC | IAM role `KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy` | 1 role | active (Step 9 apply 후). IAM: 무료 |
+| Data/Dashboard VPC | S3 web bucket deploy (PUT/DELETE/GET ops) | usage-based | Step 9 workflow 실행 시 소량. PUT ~$0.005/1000 req, GET ~$0.0004/1000 req |
+| Data/Dashboard VPC | CloudFront invalidation `//*` | usage-based | 월 1,000 paths 무료, 초과 $0.005/path |
 | Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — LLM 일간 보고서 팀원/후속 작업 |
 
 현재 확인된 비활성 또는 미생성 항목:

@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v1.4  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions workflow, IAM OIDC web deploy role(ADR 0023), Terraform apply 2 add 0 change 완료. GitHub repo-level Secret/Variable 등록 후 실제 배포 가능.
   - 2026-05-26 v1.3  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. npm build/lint/test 통과. Step 9 배포 CI/CD 방향 명시.
   - 2026-05-26 v1.2  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26 v1.1  Step 7 apply 완료 반영. Step 7.5 Route53 Hosted Zone 영구 분리 추가. Route53 hosted zone을 destroy 대상에서 제외, $0.50/월 영구 비용으로 분리. infra/data-dashboard-dns/ allowlist 추가.
@@ -351,7 +352,54 @@ Step 1 진행 시:
 LLM 일간 보고서(ADR 0016, Lambda report-generator + Bedrock)는 팀원/후속 작업으로 분리한다.
 ```
 
-### Step 9 — End-to-end 통합 검증
+### Step 9 — S3+CloudFront 배포 CI/CD + End-to-end 통합 검증
+
+#### Step 9 Part 1 — S3+CloudFront 배포 CI/CD ✅ 구현 완료 (2026-05-26, ADR 0023)
+
+```text
+완료된 구현:
+- GitHub Actions: .github/workflows/dashboard-web.yml 신설
+    트리거: push main (apps/dashboard-web/**, .github/workflows/dashboard-web.yml), workflow_dispatch
+    test job: npm ci → npm run lint → npm run test
+    build-and-deploy job (needs: test):
+      - npm ci
+      - npm run build (VITE_* env: vars.* 주입)
+      - configure-aws-credentials (OIDC: secrets.AWS_OIDC_DASHBOARD_WEB_ROLE_ARN)
+      - aws s3 sync apps/dashboard-web/dist/ s3://$DASHBOARD_WEB_BUCKET/ --delete
+      - aws cloudfront create-invalidation --distribution-id $DASHBOARD_CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+    OIDC permissions(id-token: write)은 build-and-deploy job에만 부여 (최소권한)
+
+- IAM role (ADR 0023, 옵션 B — 별도 role):
+    신규: KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy
+    권한: s3:ListBucket(bucket) + s3:PutObject/DeleteObject/GetObject(bucket/*) + cloudfront:CreateInvalidation(distribution)
+    Trust policy: github_oidc_ecr_push_assume 재사용 (동일 OIDC provider + repo:aegis-pi/dashboard_vpc:*)
+    기존 KJW-AEGIS-Data-IAMRole-OIDC-ECRPush: 변경 없음
+
+- Terraform:
+    infra/data-dashboard/ecr.tf 하단에 role/policy document/role policy 추가
+    infra/data-dashboard/outputs.tf에 github_oidc_web_deploy_role_arn output 추가
+    terraform fmt -check: 통과 / terraform validate: Success! / terraform plan: 2 add, 0 change, 0 destroy
+    terraform apply: 2 added, 0 changed, 0 destroyed
+
+- 로컬 검증:
+    npm run lint: 0 errors / npm run test: 6 passed / npm run build: dist/ 675 kB 생성
+
+GitHub 설정:
+  - org-level 등록 시도는 gh token의 admin:org 권한 부족으로 실패
+  - repo-level secret AWS_OIDC_DASHBOARD_WEB_ROLE_ARN 등록 완료
+  - repo-level variables 9종 등록 완료:
+       DASHBOARD_WEB_BUCKET             (kjw-aegis-data-web)
+       DASHBOARD_CLOUDFRONT_DISTRIBUTION_ID
+       VITE_API_BASE_URL, VITE_WS_BASE_URL
+       VITE_COGNITO_AUTHORITY, VITE_COGNITO_DOMAIN, VITE_COGNITO_CLIENT_ID
+       VITE_COGNITO_REDIRECT_URI, VITE_COGNITO_LOGOUT_URI
+
+미실행:
+  1. workflow_dispatch 또는 push로 실제 배포 트리거
+  2. https://dashboard.aegis-pi.cloud 접속 수기 확인
+```
+
+#### Step 9 Part 2 — End-to-end 통합 검증 (SPA 배포 후 진행)
 
 ```text
 - IoT Core → Lambda data processor → DDB LATEST 반영 지연 실측
