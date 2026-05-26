@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 9 Part 2 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. 다음: Step 10(LLM 보고서, 팀원) 또는 데모 준비.
   - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions dashboard-web.yml, IAM OIDC web deploy role(ADR 0023), Terraform plan 2 add 0 change 확인. Workflow Node runtime은 Node 24 기준으로 확정.
   - 2026-05-26  Step 8 운영용 Frontend Vite + React 마이그레이션 완료 반영. apps/dashboard-web/ SPA 구현. npm run build/lint/test 통과.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. Organization secret 등록(사용자 확인), ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인.
@@ -336,7 +337,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9 S3+CloudFront 배포 CI/CD 구현/IAM apply/SPA 배포 완료. GitHub Actions secret/variables는 repo 수준 등록 완료. 다음: Step 9 end-to-end 통합 검증
+현재 단계: Phase 1 Step 9 end-to-end 통합 검증 완료(2026-05-26). Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 항목 통과. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증(인프라 정상). 다음: Step 10(LLM 보고서, 팀원/후속) 또는 데모 준비
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -655,6 +656,39 @@ secret exists, DATA=4
 ```
 
 ## 다음에 할 일
+
+### 0. 완료: Phase 1 Step 9 Part 2 end-to-end 통합 검증 (2026-05-26)
+
+```text
+검증 완료 항목:
+  + https://api.aegis-pi.cloud/healthz → HTTP 200 {"status":"ok"}
+  + https://dashboard.aegis-pi.cloud/ → HTTP 200, CloudFront Hit
+  + /factories 무인증 → HTTP 401 "Missing Authorization header" (Bearer 인증 보호 정상)
+  + AEGIS-DynamoDB-FactoryStatus: ACTIVE, Streams NEW_AND_OLD_IMAGES
+  + DynamoDB LATEST factory-a/b/c: 각 1건 (updated_at 2026-05-21, HISTORY_TTL_HOURS=48h 만료)
+  + Lambda data-processor: Active, DYNAMODB_TABLE_NAME=AEGIS-DynamoDB-FactoryStatus
+  + IoT Rule factory_state/infra_state_processor: 모두 Disabled=false
+  + Lambda notifier ESM: State=Enabled, EventSourceArn=AEGIS-DynamoDB-FactoryStatus stream
+  + DLQ: ApproximateNumberOfMessages=0
+  + ECS Backend: ACTIVE, desired=1, running=1, COMPLETED
+  + CloudFront: Deployed, Enabled
+  + Cognito: MFA=ON, Callback=https://dashboard.aegis-pi.cloud/callback, Logout=https://dashboard.aegis-pi.cloud/
+  + GitHub Actions dashboard-web: 최근 2회 success
+  + git status: clean / git diff --check: pass
+
+미검증 항목:
+  + IoT → Lambda → DDB LATEST 실시간 반영: factory-a Edge Agent 비활성(인프라 정상, 2026-05-21 이후 신규 write 없음)
+  + DDB Streams → notifier → Redis PUBLISH: 신규 DDB write 없어서 미실행(LastResult="No records processed")
+  + WebSocket 실시간 push: Cognito JWT 없이 연결 불가
+  + Cognito 로그인/콜백/로그아웃 UI: 브라우저 수기 확인 필요
+
+세부 검증 결과: docs/ops/22_data_dashboard_vpc_runbook.md § Step 9 End-to-End 통합 검증 결과
+
+다음:
+  1. factory-a Edge Agent 재활성화 시 IoT→DDB→Redis→WebSocket 경로 검증
+  2. 브라우저에서 Cognito 로그인/콜백/로그아웃 수기 확인
+  3. Step 10 LLM 일간 보고서 (Bedrock Claude 3 Haiku, 팀원/후속 작업)
+```
 
 ### 1. 완료: Phase 1 Step 9 S3+CloudFront 배포 CI/CD (workflow + IAM apply)
 

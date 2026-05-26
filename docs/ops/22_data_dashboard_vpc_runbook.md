@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.4  Step 9 end-to-end 통합 검증 결과 섹션 추가. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료 항목과 미검증 항목 분리 기록.
   - 2026-05-26 v0.3  Step 9 S3+CloudFront 배포 CI/CD 구현 반영. GitHub Actions workflow, IAM role, GitHub Secret/Variable 목록 추가.
   - 2026-05-26 v0.2  Step 7.5 Route53 Hosted Zone 영구 분리 반영. `infra/data-dashboard-dns/`와 state 이전 절차 추가.
 
@@ -293,3 +294,89 @@ aws rds delete-db-snapshot \
 ```
 
 삭제 전에는 복구 필요 여부를 확인한다. snapshot 삭제 후에는 해당 시점의 RDS 데이터를 복구할 수 없다.
+
+## Step 9 End-to-End 통합 검증 결과
+
+기준일: 2026-05-26T07:XX KST (검증자: AI 에이전트)
+
+### 검증 완료 항목
+
+| 항목 | 명령 | 결과 | 해석 |
+| --- | --- | --- | --- |
+| Backend health | `curl -i https://api.aegis-pi.cloud/healthz` | HTTP 200 `{"status":"ok"}` | ECS Fargate 정상 응답 |
+| Dashboard Web | `curl -I -L https://dashboard.aegis-pi.cloud/` | HTTP 200, `x-cache: Hit from cloudfront` | CloudFront+S3 SPA 정상 서비스 |
+| API 인증 보호 | `curl -i https://api.aegis-pi.cloud/factories` | HTTP 401 `Missing Authorization header` | 무인증 차단 정상. www-authenticate: Bearer 헤더 포함 |
+| DynamoDB 상태 | `aws dynamodb describe-table --table-name AEGIS-DynamoDB-FactoryStatus` | ACTIVE, StreamEnabled=true, StreamViewType=NEW_AND_OLD_IMAGES | 공식 hot store 활성, Streams 활성 |
+| DynamoDB LATEST | pk=FACTORY#factory-a, sk=LATEST 조회 | `updated_at: 2026-05-21T07:59:05.956Z` | 최후 write는 2026-05-21. rebuild 이후 신규 write 없음 |
+| DynamoDB 전체 항목 | `scan --select COUNT` | Count=3 (factory-a/b/c LATEST 각 1건) | HISTORY_TTL_HOURS=48h 만료로 HISTORY 항목 전량 소멸 |
+| Lambda data-processor | `get-function-configuration` | State=Active, DYNAMODB_TABLE_NAME=AEGIS-DynamoDB-FactoryStatus | 환경변수 정렬 정상 (ADR 0022) |
+| IoT Rule 활성화 | `list-topic-rules` | factory_state_processor/infra_state_processor 모두 Disabled=false | IoT → Lambda 트리거 경로 인프라 정상 |
+| Lambda notifier ESM | `list-event-source-mappings` | State=Enabled, EventSourceArn=AEGIS-DynamoDB-FactoryStatus stream | DDB Streams → notifier 연결 정상 |
+| Lambda notifier DLQ | `sqs get-queue-attributes` | ApproximateNumberOfMessages=0 | 재처리 실패 메시지 없음 |
+| ECS Backend 서비스 | `ecs describe-services` | Status=ACTIVE, Desired=1, Running=1, RolloutState=COMPLETED | Backend 정상 가동 |
+| CloudFront 배포 | `cloudfront list-distributions` | Status=Deployed, Enabled=true | CDN 정상 배포 |
+| Cognito User Pool | `cognito-idp describe-user-pool` | MfaConfig=ON, Name=KJW-AEGIS-Data-UserPool | ADR 0008 MFA Required 준수 |
+| Cognito Callback URL | `describe-user-pool-client` | CallbackURLs=`https://dashboard.aegis-pi.cloud/callback` | VITE_COGNITO_REDIRECT_URI 일치 |
+| Cognito Logout URL | `describe-user-pool-client` | LogoutURLs=`https://dashboard.aegis-pi.cloud/` | VITE_COGNITO_LOGOUT_URI 일치 |
+| GitHub Actions | `gh run list --workflow dashboard-web.yml --limit 3` | 최근 2회 success (2026-05-26) | S3+CloudFront 배포 파이프라인 정상 |
+| git 상태 | `git status --short` / `git diff --check` | clean / pass | 워킹 트리 깨끗, whitespace 이상 없음 |
+
+### 미검증 항목 (인프라 정상, 데이터 흐름 미활성)
+
+| 항목 | 미검증 이유 | 확인 방법 (수동) |
+| --- | --- | --- |
+| IoT → Lambda → DDB LATEST 실시간 반영 | factory-a Edge Agent가 현재 비활성 (updated_at=2026-05-21, CW 마지막 로그=2026-05-21) | factory-a Edge Agent 재가동 후 `aws iot-data publish --topic 'aegis/factory-a/factory_state' --payload ...` 전송 → DDB LATEST updated_at 변화 확인 |
+| DDB Streams → Lambda notifier → Redis PUBLISH | 신규 DDB write 없어서 notifier LastResult="No records processed" | factory-a 데이터 write 발생 후 CW Logs `/aws/lambda/KJW-AEGIS-Data-Lambda-notifier` 조회 |
+| WebSocket 실시간 push | Cognito JWT 인증 토큰 없이 `wss://api.aegis-pi.cloud/ws/factories/factory-a` 연결 불가 | 브라우저 로그인 후 `?token=<jwt>` 쿼리로 연결, factory 데이터 수신 확인 |
+| Cognito 로그인/콜백/로그아웃 UI | 브라우저 수기 확인 필요 | 아래 브라우저 체크리스트 참조 |
+
+### IoT Pipeline 비활성 원인 분석
+
+- factory-a Edge Agent (Raspberry Pi K3s)가 현재 데이터를 송신 중이지 않음
+- IoT Thing/Policy/Certificate는 워크스트림 A 소유. destroy 대상이 아니어서 인증서 자체는 유효
+- Lambda data processor(Active), IoT Rules(Disabled=false), ESM(Enabled) 등 인프라 구성은 정상
+- factory-a가 IoT에 메시지를 보내면 전체 경로가 동작할 것으로 예상
+- factory-b, factory-c LATEST도 2026-05-21 기준 (같은 상황)
+
+### 브라우저 수기 확인 체크리스트 (운영자 직접 확인)
+
+```text
+[ ] https://dashboard.aegis-pi.cloud/ 접속 → Cognito 리디렉션 발생 확인
+[ ] https://kjw-aegis-data-auth.auth.ap-south-1.amazoncognito.com/login
+    → 로그인 UI 표시 확인
+[ ] 로그인 성공 → callback URL: https://dashboard.aegis-pi.cloud/callback 리디렉션 확인
+[ ] FleetPage (/) 렌더링 확인 — factory 카드 표시 (데이터 없으면 빈 목록 또는 오류 상태 확인)
+[ ] /factories API 호출 → 401이 아닌 200 또는 빈 배열 확인 (인증 후)
+[ ] 로그아웃 → https://dashboard.aegis-pi.cloud/ 리디렉션 확인
+```
+
+### 다음 수동 검증 절차 (IoT 경로 복구 시)
+
+```bash
+# 1. factory-a IoT 메시지 수동 publish (테스트)
+aws iot-data publish \
+  --topic "aegis/factory-a/factory_state" \
+  --payload '{"factory_id":"factory-a","timestamp":"2026-05-26T07:00:00Z","status":"normal","risk_score":0.1}' \
+  --region ap-south-1
+
+# 2. DDB LATEST updated_at 갱신 확인 (30초 후)
+aws dynamodb query \
+  --table-name AEGIS-DynamoDB-FactoryStatus \
+  --key-condition-expression "pk = :pk AND sk = :sk" \
+  --expression-attribute-values '{":pk":{"S":"FACTORY#factory-a"},":sk":{"S":"LATEST"}}' \
+  --region ap-south-1 \
+  --query 'Items[0].updated_at.S' \
+  --output text
+
+# 3. Lambda notifier CW Logs 확인
+aws logs tail /aws/lambda/KJW-AEGIS-Data-Lambda-notifier \
+  --region ap-south-1 \
+  --since 5m
+
+# 4. ESM LastResult 확인 (갱신 여부)
+aws lambda list-event-source-mappings \
+  --function-name KJW-AEGIS-Data-Lambda-notifier \
+  --region ap-south-1 \
+  --query 'EventSourceMappings[0].LastProcessingResult' \
+  --output text
+```

@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 9 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. TL;DR·§ 2 갱신.
   - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공, Node 24 workflow runtime 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 end-to-end 통합 검증.
   - 2026-05-26  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. TL;DR·현재 구현 상태·Known Gaps 갱신. 다음 작업 Step 9로 전환.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
@@ -22,7 +23,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 9 end-to-end 통합 검증 (Step 9 CI/CD 구현/IAM apply/SPA 배포 완료 — GitHub repo-level Secret/Variables 등록 완료)
+- **본 환경의 다음 작업**: Phase 1 Step 9 end-to-end 통합 검증 완료(2026-05-26). 다음: Step 10 LLM 보고서(팀원/후속) 또는 factory-a Edge Agent 재활성화 후 IoT→DDB 실시간 경로 재검증
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -48,7 +49,7 @@
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
-- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 S3+CloudFront 배포 CI/CD 구현/IAM apply/SPA 배포 완료 (2026-05-26). GitHub Actions dashboard-web.yml, IAM OIDC web deploy role, Terraform apply 2 add 0 change, repo-level Secret/Variables 등록, S3 sync + CloudFront invalidation 확인
+- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 end-to-end 통합 검증 완료 (2026-05-26). Backend HTTP 200, Dashboard Web HTTP 200, /factories 무인증 401, DDB ACTIVE+Streams, Lambda Active+ESM Enabled, IoT Rules Disabled=false, Cognito MFA=ON+Callback URL 일치, CloudFront Deployed, ECS running=1. 미검증: IoT→DDB 실시간 경로(factory-a Edge Agent 비활성), WebSocket 실시간 push(Cognito JWT 필요), Cognito 로그인 UI 수기
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
 - **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 Backend 활성화 완료(ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
 
