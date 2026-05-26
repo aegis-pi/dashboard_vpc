@@ -10,7 +10,7 @@ locals {
   _backend_image = (
     var.backend_container_image != ""
     ? var.backend_container_image
-    : "${aws_ecr_repository.dashboard_backend.repository_url}:latest"
+    : "${data.terraform_remote_state.permanent.outputs.ecr_repository_url}:latest"
   )
 }
 
@@ -163,7 +163,7 @@ data "aws_iam_policy_document" "ecs_task_inline" {
       "dynamodb:PutItem",
     ]
     resources = [
-      aws_dynamodb_table.daily_report.arn,
+      data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_arn,
     ]
   }
 
@@ -237,11 +237,11 @@ resource "aws_ecs_task_definition" "backend" {
       # Non-sensitive configuration passed as environment variables.
       environment = [
         { name = "DDB_TABLE_STATUS", value = data.aws_dynamodb_table.official_factory_status.name },
-        { name = "DDB_TABLE_REPORT", value = aws_dynamodb_table.daily_report.name },
+        { name = "DDB_TABLE_REPORT", value = data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_name },
         { name = "S3_BUCKET_DATA", value = var.shared_data_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
-        { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.this.id },
-        { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.this.id },
+        { name = "COGNITO_USER_POOL_ID", value = data.terraform_remote_state.permanent.outputs.cognito_user_pool_id },
+        { name = "COGNITO_APP_CLIENT_ID", value = data.terraform_remote_state.permanent.outputs.cognito_app_client_id },
         # REDIS_AUTH_TOKEN_SECRET_ARN: ARN only (not the token itself).
         { name = "REDIS_AUTH_TOKEN_SECRET_ARN", value = aws_secretsmanager_secret.redis_auth.arn },
       ]

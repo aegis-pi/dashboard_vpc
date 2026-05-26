@@ -12,27 +12,6 @@ data "aws_dynamodb_table" "official_factory_status" {
 }
 
 # ===========================================================================
-# DynamoDB — aegis-daily-report
-# PK: report_date (S, YYYY-MM-DD)  SK: factory_id (S)
+# DynamoDB — aegis-daily-report MOVED to infra/data-dashboard-permanent/ (Step 9.5)
+# References now via data.terraform_remote_state.permanent.outputs.*
 # ===========================================================================
-
-resource "aws_dynamodb_table" "daily_report" {
-  name         = "aegis-daily-report"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "report_date"
-  range_key    = "factory_id"
-
-  attribute {
-    name = "report_date"
-    type = "S"
-  }
-
-  attribute {
-    name = "factory_id"
-    type = "S"
-  }
-
-  tags = merge(local.tags, {
-    Name = "${local.naming_prefix}-DDB-DailyReport"
-  })
-}

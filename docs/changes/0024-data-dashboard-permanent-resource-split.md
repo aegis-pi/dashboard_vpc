@@ -206,3 +206,18 @@ destroy 명령은 절대 실행하지 않는다.
 - git diff --check: 통과
 - 허용 파일 범위 내 변경만 포함
 - 민감 정보(비밀번호/token/private key/MFA OTP/전체 ARN/계정 세부정보) 미포함 확인
+
+## 실행 결과 (2026-05-26 migration 완료)
+
+- infra/data-dashboard-permanent/ 신설 완료. 25 resources import 성공.
+- permanent plan: `Plan: 0 to add, 3 to change, 0 to destroy` (destroy 없음)
+  - 3 in-place change: token_validity_units, DDB deletion_protection+PITR, allow_overwrite=true (모두 의도된 spec 강화)
+- data-dashboard state rm: 20 resources 제거 완료
+- data-dashboard plan: `Plan: 1 to add, 1 to change, 1 to destroy`
+  - ECS task def 교체(image :latest vs sha-9d2c200 diff)와 service 업데이트만. 영구 리소스 없음.
+- 엔드포인트 검증: https://dashboard.aegis-pi.cloud/ HTTP 200 / https://api.aegis-pi.cloud/healthz HTTP 200
+- 주요 결정 사항 (설계 시 미예측):
+  - `aws_acm_certificate_validation`: import 불가 리소스 (Terraform wait helper). permanent root에서 영구 제외.
+    CloudFront는 `aws_acm_certificate.cloudfront.arn` 직접 참조. cert ISSUED 상태라 안전.
+  - `generate_secret = false`: ForceNew 속성. import 후 추가 시 Cognito client 교체 발생. permanent root에서 제거.
+    public client는 항상 secret 없이 생성되므로 동작에 영향 없음.

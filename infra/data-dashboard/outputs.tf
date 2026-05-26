@@ -104,8 +104,8 @@ output "acm_alb_certificate_arn" {
 }
 
 output "acm_cloudfront_certificate_arn" {
-  description = "ACM certificate ARN for CloudFront (us-east-1)."
-  value       = aws_acm_certificate.cloudfront.arn
+  description = "ACM certificate ARN for CloudFront (us-east-1) — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.acm_cloudfront_certificate_arn
 }
 
 # ---------------------------------------------------------------------------
@@ -113,13 +113,13 @@ output "acm_cloudfront_certificate_arn" {
 # ---------------------------------------------------------------------------
 
 output "s3_web_bucket_name" {
-  description = "S3 bucket name for Dashboard Web SPA."
-  value       = aws_s3_bucket.web.bucket
+  description = "S3 bucket name for Dashboard Web SPA — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.s3_web_bucket_name
 }
 
 output "s3_web_bucket_arn" {
-  description = "S3 bucket ARN for Dashboard Web SPA."
-  value       = aws_s3_bucket.web.arn
+  description = "S3 bucket ARN for Dashboard Web SPA — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.s3_web_bucket_arn
 }
 
 # ---------------------------------------------------------------------------
@@ -127,13 +127,13 @@ output "s3_web_bucket_arn" {
 # ---------------------------------------------------------------------------
 
 output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID (used for cache invalidation on deploy)."
-  value       = aws_cloudfront_distribution.web.id
+  description = "CloudFront distribution ID (used for cache invalidation on deploy) — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.cloudfront_distribution_id
 }
 
 output "cloudfront_domain_name" {
-  description = "CloudFront distribution domain name."
-  value       = aws_cloudfront_distribution.web.domain_name
+  description = "CloudFront distribution domain name — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.cloudfront_domain_name
 }
 
 # ---------------------------------------------------------------------------
@@ -141,23 +141,23 @@ output "cloudfront_domain_name" {
 # ---------------------------------------------------------------------------
 
 output "cognito_user_pool_id" {
-  description = "Cognito User Pool ID."
-  value       = aws_cognito_user_pool.this.id
+  description = "Cognito User Pool ID — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.cognito_user_pool_id
 }
 
 output "cognito_user_pool_arn" {
-  description = "Cognito User Pool ARN."
-  value       = aws_cognito_user_pool.this.arn
+  description = "Cognito User Pool ARN — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.cognito_user_pool_arn
 }
 
 output "cognito_app_client_id" {
-  description = "Cognito App Client ID (used by Frontend VITE_COGNITO_CLIENT_ID)."
-  value       = aws_cognito_user_pool_client.this.id
+  description = "Cognito App Client ID (used by Frontend VITE_COGNITO_CLIENT_ID) — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.cognito_app_client_id
 }
 
 output "cognito_hosted_ui_url" {
-  description = "Cognito Hosted UI base URL (used by Frontend VITE_COGNITO_DOMAIN)."
-  value       = "https://${aws_cognito_user_pool_domain.this.domain}.auth.${var.aws_region}.amazoncognito.com"
+  description = "Cognito Hosted UI base URL (used by Frontend VITE_COGNITO_DOMAIN) — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.cognito_hosted_ui_url
 }
 
 # ---------------------------------------------------------------------------
@@ -189,8 +189,8 @@ output "dynamodb_factory_status_stream_arn" {
 }
 
 output "dynamodb_daily_report_name" {
-  description = "DynamoDB table name: aegis-daily-report."
-  value       = aws_dynamodb_table.daily_report.name
+  description = "DynamoDB table name: aegis-daily-report — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_name
 }
 
 # ---------------------------------------------------------------------------
@@ -284,18 +284,18 @@ output "lambda_notifier_event_source_mapping_uuid" {
 # ---------------------------------------------------------------------------
 
 output "dashboard_backend_ecr_repository_url" {
-  description = "ECR repository URL for aegis/dashboard-backend. GHA pushes sha-<7char> tags here."
-  value       = aws_ecr_repository.dashboard_backend.repository_url
+  description = "ECR repository URL for aegis/dashboard-backend — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.ecr_repository_url
 }
 
 output "github_oidc_ecr_push_role_arn" {
-  description = "IAM role ARN for GitHub Actions OIDC ECR push. Set as AWS_OIDC_DASHBOARD_ROLE_ARN GitHub Secret."
-  value       = aws_iam_role.github_oidc_ecr_push.arn
+  description = "IAM role ARN for GitHub Actions OIDC ECR push — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.github_oidc_ecr_push_role_arn
 }
 
 output "github_oidc_web_deploy_role_arn" {
-  description = "IAM role ARN for GitHub Actions OIDC web deploy (S3 sync + CloudFront invalidation). Set as AWS_OIDC_DASHBOARD_WEB_ROLE_ARN GitHub Secret."
-  value       = aws_iam_role.github_oidc_web_deploy.arn
+  description = "IAM role ARN for GitHub Actions OIDC web deploy (S3 sync + CloudFront invalidation) — from permanent root."
+  value       = data.terraform_remote_state.permanent.outputs.github_oidc_web_deploy_role_arn
 }
 
 # ---------------------------------------------------------------------------

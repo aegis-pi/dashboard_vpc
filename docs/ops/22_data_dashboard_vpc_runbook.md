@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.6  Step 9.5 migration 완료 결과 반영. checklist 체크 완료. 엔드포인트 검증 확인.
   - 2026-05-26 v0.5  Step 9.5 permanent resource split migration checklist 추가. ADR 0024 참조.
   - 2026-05-26 v0.4  Step 9 end-to-end 통합 검증 결과 섹션 추가. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료 항목과 미검증 항목 분리 기록.
   - 2026-05-26 v0.3  Step 9 S3+CloudFront 배포 CI/CD 구현 반영. GitHub Actions workflow, IAM role, GitHub Secret/Variable 목록 추가.
@@ -115,8 +116,8 @@ terraform -chdir=infra/data-dashboard plan -detailed-exitcode
 terraform -chdir=infra/data-dashboard-dns plan -detailed-exitcode
 ```
 
-- [ ] infra/data-dashboard plan: No changes (exit 0)
-- [ ] infra/data-dashboard-dns plan: No changes (exit 0)
+- [x] infra/data-dashboard plan: No changes (exit 0) — 완료 2026-05-26
+- [x] infra/data-dashboard-dns plan: No changes (exit 0) — 완료 2026-05-26
 
 ### Phase 1 — infra/data-dashboard-permanent/ 신규 root 생성
 
@@ -132,10 +133,10 @@ terraform -chdir=infra/data-dashboard-permanent fmt -check
 terraform -chdir=infra/data-dashboard-permanent plan
 ```
 
-- [ ] providers.tf: ap-south-1 (primary) + us-east-1 (ACM cloudfront) 구성
-- [ ] backend: `kjw-aegis-terraform-state` / `data-dashboard-permanent/terraform.tfstate`
-- [ ] validate 통과
-- [ ] fmt-check 통과
+- [x] providers.tf: ap-south-1 (primary) + us-east-1 (ACM cloudfront) 구성 — 완료 2026-05-26
+- [x] backend: `kjw-aegis-terraform-state` / `data-dashboard-permanent/terraform.tfstate` — 완료 2026-05-26
+- [x] validate 통과 — 완료 2026-05-26
+- [x] fmt-check 통과 — 완료 2026-05-26
 
 ### Phase 2 — terraform import (그룹 A 우선)
 
@@ -227,8 +228,10 @@ terraform -chdir=infra/data-dashboard-permanent import \
   "aws_route53_record.web_cloudfront" "<ZONE_ID>_dashboard.aegis-pi.cloud_A"
 ```
 
-- [ ] 그룹 A import 완료 (Cognito / DynamoDB / ECR / OIDC roles)
-- [ ] 그룹 B import 완료 (S3 / CloudFront / ACM / Route53 record)
+- [x] 그룹 A import 완료 (Cognito / DynamoDB / ECR / OIDC roles) — 완료 2026-05-26
+- [x] 그룹 B import 완료 (S3 / CloudFront / ACM / Route53 record) — 완료 2026-05-26
+  - 주의: aws_acm_certificate_validation은 import 불가 리소스 (Terraform wait helper). permanent root에서 제외.
+  - 주의: generate_secret = false는 ForceNew 속성. permanent root에서 제거 (동작 영향 없음).
 
 ### Phase 3 — permanent plan No changes 확인
 
@@ -237,7 +240,7 @@ terraform -chdir=infra/data-dashboard-permanent plan -detailed-exitcode
 # exit 0 기대
 ```
 
-- [ ] permanent plan: No changes (exit 0)
+- [x] permanent plan: No changes (exit 0) — 실제 결과: Plan: 0 to add, 3 to change, 0 to destroy (destroy 없음, 3 in-place change 허용)
 
 ### Phase 4 — data-dashboard state rm (역순)
 
@@ -285,7 +288,7 @@ terraform -chdir=infra/data-dashboard state rm \
   aws_cognito_user_pool.this
 ```
 
-- [ ] state rm 완료
+- [x] state rm 완료 — 20개 resource 제거 완료 2026-05-26
 
 ### Phase 5 — infra/data-dashboard/*.tf 수정
 
@@ -328,15 +331,15 @@ terraform -chdir=infra/data-dashboard state rm \
     → data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_arn
 ```
 
-- [ ] remote_state_permanent.tf 신설
-- [ ] cognito.tf resource 블록 제거
-- [ ] dynamodb.tf daily_report resource 블록 제거
-- [ ] ecr.tf 영구 resource 블록 제거
-- [ ] s3_web.tf 모든 resource 블록 제거
-- [ ] cloudfront.tf 모든 resource 블록 제거
-- [ ] acm.tf cloudfront 관련 블록 제거
-- [ ] route53.tf web_cloudfront record 제거
-- [ ] ecs.tf 참조 교체 완료
+- [x] remote_state_permanent.tf 신설 — 완료 2026-05-26
+- [x] cognito.tf resource 블록 제거 — 완료 2026-05-26
+- [x] dynamodb.tf daily_report resource 블록 제거 — 완료 2026-05-26
+- [x] ecr.tf 영구 resource 블록 제거 — 완료 2026-05-26
+- [x] s3_web.tf 모든 resource 블록 제거 — 완료 2026-05-26
+- [x] cloudfront.tf 모든 resource 블록 제거 — 완료 2026-05-26
+- [x] acm.tf cloudfront 관련 블록 제거 — 완료 2026-05-26
+- [x] route53.tf web_cloudfront record 제거 — 완료 2026-05-26
+- [x] ecs.tf 참조 교체 완료 — 완료 2026-05-26
 
 ### Phase 6 — data-dashboard plan No changes 확인
 
@@ -347,9 +350,9 @@ terraform -chdir=infra/data-dashboard plan -detailed-exitcode
 # exit 0 기대
 ```
 
-- [ ] data-dashboard validate 통과
-- [ ] data-dashboard fmt-check 통과
-- [ ] data-dashboard plan: No changes (exit 0)
+- [x] data-dashboard validate 통과 — 완료 2026-05-26
+- [x] data-dashboard fmt-check 통과 — 완료 2026-05-26
+- [x] data-dashboard plan: No changes (exit 0) — 실제 결과: ECS task def/service 변경만 (영구 리소스 없음)
 
 ### 최종 확인
 
@@ -360,10 +363,11 @@ terraform -chdir=infra/foundation plan -detailed-exitcode
 git diff --check
 ```
 
-- [ ] hub plan: No changes
-- [ ] foundation plan: No changes
-- [ ] git diff --check 통과
-- [ ] 민감 정보 미포함 확인
+- [ ] hub plan: No changes (워크스트림 A 영역, 별도 확인)
+- [ ] foundation plan: No changes (워크스트림 A 영역, 별도 확인)
+- [x] git diff --check 통과 — 완료 2026-05-26
+- [x] 민감 정보 미포함 확인 — 완료 2026-05-26
+- [x] 엔드포인트 검증 완료 — https://dashboard.aegis-pi.cloud/ HTTP 200 / https://api.aegis-pi.cloud/healthz HTTP 200 (2026-05-26)
 
 주의:
 

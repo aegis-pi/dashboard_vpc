@@ -6,17 +6,8 @@
 # infra/data-dashboard is destroyed. This prevents Gabia NS delegation from
 # breaking across build/destroy cycles.
 #
-# State migration procedure (Step 7.5):
-#   1. terraform -chdir=infra/data-dashboard-dns init
-#   2. terraform -chdir=infra/data-dashboard-dns import \
-#        aws_route53_zone.dashboard <ZONE_ID>
-#   3. terraform -chdir=infra/data-dashboard state rm \
-#        aws_route53_zone.dashboard
-#   4. terraform -chdir=infra/data-dashboard plan    (no zone destroy/create)
-#   5. terraform -chdir=infra/data-dashboard-dns plan (no changes)
-#
-# NOTE: `state rm` removes the resource from Terraform state only — it does
-#       NOT delete the AWS resource. The hosted zone remains intact.
+# NOTE: web_cloudfront A-record MOVED to infra/data-dashboard-permanent/
+#       (Step 9.5). cf_cert_validation also moved there.
 # ===========================================================================
 
 data "aws_route53_zone" "dashboard" {
@@ -37,21 +28,5 @@ resource "aws_route53_record" "api_alb" {
     name                   = aws_lb.this.dns_name
     zone_id                = aws_lb.this.zone_id
     evaluate_target_health = true
-  }
-}
-
-# ---------------------------------------------------------------------------
-# A-record: dashboard.<domain> → CloudFront (alias)
-# ---------------------------------------------------------------------------
-
-resource "aws_route53_record" "web_cloudfront" {
-  zone_id = data.aws_route53_zone.dashboard.zone_id
-  name    = local.dashboard_web_fqdn
-  type    = "A"
-
-  alias {
-    name                   = aws_cloudfront_distribution.web.domain_name
-    zone_id                = aws_cloudfront_distribution.web.hosted_zone_id
-    evaluate_target_health = false
   }
 }

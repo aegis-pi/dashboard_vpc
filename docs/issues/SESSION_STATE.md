@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설(25 resources import). data-dashboard state rm 20개. 양쪽 plan No destroy. HTTP 200 엔드포인트 확인. 다음: Step 10 LLM 보고서(팀원/후속) 또는 데모 준비.
   - 2026-05-26  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. 의존성 분석, migration 순서 문서화. 다음: Step 9.5 migration 실행 (다음 세션, infra/data-dashboard-permanent/ 신설 + import/state rm/apply).
   - 2026-05-26  Step 9 Part 2 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. 다음: Step 10(LLM 보고서, 팀원) 또는 데모 준비.
   - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions dashboard-web.yml, IAM OIDC web deploy role(ADR 0023), Terraform plan 2 add 0 change 확인. Workflow Node runtime은 Node 24 기준으로 확정.
@@ -338,7 +339,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent resource split 설계 완료(2026-05-26). ADR 0024 작성. infra/data-dashboard-permanent/ 신규 root에 관리할 리소스 분류 및 의존성 분석 완료. 다음: Step 9.5 migration 실행 (infra/data-dashboard-permanent/ 신설 + terraform import/state rm + data-dashboard remote_state 참조 교체)
+현재 단계: Phase 1 Step 9.5 permanent resource split migration 완료(2026-05-26). infra/data-dashboard-permanent/ 신규 root 생성, 25 resources import, data-dashboard state rm 20개 완료. permanent plan: 0 destroy. data-dashboard plan: ECS task def 교체만(영구 리소스 없음). https://dashboard.aegis-pi.cloud/ HTTP 200, https://api.aegis-pi.cloud/healthz HTTP 200 확인. 다음: Step 10 LLM 일간 보고서(팀원/후속) 또는 데모 준비.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -658,21 +659,39 @@ secret exists, DATA=4
 
 ## 다음에 할 일
 
-### 0. 다음: Phase 1 Step 9.5 — Permanent Resource Split migration 실행
+### 0. 완료: Phase 1 Step 9.5 — Permanent Resource Split migration (2026-05-26)
 
 ```text
-설계 완료 (2026-05-26): ADR 0024, migration checklist 작성 완료
-다음 세션에서 실행:
-  1. infra/data-dashboard-permanent/ 신규 root 생성 (tf 파일 작성)
-     - backend: kjw-aegis-terraform-state / data-dashboard-permanent/terraform.tfstate
-     - providers: ap-south-1 (primary) + us-east-1 (ACM cloudfront)
-  2. terraform import: Cognito → DynamoDB → ECR/OIDC roles → S3 → CloudFront/OAC → ACM → Route53 record
-  3. terraform plan permanent → No changes 확인
-  4. terraform state rm: data-dashboard root에서 영구 리소스 제거 (역순)
-  5. infra/data-dashboard/*.tf: remote_state_permanent.tf 추가, resource 블록 제거, 참조 교체
-  6. terraform plan data-dashboard → No changes 확인
-상세: docs/changes/0024-data-dashboard-permanent-resource-split.md
-     docs/ops/22_data_dashboard_vpc_runbook.md § Permanent resource split migration checklist
+완료 내용:
+  + infra/data-dashboard-permanent/ 신규 Terraform root 생성
+    - backend: kjw-aegis-terraform-state / data-dashboard-permanent/terraform.tfstate
+    - providers: ap-south-1 (primary) + us-east-1 (ACM cloudfront)
+    - 파일: versions.tf / providers.tf / variables.tf / locals.tf / cognito.tf / dynamodb.tf /
+            ecr.tf / s3_web.tf / cloudfront.tf / acm.tf / route53.tf / outputs.tf
+  + terraform import: 25 resources 모두 import 완료
+    - Cognito 3 + DynamoDB 1 + ECR 2 + OIDC 4 + S3 4 + CloudFront 2 + ACM 1 + Route53 2 + data sources
+  + permanent plan: Plan: 0 to add, 3 to change, 0 to destroy (destroy 없음)
+    - 3 in-place change: token_validity_units 추가, DDB deletion_protection+PITR, allow_overwrite=true
+  + terraform state rm: data-dashboard root에서 영구 리소스 20개 제거 완료
+  + infra/data-dashboard/*.tf 수정 완료:
+    - remote_state_permanent.tf 신설 (data.terraform_remote_state.permanent)
+    - cognito.tf / cloudfront.tf / s3_web.tf / ecr.tf: 영구 리소스 블록 제거
+    - acm.tf: CloudFront cert 블록 제거 (ALB cert만 유지)
+    - route53.tf: web_cloudfront 레코드 제거 (api_alb 유지)
+    - dynamodb.tf: daily_report 리소스 제거 (data source 유지)
+    - ecs.tf: ECR URL / DDB name/arn / Cognito ID 참조 → remote_state 교체
+    - outputs.tf: 영구 리소스 output → remote_state 참조 교체
+  + data-dashboard plan: Plan: 1 to add, 1 to change, 1 to destroy
+    - ECS task def 교체(image :latest ↔ sha-9d2c200 diff) + service 업데이트만. 영구 리소스 없음.
+  + 엔드포인트 검증:
+    - https://dashboard.aegis-pi.cloud/ → HTTP 200
+    - https://api.aegis-pi.cloud/healthz → HTTP 200
+  + 주요 결정:
+    - aws_acm_certificate_validation: import 불가 리소스 — permanent root에서 영구 제외
+      CloudFront는 aws_acm_certificate.cloudfront.arn 직접 참조 (cert ISSUED 상태라 안전)
+    - generate_secret = false: ForceNew 속성 — permanent root에서 제거
+      (Cognito client는 항상 public client로 생성됨)
+  + ADR 0024 작성 완료 (docs/changes/0024-data-dashboard-permanent-resource-split.md)
 ```
 
 ### 1. 완료: Phase 1 Step 9 Part 2 end-to-end 통합 검증 (2026-05-26)
