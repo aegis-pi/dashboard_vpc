@@ -3,6 +3,7 @@
 상태: draft
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.8  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 목표로 분리.
   - 2026-05-26 v0.7  Step 6 완료 반영. Dashboard Backend 구현 완료/미배포 상태 명시. frontend/ prototype/reference와 apps/dashboard-web/ 운영 SPA 경로 구분 추가.
   - 2026-05-21 v0.6  VPC 1 Terraform 구현 가드 추가. 신규 Data/Dashboard 리소스는 `KJW-AEGIS-Data-*` prefix를 사용하고, `infra/data-dashboard/` root에서 목표 아키텍처 기준으로만 생성하도록 명시.
   - 2026-05-19 v0.5  ADR 0017 반영. 1번 VPC 메타 저장소를 RDS PostgreSQL로 변경.
@@ -121,7 +122,7 @@ Dashboard Web (SPA, CloudFront + S3)
     <- WebSocket (factory-update push)
 ```
 
-### LLM 보고서 (스케줄)
+### LLM 보고서 (스케줄, 팀원/후속 목표)
 
 ```text
 EventBridge schedule (매일 09:00 KST)
@@ -140,7 +141,8 @@ Dashboard Web
 
 - `Edge Agent → IoT Core → IoT Rule → Lambda data processor → DDB/S3` 경로는 워크스트림 A·B 공통 합의 영역. **본 환경에서 변경하지 않는다**
 - 메시지 주기 3s sensor / 20s heartbeat, factory-a 실데이터 / factory-b·c dummy 데이터도 팀 합의 영역
-- 본 환경의 자유 설계 영역은 IoT Rule 이후 처리 결과의 **조회/실시간 푸시/메타 관리/LLM 보고**
+- 본 환경의 자유 설계 영역은 IoT Rule 이후 처리 결과의 **조회/실시간 푸시/메타 관리/운영 Dashboard Web**
+- LLM 보고서는 ADR 0016 목표로 유지하되, 현재 본 환경 Step 8에서는 구현하지 않고 팀원/후속 작업으로 분리한다.
 
 ### 확장 조건
 
@@ -283,9 +285,9 @@ Terraform locals 권장:
 - CloudFront + WAF
 - Cognito User Pool + Hosted UI (관리자 전용, MFA Required)
 - Lambda data processor (IoT Rule trigger, 팀 합의 영역, 변경 없음)
-- Lambda report-generator (EventBridge schedule, Bedrock 호출)
-- Bedrock Claude 3 Haiku
-- EventBridge Scheduler (매일 09:00 KST 일간 보고서)
+- Lambda report-generator (EventBridge schedule, Bedrock 호출, 팀원/후속)
+- Bedrock Claude 3 Haiku (팀원/후속)
+- EventBridge Scheduler (매일 09:00 KST 일간 보고서, 팀원/후속)
 - DynamoDB AEGIS-DynamoDB-FactoryStatus (LATEST + HISTORY, Streams 활성화)
 - DynamoDB aegis-daily-report (PK: report_date, SK: factory_id)
 - S3 aegis-bucket-data (raw/ + processed/ + reports/, 단일 bucket prefix 분리, ADR 0009)
@@ -311,7 +313,7 @@ ECS Fargate Backend × N (모든 task가 subscribe → 자신의 WebSocket clien
 Dashboard Web 클라이언트
 ```
 
-### LLM 일간 보고서 흐름 (ADR 0016)
+### LLM 일간 보고서 흐름 (ADR 0016, 팀원/후속 목표)
 
 ```text
 EventBridge Scheduler (cron 0 0 * * ? * UTC = 09:00 KST)
@@ -448,7 +450,7 @@ event
     - Route53 + ACM (us-east-1, ap-south-1)
     - CloudFront + WAF + S3 dashboard-web bucket
     - Dashboard Web (Vite + React 정적 SPA)
-11. LLM 일간 보고서:
+11. LLM 일간 보고서 (팀원/후속):
     - Lambda report-generator + Bedrock Claude 3 Haiku
     - EventBridge Scheduler
 12. `factory-b`, `factory-c` 테스트베드 확장 (워크스트림 A와 공동)
@@ -493,7 +495,7 @@ ECS Fargate Dashboard Backend (FastAPI)     ADR 0012
 RDS PostgreSQL                              ADR 0017
 ElastiCache Redis (캐시 + Pub/Sub)           ADR 0014
 WebSocket 실시간 (DDB Streams + notifier)    ADR 0015
-Bedrock Claude 3 Haiku 일간 보고서           ADR 0016
+Bedrock Claude 3 Haiku 일간 보고서           ADR 0016 (팀원/후속)
 + 팀 합의 영역 (IoT Core, Lambda data processor, DDB/S3) 변경 없음
 ```
 
@@ -527,10 +529,10 @@ frontend/           = 화면 설계 prototype/reference
                       S3/CloudFront 배포 source로 직접 사용하지 않는다
 
 apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA (예정)
-                      Phase 1 Step 1 마이그레이션에서 신설
+                      Phase 1 Step 8 마이그레이션에서 신설
                       S3 dashboard-web bucket 빌드 산출물(dist/) 배포 대상
 
-Step 1 작업 방향:
+Step 8 작업 방향:
   frontend/ prototype을 참고해 apps/dashboard-web/ Vite + React로 공식 구현
   WebSocket JWT는 ?token= 파라미터로 전달 (backend 구현과 정렬)
 ```

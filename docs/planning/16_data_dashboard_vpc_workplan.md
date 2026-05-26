@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v1.0  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리.
   - 2026-05-26 v0.9  Step 6 완료 반영. frontend/ prototype/reference와 apps/dashboard-web/ 공식 SPA 경로 구분 명확화. Step 1 Aegis-pi2/ 참조를 frontend/ 기준으로 통일.
   - 2026-05-22 v0.8  Data/Dashboard VPC build/destroy wrapper 스크립트 구현. RDS final snapshot 이름을 random suffix로 충돌 방지하고, Secrets Manager는 재생성 사이클을 위해 즉시 삭제 기준으로 변경.
   - 2026-05-21 v0.7  Claude Code 세션 운영 기준 추가. 같은 Step은 기존 세션, Step/Phase 전환은 새 세션으로 시작하고 문서 재확인 후 작업.
@@ -35,7 +36,7 @@
   - RDS PostgreSQL (메타·권한·알림룰·감사, ADR 0017)
   - ElastiCache Redis (캐시 + Pub/Sub, ADR 0014)
   - Lambda notifier (DDB Streams → Redis publish, ADR 0015)
-  - Lambda report-generator + Bedrock Claude 3 Haiku (일간 보고서, ADR 0016)
+  - Lambda report-generator + Bedrock Claude 3 Haiku (일간 보고서, ADR 0016, 팀원/후속 작업)
   - Dashboard Web (정적 SPA + S3 + CloudFront, ADR 0006)
   - CloudFront/WAF/Route53/ACM (신규 도메인, ADR 0010)
   - Cognito User Pool (관리자 전용, MFA, ADR 0008)
@@ -56,7 +57,8 @@
 | Route53 hosted zone (신규 도메인) + ACM × 2 (us-east-1, ap-south-1) | Terraform | 본 환경 |
 | Cognito User Pool + App Client + Hosted UI (관리자 전용, MFA Required) | Terraform | 본 환경 (MVP 범위, ADR 0008) |
 | Lambda data processor (코드/패키지/IAM/IoT Rule 라우팅) — VPC 밖 | Terraform + 코드 | 본 환경 |
-| Lambda notifier / Lambda report-generator | Terraform + 코드 | 본 환경 |
+| Lambda notifier | Terraform + 코드 | 본 환경 |
+| Lambda report-generator | Terraform + 코드 | 팀원/후속 작업 |
 | DynamoDB `AEGIS-DynamoDB-FactoryStatus` (LATEST + HISTORY, pk/sk, Streams 활성화 필요) | Terraform | 본 환경 (기존 실데이터 table 참조/정렬, ADR 0022) |
 | DynamoDB `aegis-daily-report` | Terraform | 본 환경 |
 | S3 `aegis-bucket-data/processed/` prefix (단일 bucket 공유, ADR 0009) | Terraform IAM only (bucket은 워크스트림 A) | 본 환경 |
@@ -85,7 +87,7 @@
 | **메타 저장소** | **RDS PostgreSQL** | `0017-rds-postgresql-for-metadata.md` |
 | **캐시 + Pub/Sub** | **ElastiCache Redis (단일 노드, 캐시 + WebSocket fan-out)** | `0014-redis-for-realtime-cache.md` |
 | **실시간 푸시** | **WebSocket + DDB Streams + Lambda notifier + Redis Pub/Sub** | `0015-websocket-for-dashboard-realtime.md` |
-| **LLM 일간 보고서** | **Bedrock Claude 3 Haiku + EventBridge schedule** | `0016-bedrock-for-llm-report.md` |
+| **LLM 일간 보고서** | **Bedrock Claude 3 Haiku + EventBridge schedule** | `0016-bedrock-for-llm-report.md` (팀원/후속 작업) |
 | Replay/Near-miss/AI Worker | Phase 1 범위 외 (Phase 3 후속) | `docs/planning/17_expansion_roadmap.md` |
 
 데이터 흐름 / 처리 단계 / 저장소 경계는 `docs/specs/data_storage_pipeline.md`를 source of truth로 그대로 인용한다. Phase 1 통합 결정과 후속 로드맵은 `docs/planning/17_expansion_roadmap.md`를 참조한다.
@@ -113,7 +115,7 @@
 - DNS 전파 시간 (1~24h) 확보를 위해 가장 먼저 진행
 ```
 
-### Step 1 — Frontend 마이그레이션 (병행 가능)
+### Step 1 — Frontend prototype/reference 정리 (병행 가능)
 
 ```text
 경로 구분 (필수):
@@ -121,21 +123,15 @@
                         기존 Aegis-pi/, Aegis-pi2/ prototype이 정리된 경로
                         배포/CI/S3 source path로 직접 사용하지 않는다
 - apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA
-                        Step 1의 구현 대상
+                        Step 8의 구현 대상
 
 Step 1 진행 시:
-- frontend/ 화면 설계를 참고해 apps/dashboard-web/ Vite + React 프로젝트로 공식 구현
-- 컴포넌트(fleet/factory/alerts/charts/sidebar/topbar) 그대로 재사용
-- import 기반 모듈 구조로 전환, ReactDOM.createRoot은 main.jsx로 분리
-- Cognito Hosted UI 연동(oidc-client-ts 또는 aws-amplify/auth)
-- WebSocket client 추가 (`react-use-websocket` 또는 직접 WebSocket API)
-  JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약, backend 구현과 정렬)
-- 보고서 탭에 react-markdown 렌더링 추가
-- 빌드 산출물 dist/ 확인
+- frontend/ prototype/reference 경로와 운영용 apps/dashboard-web/ 경로를 명확히 분리
+- frontend/ 화면 설계는 Step 8 운영 SPA 구현의 reference로 유지
 
 금지:
 - frontend/ 코드를 S3/CloudFront 배포 source로 직접 사용
-- apps/dashboard-web/ 구현을 Step 1 이전에 시작 (Step 6 이후 가능)
+- apps/dashboard-web/ 구현을 Step 8 이전에 시작
 ```
 
 ### Step 2 — Terraform 1번 VPC 골격 (`infra/data-dashboard/`)
@@ -240,8 +236,8 @@ Step 1 진행 시:
     GET /factories
     GET /factories/{factory_id}
     GET /factories/{factory_id}/history?window=1h  (HISTORY#STATE#* 조회)
-    GET /reports  (skeleton — Step 8 lambda-report-generator 이후 구현)
-    GET /reports/{report_date}/{factory_id}  (skeleton — S3 reports/ Step 8 이후)
+    GET /reports  (skeleton — LLM report-generator 팀원/후속 작업 이후 구현)
+    GET /reports/{report_date}/{factory_id}  (skeleton — S3 reports/ 후속 작업 이후)
 - WebSocket: /ws/factories/{factory_id}
     JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약)
     Redis Pub/Sub factory:update:{factory_id} subscribe
@@ -267,7 +263,7 @@ Step 1 진행 시:
 - Task Definition (0.5 vCPU / 1 GB, awsvpc, FARGATE_LATEST)
 - ECS Service (desired_count=1, deployment circuit breaker)
 - Task Execution Role: ECR pull, CloudWatch Logs
-- Task Role: DDB Get/Query/PutItem, S3 Get, RDS PostgreSQL 접속 정보 조회(Secrets), Redis (Secrets), Bedrock InvokeModel, Secrets Manager Get
+- Task Role: DDB Get/Query/PutItem, S3 Get, RDS PostgreSQL 접속 정보 조회(Secrets), Redis (Secrets), Secrets Manager Get
 - ALB (HTTPS 443, ACM):
     Listener rule: / → ECS target group
     Listener rule: /ws/* → ECS target group (sticky session 옵션)
@@ -275,16 +271,19 @@ Step 1 진행 시:
 - Route53 A-record (alias) api.<도메인> → ALB
 ```
 
-### Step 8 — LLM 일간 보고서 (ADR 0016)
+### Step 8 — 운영용 Frontend Vite + React 마이그레이션
 
 ```text
-- Lambda report-generator (Python 3.12, 5분 timeout, 512MB)
-- IAM: DDB read, S3 read/write, Bedrock InvokeModel (Claude 3 Haiku model ARN)
-- EventBridge Scheduler: cron(0 0 * * ? *) UTC = 09:00 KST
-- Bedrock 호출 리전 확인 (ap-south-1 미지원 시 us-east-1 cross-region invoke)
-- 프롬프트 템플릿 + 출력 검증 (Markdown 형식 보장)
-- S3 reports/<YYYY-MM-DD>/<factory_id>.md write + DDB aegis-daily-report 메타 write
-- Backend 보고서 조회 endpoint와 연동
+- frontend/ prototype reference의 화면 설계를 apps/dashboard-web/ 공식 Vite + React SPA로 이전
+- S3 + CloudFront 배포 가능한 dist/ 산출물 생성
+- Cognito Hosted UI 연동(oidc-client-ts 또는 aws-amplify/auth)
+- WebSocket client 추가 (`react-use-websocket` 또는 직접 WebSocket API)
+  JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약, backend 구현과 정렬)
+- API base URL / WebSocket base URL / Cognito 값은 Vite 환경변수로 분리
+- .env* 는 commit 금지, .env.example 만 commit
+- 보고서 탭은 skeleton 상태로 유지하거나 후속 LLM 보고서와 연결 가능한 placeholder로 둔다
+
+LLM 일간 보고서(ADR 0016, Lambda report-generator + Bedrock)는 팀원/후속 작업으로 분리한다.
 ```
 
 ### Step 9 — End-to-end 통합 검증
@@ -298,7 +297,7 @@ Step 1 진행 시:
 - WAF 차단 케이스 (간단한 SQL injection / XSS 패턴, IP allow-list)
 - RDS PostgreSQL connection pool 메트릭 (active/idle/overflow)
 - Redis hit/miss ratio
-- Bedrock 일간 보고서: 수동 invoke + 다음 09:00 자동 트리거 확인
+- 운영 SPA: S3 + CloudFront 산출물 배포/캐시 무효화 후 주요 화면 수기 확인
 - 부하 테스트: k6/artillery WebSocket 100 concurrent connection
 ```
 
@@ -346,5 +345,5 @@ Step 1 진행 시:
 - DDB Streams → notifier → Redis → WebSocket push 1~2초 이내 실측
 - ECS Backend p95 응답시간 < 500ms (캐시 hit 시 < 100ms)
 - RDS PostgreSQL connection pool overflow 0
-- Bedrock 일간 보고서 매일 09:00 KST 자동 생성 확인
+- 운영 SPA 빌드 산출물(dist/) 배포 후 Cognito 로그인 / API 조회 / WebSocket push 확인
 - destroy 사이클 후 잔존 자원: Terraform backend S3 bucket, RDS PostgreSQL snapshot만 (Route53 hosted zone / S3 web bucket / Secrets Manager / NAT GW / ALB / ECS / RDS PostgreSQL instance / Redis / Lambda 모두 0)

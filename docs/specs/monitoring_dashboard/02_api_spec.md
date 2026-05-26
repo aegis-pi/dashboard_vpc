@@ -83,8 +83,8 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/factories` | Cognito JWT | 공장 목록 + latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) | 구현 완료 |
 | GET | `/factories/{factory_id}` | Cognito JWT | 단일 공장 latest 전체 | DDB GetItem | 구현 완료 |
 | GET | `/factories/{factory_id}/history?window=1h` | Cognito JWT | 시계열 (risk/factory_state/infra_state 통합) | DDB Query (`sk begins_with HISTORY#STATE#`) | 구현 완료 |
-| GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — Step 8 이후 | skeleton |
-| GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — Step 8 이후 | skeleton |
+| GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — LLM report-generator 후속 작업 이후 | skeleton |
+| GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — LLM report-generator 후속 작업 이후 | skeleton |
 
 **Note**: history endpoint는 `HISTORY#STATE#*` sk pattern으로 통합 조회한다. `HISTORY#RISK`, `HISTORY#FACTORY`, `HISTORY#INFRA` prefix는 사용하지 않는다 (ADR 0022).
 

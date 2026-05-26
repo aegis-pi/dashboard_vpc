@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리.
   - 2026-05-26  Step 7 Terraform 구현 완료 반영. ecr.tf/ecs.tf 신설, secrets.tf/variables.tf/outputs.tf 갱신. terraform validate/plan(92 add) 통과. apply 사용자 승인 대기.
   - 2026-05-26  Step 6 Dashboard Backend FastAPI 구현 완료 반영. Step 7 ECS Fargate/ALB/ECR 배포 진입 준비 갱신. frontend/ prototype/reference vs apps/dashboard-web/ 공식 경로 구분 명확화.
 
@@ -80,7 +81,7 @@ Phase 1 (확정 배포 목표)
   + RDS PostgreSQL                              ADR 0017
   + ElastiCache Redis (캐시 + Pub/Sub)            ADR 0014
   + WebSocket 실시간 (DDB Streams + notifier)     ADR 0015
-  + Bedrock Claude 3 Haiku 일간 보고서            ADR 0016
+  + Bedrock Claude 3 Haiku 일간 보고서            ADR 0016 — 팀원/후속 작업
   + 1번 VPC Public/Private App/Private Data 3-tier + NAT GW × 1 (ADR 0011 supersede)
   + CloudFront + S3 SPA + Cognito (변경 없음)
 
@@ -111,15 +112,12 @@ Phase 1 (확정 배포 목표)
 Step 0 - 외부 사전 작업 (병행 가능)
   + Gabia 도메인 구매 + DNS 전파 시간 확보
 
-Step 1 - Frontend 마이그레이션 (병행 가능)
-  + 현재 보류. Step 6 Backend FastAPI 완료 → 진행 가능 상태
+Step 1 - Frontend prototype/reference 정리 (병행 가능)
+  + frontend/ 화면 설계 prototype/reference 정리 단계
   + frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ 정리됨)
   + apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA 예정 경로 (미구현)
-  + 진행 시 frontend/ 화면 설계를 apps/dashboard-web/ Vite + React로 공식 구현
+  + 운영용 apps/dashboard-web/ 공식 구현은 Step 8에서 진행
   + frontend/ 를 배포/CI/S3 source path로 직접 사용하지 않음
-  + Cognito Hosted UI 연동
-  + WebSocket client 추가 (JWT는 ?token= 파라미터, backend 구현과 정렬)
-  + 보고서 탭 react-markdown 렌더링
 
 Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/) ✅ 완료 (2026-05-21)
   + 전체 apply 완료: 47 resources (Route53 zone 1 + 40 + 잔여 6)
@@ -246,8 +244,8 @@ Step 6 — Dashboard Backend FastAPI 구현 ✅ 완료 (2026-05-26)
     - GET /factories (Cognito JWT 필수)
     - GET /factories/{factory_id} (Cognito JWT 필수)
     - GET /factories/{factory_id}/history?window=1h (HISTORY#STATE#* 조회, HISTORY#RISK/FACTORY/INFRA 미사용)
-    - GET /reports (skeleton, Step 8 lambda-report-generator 이후 구현)
-    - GET /reports/{report_date}/{factory_id} (skeleton, S3 reports/ prefix는 Step 8 이후 생성)
+    - GET /reports (skeleton, LLM report-generator 팀원/후속 작업 이후 구현)
+    - GET /reports/{report_date}/{factory_id} (skeleton, S3 reports/ prefix는 후속 작업 이후 생성)
   + WebSocket:
     - /ws/factories/{factory_id} (JWT는 ?token= 쿼리 파라미터로 전달 — 브라우저 WS 헤더 제약 대응)
     - Redis Pub/Sub factory:update:{factory_id} subscribe
@@ -265,13 +263,13 @@ Step 6 — Dashboard Backend FastAPI 구현 ✅ 완료 (2026-05-26)
   + frontend 상태:
     - frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ 정리됨)
     - apps/dashboard-web/ = 운영 배포용 Vite + React SPA 예정 경로 (아직 미구현)
-    - Step 1 마이그레이션에서 frontend/ prototype 참고 → apps/dashboard-web/ 공식 구현
+    - Step 8 운영용 Frontend 마이그레이션에서 frontend/ prototype 참고 → apps/dashboard-web/ 공식 구현
 
-3. Step 1 Frontend 마이그레이션은 Step 6 이후 진행 가능
+3. Step 8 운영용 Frontend 마이그레이션은 Step 7 apply / Backend 배포 준비 이후 진행
    - frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ → frontend/ 정리됨)
    - apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA 예정 경로
    - frontend/를 배포/CI/S3 source path로 직접 사용하지 않음
-   - Step 1에서 frontend/ prototype 참고 → apps/dashboard-web/ Vite + React로 공식 구현
+   - Step 8에서 frontend/ prototype 참고 → apps/dashboard-web/ Vite + React로 공식 구현
    - Cognito Hosted UI / WebSocket client / 보고서 탭 react-markdown 준비
 
 4. Step 4 (Lambda data processor 협의) — 워크스트림 A와 합류 지점
@@ -631,9 +629,9 @@ secret exists, DATA=4
 
 ## 다음에 할 일
 
-### 1. 다음 시작 작업: Phase 1 Step 7 ECS Fargate / ALB / ECR / Route53 배포
+### 1. 현재 작업: Phase 1 Step 7 ECS Fargate / ALB / ECR / Route53 apply 준비
 
-Phase 1 Step 6 Dashboard Backend FastAPI 구현이 완료됐다. 다음 작업은 Step 7 Terraform 배포다.
+Phase 1 Step 7 Terraform 구현은 완료됐다. 다음 작업은 `infra/data-dashboard` apply와 이미지 push/Secret 등록 절차다.
 
 ```text
 Step 7 작업 목표 (infra/data-dashboard/):
@@ -641,30 +639,32 @@ Step 7 작업 목표 (infra/data-dashboard/):
   - Task Definition (0.5 vCPU / 1 GB, awsvpc, FARGATE_LATEST)
   - ECS Service (첫 apply 기본 desired_count=0, 이미지 push 이후 desired_count=1, deployment circuit breaker)
   - Task Execution Role: ECR pull, CloudWatch Logs
-  - Task Role: DDB Get/Query/PutItem, S3 GetObject, Secrets Manager, Bedrock InvokeModel
+  - Task Role: DDB Get/Query/PutItem, S3 GetObject, Secrets Manager
   - ECR repository: aegis/dashboard-backend (Step 7 신설)
   - ALB HTTPS 443 listener rule + /ws/* sticky session 옵션
   - Route53 A-record alias: api.<도메인> → ALB
   - GitHub Secret AWS_OIDC_DASHBOARD_ROLE_ARN 등록 (ECR push용 OIDC role)
 
-Step 7 선행 확인 필요:
-  - infra/data-dashboard/ Terraform 재생성 (build-data-dashboard.sh)
-  - secrets Manager, RDS, Redis, VPC 재생성 완료 후 Step 7 진행
-  - apps/dashboard-backend/.env.example 기반 Task Definition 환경변수 설정
-  - ECR aegis/dashboard-backend repo 신설 후 GHA push 검증
-  - github_repo_for_oidc 기본값: aegis-pi/dashboard_vpc
+Step 7 현재 상태:
+  + Terraform 구현 완료: ecr.tf / ecs.tf / secrets.tf / variables.tf / outputs.tf
+  + terraform validate 통과
+  + terraform plan: 92 to add, 0 to change, 0 to destroy
+  + 첫 apply 기본 desired_count=0 — ECR 이미지 push 전 ECS task 시작 방지
+  + github_repo_for_oidc 기본값: aegis-pi/dashboard_vpc
 ```
 
-Step 6에서 완료된 것:
+완료된 것:
 - apps/dashboard-backend/ 로컬 구현 완료 (pytest 18 passed, docker build 통과)
 - .github/workflows/dashboard-backend.yml 골격 완료 (AWS_OIDC_DASHBOARD_ROLE_ARN Secret 등록 대기)
 - AEGIS-DynamoDB-FactoryStatus 기준 DDB 조회 로직 구현
+- ECR/ECS/ALB Terraform 정의 완료
 
-Step 6에서 아직 남은 것 (Step 7 이후 완성):
-- ECR aegis/dashboard-backend repo 신설 및 이미지 push
-- ECS Task Definition / Service 배포
-- ALB listener rule 연결 (api.<도메인> HTTPS)
-- GitHub Secret 등록 후 GHA CI/CD 파이프라인 활성화
+아직 남은 것:
+- `infra/data-dashboard` apply
+- apply 후 ECR `aegis/dashboard-backend` 이미지 push
+- GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 등록 후 GHA CI/CD 파이프라인 활성화
+- 이미지 push 후 `ecs_backend_desired_count=1` 활성화 apply
+- Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션
 
 2026-05-15 기준 최근 검증 완료 전제:
 
@@ -898,7 +898,7 @@ AWS 비용 기준은 `docs/ops/15_aws_cost_baseline.md`에 반영했고, AWS 리
 현재 세션 정리 내용:
 
 ```text
-2026-05-26 세션 저장 기준 (Phase 1 Step 6 완료)
+2026-05-26 세션 저장 기준 (Phase 1 Step 7 구현 완료 / apply 전)
 Step 6 Dashboard Backend FastAPI 구현 완료:
   + apps/dashboard-backend/ 신설 (FastAPI 0.1.0)
   + REST: /healthz, /factories, /factories/{id}, /factories/{id}/history, /reports, /reports/{date}/{id}
@@ -910,15 +910,23 @@ Step 6 Dashboard Backend FastAPI 구현 완료:
   + Dockerfile (python:3.12-slim 단일 stage, non-root appuser)
   + .github/workflows/dashboard-backend.yml (pytest CI + ECR sha-<7char> push 골격)
   + pytest -q: 18 passed / docker build: 통과 / git diff --check: 통과
-  + ECS/ECR/ALB 미배포 — Step 7 Terraform 배포 전, AWS 비용 미발생
+  + ECS/ECR/ALB 미배포 — Step 7 apply 전, AWS 비용 미발생
+
+Step 7 ECS Fargate / ALB / ECR Terraform 구현 완료:
+  + infra/data-dashboard/ecr.tf, ecs.tf 신설
+  + secrets.tf / variables.tf / outputs.tf 갱신
+  + ECR aegis/dashboard-backend, ECS Cluster/TaskDef/Service, CloudWatch Logs, IAM, ALB listener rule 정의
+  + 첫 apply 기본 desired_count=0, 이미지 push 후 desired_count=1 활성화
+  + Backend ECS Task Role에서 Bedrock InvokeModel 권한 제외 (LLM 보고서는 팀원/후속)
+  + terraform validate 통과 / plan: 92 to add, 0 to change, 0 to destroy
 
 frontend 경로 정리:
   + frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ 정리됨)
-  + apps/dashboard-web/ = 운영 배포용 Vite + React SPA 예정 경로 (Step 1 미구현)
+  + apps/dashboard-web/ = 운영 배포용 Vite + React SPA 예정 경로 (Step 8 미구현)
   + frontend/ → S3/CloudFront 직접 배포 금지
 
 다음 작업 (워크스트림 B):
-  Phase 1 Step 7 ECS Fargate / ALB / ECR / Route53 Terraform 배포 — 새 Claude Code 세션 시작
+  Phase 1 Step 7 apply 절차 진행 후 Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션
 
 워크스트림 A 잔여 (본 환경 실행 안 함):
   M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정

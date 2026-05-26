@@ -13,7 +13,7 @@ async def list_reports(
 ):
     """List daily report metadata from aegis-daily-report DDB table.
 
-    Skeleton — DDB query implemented in Step 8 after lambda-report-generator.
+    Skeleton — DDB query will be implemented after future lambda-report-generator work.
     """
     return []
 
@@ -26,10 +26,10 @@ async def get_report(
 ):
     """Return a Markdown report from S3 reports/ prefix.
 
-    Skeleton — S3 objects are populated by lambda-report-generator (Step 8).
+    Skeleton — S3 objects will be populated by future lambda-report-generator work.
     """
     try:
         markdown = await s3.get_report_markdown(report_date, factory_id)
         return PlainTextResponse(markdown, media_type="text/markdown")
     except Exception:
-        raise HTTPException(status_code=503, detail="Report not yet available (Step 8)")
+        raise HTTPException(status_code=503, detail="Report not yet available")

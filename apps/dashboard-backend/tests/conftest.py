@@ -37,7 +37,6 @@ os.environ.update(
         "COGNITO_USER_POOL_ID": "ap-south-1_TESTPOOL",
         "COGNITO_APP_CLIENT_ID": "test-client-id",
         "AWS_REGION": "ap-south-1",
-        "BEDROCK_REGION": "us-east-1",
     }
 )
 

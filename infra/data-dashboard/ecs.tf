@@ -113,7 +113,7 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
 
 # ---------------------------------------------------------------------------
 # IAM — Task Role (least-privilege, applied to running container)
-# DynamoDB read + S3 GetObject + SecretsManager + Bedrock InvokeModel
+# DynamoDB read + S3 GetObject + SecretsManager
 # Reference: docs/AI_AGENT_HARNESS.md § 8.3
 # ---------------------------------------------------------------------------
 
@@ -193,18 +193,6 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     ]
   }
 
-  # Bedrock InvokeModel scoped to Claude 3 Haiku (us-east-1).
-  # Step 8 report-generator uses the same model; expand here if needed.
-  statement {
-    sid    = "BedrockInvokeHaiku"
-    effect = "Allow"
-    actions = [
-      "bedrock:InvokeModel",
-    ]
-    resources = [
-      "arn:aws:bedrock:${var.bedrock_region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
-    ]
-  }
 }
 
 resource "aws_iam_role_policy" "ecs_task_inline" {
@@ -252,7 +240,6 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "DDB_TABLE_REPORT", value = aws_dynamodb_table.daily_report.name },
         { name = "S3_BUCKET_DATA", value = var.shared_data_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
-        { name = "BEDROCK_REGION", value = var.bedrock_region },
         { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.this.id },
         { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.this.id },
         # REDIS_AUTH_TOKEN_SECRET_ARN: ARN only (not the token itself).

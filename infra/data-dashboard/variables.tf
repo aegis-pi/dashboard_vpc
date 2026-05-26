@@ -114,12 +114,6 @@ variable "backend_container_image" {
   default     = ""
 }
 
-variable "bedrock_region" {
-  description = "AWS region for Bedrock InvokeModel calls. Claude 3 Haiku requires us-east-1 if ap-south-1 is unsupported."
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "github_repo_for_oidc" {
   description = "GitHub repository path (org/repo) trusted in the OIDC assume-role condition for ECR push."
   type        = string

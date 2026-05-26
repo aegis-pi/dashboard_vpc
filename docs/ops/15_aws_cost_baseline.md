@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v1.7  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM report-generator/Bedrock 비용은 팀원/후속 작업 예상치로 분리. Backend ECS Task Role의 Bedrock 권한 제거 반영.
   - 2026-05-26 v1.6  Step 7 Terraform 구현 완료 반영. ECR `aegis/dashboard-backend` 신설, ECS Fargate Cluster/TaskDef/Service/CloudWatch Logs/IAM 추가. Secrets Manager 2개 추가(database_url/redis_url, 합계 4개). 리소스 상태 표 갱신. 비용 표 갱신(Secrets 4개로 수정).
   - 2026-05-26 v1.5  Step 6 완료(로컬 구현) 반영. apps/dashboard-backend/ 신설, ECS/ECR/ALB는 Step 7 배포 전으로 AWS 비용 미발생. 리소스 상태 표 Step 6 항목 갱신.
   - 2026-05-22 v1.4  `infra/data-dashboard` destroy 완료(73 destroyed). Data/Dashboard VPC active 리소스 삭제, backend state bucket + RDS final snapshot만 잔존. build/destroy wrapper와 snapshot/secret 재생성 기준 반영.
@@ -73,12 +74,13 @@
 | Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | Terraform 정의 완료 | Step 7 구현 완료. KJW-AEGIS-Data-ECSCluster / kjw-aegis-data-backend / KJW-AEGIS-Data-Service-Backend. 첫 apply 기본 desired_count=0, 이미지 push 후 desired_count=1로 활성화 |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | Terraform 정의 완료 | Step 7 구현 완료. 30일 보존. 비용 usage-based (소량) |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | Terraform 정의 완료 | Step 7 신규 2개 (ECS 컨테이너 시크릿 주입용). apply 후 생성 |
-| Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — Phase 1 Step 8 |
+| Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — LLM 일간 보고서 팀원/후속 작업 |
 
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- 1번 Data/Dashboard VPC Step 6 이후 리소스(ECS Fargate Backend, Backend ECR, Lambda report-generator)는 미배포
+- 1번 Data/Dashboard VPC Step 7 리소스(ECS Fargate Backend, Backend ECR)는 Terraform 정의 완료 / apply 전 미배포
+- Lambda report-generator / Bedrock 일간 보고서는 팀원/후속 작업으로 현재 Step 8 범위가 아님
 - Dashboard Backend용 ECR `aegis/dashboard-backend` 없음
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산
@@ -187,10 +189,10 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | CloudFront requests | `$0.0075 / 10k HTTPS` | < 100k/월 | `~$0.08` |
 | Lambda data processor invocations | `$0.20 / 1M` (1M 무료) | < 200k/월 | `~$0.00` (무료 티어 내) |
 | Lambda notifier invocations (DDB Streams) | `$0.20 / 1M` | < 200k/월 | `~$0.00` |
-| Lambda report-generator invocations | `$0.20 / 1M` | 3 호출/일 × 30 = 90/월 | `~$0.00` |
+| Lambda report-generator invocations | `$0.20 / 1M` | 팀원/후속 LLM 보고서 도입 시 3 호출/일 × 30 = 90/월 | `~$0.00` |
 | Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k 무료) | < 100k GB-sec | `~$0.00` |
-| Bedrock Claude 3 Haiku (input) | `$0.00025 / 1k tokens` | 일간 보고서 + 이상 요약 ≈ 60k tokens/월 | `~$0.015` |
-| Bedrock Claude 3 Haiku (output) | `$0.00125 / 1k tokens` | ≈ 15k tokens/월 | `~$0.019` |
+| Bedrock Claude 3 Haiku (input) | `$0.00025 / 1k tokens` | 팀원/후속 LLM 보고서 도입 시 일간 보고서 + 이상 요약 ≈ 60k tokens/월 | `~$0.015` |
+| Bedrock Claude 3 Haiku (output) | `$0.00125 / 1k tokens` | 팀원/후속 LLM 보고서 도입 시 ≈ 15k tokens/월 | `~$0.019` |
 | DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3s/20s 주기 = ~120k write/월 | `~$0.15` |
 | DynamoDB on-demand read | `$0.25 / 1M RCU` | Backend 캐시 hit으로 read 감소 ~50k/월 | `~$0.013` |
 | DynamoDB Streams read | `$0.02 / 100k stream read` | ~120k/월 | `~$0.024` |

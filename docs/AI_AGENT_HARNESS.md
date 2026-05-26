@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거.
   - 2026-05-26  Step 6 완료 반영. TL;DR·현재 구현 상태·Known Gaps 갱신. Step 1 frontend prototype/reference vs apps/dashboard-web/ 공식 경로 구분 추가. 변경 이력 추가.
 대상: Claude Code, Codex, 또는 동급의 AI 코딩 에이전트
 언어: 한국어 (개조식 우선) / 코드·식별자는 원문 유지
@@ -59,7 +60,7 @@
 | --- | --- | --- |
 | VPC | 2번 Control / Management | 1번 Data / Dashboard |
 | 마일스톤 | M1, M2, M3, M5 | M4 (소비측), M6, Phase 1 Step 0~10 |
-| 핵심 자산 | EKS Hub, ArgoCD, Tailscale, Prometheus, Grafana, Admin UI, edge-agent ECR | 1번 VPC, ALB, ECS Fargate Backend, RDS PostgreSQL, Redis, Lambda data processor / notifier / report-generator, Dashboard SPA, Cognito, Bedrock |
+| 핵심 자산 | EKS Hub, ArgoCD, Tailscale, Prometheus, Grafana, Admin UI, edge-agent ECR | 1번 VPC, ALB, ECS Fargate Backend, RDS PostgreSQL, Redis, Lambda data processor / notifier, Dashboard SPA, Cognito. report-generator/Bedrock은 팀원/후속 작업 |
 | Lambda data processor | **합류 지점** (코드/Terraform은 본 환경, IoT Rule 트리거는 워크스트림 A와 ADR로 합의) | **합류 지점** |
 | S3 `aegis-bucket-data` | bucket·정책·KMS 소유 | `processed/`·`reports/` prefix 와 본 환경 IAM 만 추가 |
 
@@ -69,9 +70,10 @@
 | --- | --- | --- |
 | 허용 | `infra/data-dashboard/**` *(신설, Phase 1 Step 2)* | 자유 |
 | 허용 | `apps/dashboard-backend/**` *(신설, Phase 1 Step 6)* | 자유 |
-| 허용 | `apps/dashboard-web/**` *(신설, Phase 1 Step 1)* | 자유 |
+| 허용 | `apps/dashboard-web/**` *(신설, Phase 1 Step 8)* | 자유 |
 | 허용 | `apps/data-processor/**` *(ADR 0020, Phase 1 Step 4 사전 정렬 완료)* | 자유 (IoT Rule 트리거 라우팅은 ADR 합의 후) |
-| 허용 | `apps/lambda-notifier/**`, `apps/lambda-report-generator/**` | 자유 |
+| 허용 | `apps/lambda-notifier/**` | 자유 |
+| 보류 | `apps/lambda-report-generator/**` | LLM 일간 보고서 팀원/후속 작업 |
 | 허용 | `docs/**` (워크스트림 A 운영 문서 제외) | 자유 (편집 규칙 § 9 준수) |
 | 허용 | `docs/changes/0NNN-*.md` (신규 ADR 추가) | 자유 |
 | 허용 | `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` *(신설)* | 자유 |
@@ -163,20 +165,17 @@
 - 롤백: Gabia 측 NS 원복 / Route53 hosted zone 삭제
 - 본 단계는 Step 1과 병렬 가능
 
-#### Phase 1 Step 1 — Frontend Vite + React 마이그레이션
+#### Phase 1 Step 1 — Frontend prototype/reference 정리
 
-- 목표: `frontend/` prototype reference(기존 `Aegis-pi/`, `Aegis-pi2/` 정리 경로)의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 모듈 구조로 이전 + Cognito Hosted UI + WebSocket client + react-markdown 보고서 탭
+- 목표: `frontend/` prototype reference(기존 `Aegis-pi/`, `Aegis-pi2/` 정리 경로)를 화면 설계 기준으로 유지한다. 운영용 공식 SPA 구현은 Step 8에서 진행한다.
 - **경로 구분 (필수)**:
   - `frontend/` = 화면 설계 prototype/reference. 기존 `Aegis-pi/`, `Aegis-pi2/` prototype이 정리된 경로
-  - `apps/dashboard-web/` = 운영 배포용 공식 Vite + React SPA. Step 1의 구현 대상
+  - `apps/dashboard-web/` = 운영 배포용 공식 Vite + React SPA. Step 8의 구현 대상
   - `frontend/`를 배포/CI/S3 source path로 직접 사용하지 않는다
-  - Step 1에서 `frontend/` prototype을 참고해 `apps/dashboard-web/`로 공식 구현한다
-- DoD: `npm run build` 성공, `dist/` 산출물 검증, prototype 의 시각·UX 회귀 없음, Cognito 콜백 URL 와 WebSocket endpoint는 환경변수로 추상화
-- 허용 파일: `apps/dashboard-web/**`(신설), `docs/specs/monitoring_dashboard/04_risk_twin_web_screen_design.md` 갱신
-- 금지: `frontend/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다. 마이그레이션 도중 백엔드 endpoint 를 hardcode 하지 않는다. `.env*` 는 `.env.example` 만 commit
-- 환경변수 계약 (Frontend): `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`
-- 검증: `npm run build`, `npm run lint`, `npm run test`, prototype 스크린샷 diff
-- 롤백: `apps/dashboard-web/` 디렉터리 삭제. `frontend/` prototype reference 는 그대로 유지
+- DoD: prototype/reference 경로와 운영용 공식 경로가 문서에 명확히 분리되어 있음
+- 허용 파일: `frontend/**`(reference 정리), 문서
+- 금지: `frontend/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다.
+- 롤백: `frontend/` reference 정리 이전 상태로 되돌림. 운영용 `apps/dashboard-web/`는 Step 8에서만 신설
 
 #### Phase 1 Step 2 — Terraform 1번 VPC 골격 (`infra/data-dashboard/`)
 
@@ -244,7 +243,7 @@
 - API 계약: § 8.2 참조
 - 허용 파일: `apps/dashboard-backend/**`, `.github/workflows/dashboard-backend.yml` (신설)
 - 금지: 환경변수 외 비밀 정보 하드코드, Cognito JWKS 검증 생략, RDS 직접 root user 사용
-- 환경변수 계약: `DATABASE_URL`, `REDIS_URL`, `REDIS_AUTH_TOKEN_SECRET_ARN`, `DDB_TABLE_STATUS`, `DDB_TABLE_REPORT`, `S3_BUCKET_DATA`, `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, `BEDROCK_REGION`
+- 환경변수 계약: `DATABASE_URL`, `REDIS_URL`, `REDIS_AUTH_TOKEN_SECRET_ARN`, `DDB_TABLE_STATUS`, `DDB_TABLE_REPORT`, `S3_BUCKET_DATA`, `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, `AWS_REGION`
 - 검증:
   - `pytest -q`
   - `docker build` 후 `docker run` → `/healthz` 200
@@ -261,17 +260,16 @@
   - `curl -I https://api.<도메인>/healthz` → 200
   - `wscat -c wss://api.<도메인>/ws/factories/factory-a` → handshake OK
 
-#### Phase 1 Step 8 — LLM 일간 보고서 (Bedrock Claude 3 Haiku)
+#### Phase 1 Step 8 — 운영용 Frontend Vite + React 마이그레이션
 
-- 목표: EventBridge cron 09:00 KST → Lambda report-generator → Bedrock Claude 3 Haiku → S3 `reports/<YYYY-MM-DD>/<factory_id>.md` + DDB `aegis-daily-report` 메타 write
-- DoD: 수동 invoke (`aws lambda invoke`) 시 S3 와 DDB 양쪽 기록 완료, Backend `/reports?date=YYYY-MM-DD` 응답에 신규 보고서 포함, 다음 09:00 자동 트리거 1회 검증
-- 허용 파일: `apps/lambda-report-generator/**`, `infra/data-dashboard/lambda_report.tf`, `infra/data-dashboard/eventbridge.tf`
-- 금지: Bedrock 호출 시 PII / 비밀 정보를 프롬프트에 포함, model ARN 하드코드 (변수화)
-- Bedrock region 확인: `ap-south-1` 미지원 시 `us-east-1` cross-region invoke (ADR 0016 § Bedrock region 참조)
-- 검증:
-  - `aws bedrock list-foundation-models --region <region>` → Claude 3 Haiku 활성
-  - 수동 invoke 후 S3 object 존재, DDB item 존재
-  - Backend 응답에 보고서 Markdown 포함
+- 목표: `frontend/` prototype reference의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 정적 SPA로 이전하고 S3 + CloudFront 배포 가능한 `dist/` 산출물을 만든다.
+- DoD: `apps/dashboard-web/`에서 `npm run build` 성공, `dist/` 산출물 생성, Cognito Hosted UI / API base URL / WebSocket base URL이 환경변수로 분리됨, `frontend/` prototype과 주요 화면 흐름이 일치함
+- 허용 파일: `apps/dashboard-web/**`, `docs/specs/monitoring_dashboard/04_risk_twin_web_screen_design.md`, 필요한 문서
+- 금지: `frontend/` 를 공식 배포/CI/S3 source path로 직접 사용하지 않는다. 백엔드 endpoint, Cognito client id, domain을 코드에 하드코드하지 않는다. `.env*` 는 `.env.example` 만 commit
+- 환경변수 계약 (Frontend): `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`
+- 검증: `npm run build`, `npm run lint`, `npm run test`(구성 시), prototype 기준 주요 화면 수기 비교
+
+> LLM 일간 보고서(ADR 0016, Bedrock + Lambda report-generator)는 팀원/후속 작업으로 분리한다. 본 환경 Step 8에서는 구현하지 않는다.
 
 #### Phase 1 Step 9 — End-to-end 통합 검증
 
@@ -307,9 +305,9 @@
 | M4 Issue 7 (pipeline status) | Lambda data processor 내부 단계 (Phase 1 Step 4) |
 | M4 Issue 8 (end-to-end 검증) | **Phase 1 Step 9** |
 | M6 Issue 1~4 (Risk 계산 / runtime-config / 임계값 / Twin 구조) | Lambda data processor 내부 (Phase 1 Step 4) |
-| M6 Issue 5~7 (Dashboard 화면) | **Phase 1 Step 1 + 6** |
+| M6 Issue 5~7 (Dashboard 화면) | **Phase 1 Step 1 + 6 + 8** |
 | M6 Issue 8 (시나리오 검증) | **Phase 1 Step 9** |
-| M6 추가 (RDS 메타·LLM 보고서) | **Phase 1 Step 3 + 8** |
+| M6 추가 (RDS 메타·LLM 보고서) | RDS 메타는 **Phase 1 Step 3**, LLM 보고서는 팀원/후속 작업 |
 
 ---
 
@@ -350,7 +348,7 @@
 | DynamoDB | `aws dynamodb describe-table --table-name AEGIS-DynamoDB-FactoryStatus` | StreamSpecification.StreamEnabled=true |
 | RDS | `aws rds describe-db-instances --db-instance-identifier <id>` | DBInstanceStatus=available, MultiAZ=false, StorageType=gp3 |
 | Redis | `aws elasticache describe-replication-groups --replication-group-id <id>` | TransitEncryptionEnabled=true, AuthTokenEnabled=true |
-| Bedrock 호출 | `aws bedrock-runtime invoke-model --model-id anthropic.claude-3-haiku-20240307-v1:0 --region <region> --body @prompt.json out.json` | 정상 응답 |
+| Bedrock 호출 | 팀원/후속 LLM 보고서 작업에서 별도 검증 | 본 환경 Step 8 대상 아님 |
 | 비용 baseline | `docs/ops/15_aws_cost_baseline.md` diff 가 PR 에 포함 | yes |
 | Markdown 린트 | **현재 저장소에 `markdownlint` / `vale` 설정 없음** | "린트 도구 미설정" 으로 명시 기록 후 § 9 의 수기 체크리스트로 대체 |
 | 문서 테스트 | **현재 저장소에 doc test 없음** | "문서 테스트 미설정" 으로 명시 기록 |
@@ -402,10 +400,10 @@
 
 | 주체 | 권한 |
 | --- | --- |
-| ECS Task Role (Backend) | `dynamodb:Get/Query/PutItem` (테이블 2개), `s3:GetObject` (`processed/*`, `reports/*`), `secretsmanager:GetSecretValue` (RDS·Redis AUTH), `bedrock:InvokeModel` (Claude 3 Haiku), `kms:Decrypt` (필요 시) |
+| ECS Task Role (Backend) | `dynamodb:Get/Query/PutItem` (테이블 2개), `s3:GetObject` (`processed/*`, `reports/*`), `secretsmanager:GetSecretValue` (RDS·Redis AUTH), `kms:Decrypt` (필요 시) |
 | Lambda data processor | `dynamodb:PutItem/UpdateItem` (테이블 1), `s3:PutObject` (`processed/*`), `logs:*` |
 | Lambda notifier | DDB Streams read, ElastiCache (보안그룹), `secretsmanager:GetSecretValue` (Redis AUTH), `logs:*` |
-| Lambda report-generator | `dynamodb:Query` (`AEGIS-DynamoDB-FactoryStatus` HISTORY), `s3:Get/PutObject` (`processed/*`, `reports/*`), `bedrock:InvokeModel`, `dynamodb:PutItem` (`aegis-daily-report`) |
+| Lambda report-generator (팀원/후속) | `dynamodb:Query` (`AEGIS-DynamoDB-FactoryStatus` HISTORY), `s3:Get/PutObject` (`processed/*`, `reports/*`), `bedrock:InvokeModel`, `dynamodb:PutItem` (`aegis-daily-report`) |
 
 ### 8.4 환경변수 / 시크릿 정책
 
@@ -450,10 +448,10 @@
 - M1 Issue 11 — Admin UI 운영 보안 강화 (WAF / Cognito / OIDC): 보류
 - EKS API endpoint public CIDR 축소: 보류
 - `apps/dashboard-backend/` — **완료** (Phase 1 Step 6, 2026-05-26). pytest 18 passed, docker build 통과. ECS/ECR/ALB 배포는 Step 7
-- `apps/dashboard-web/` 디렉터리 미존재 — Phase 1 Step 1 에서 신설 (`frontend/` prototype reference 참고)
-- `apps/lambda-report-generator/` 디렉터리 미존재 — Phase 1 Step 8 에서 신설
+- `apps/dashboard-web/` 디렉터리 미존재 — Phase 1 Step 8 에서 신설 (`frontend/` prototype reference 참고)
+- `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
-- `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (Step 1 미구현)
+- `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (Step 8 미구현)
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 미등록 — Step 7 IAM 생성 후 등록
 - Markdown 린트 / 문서 테스트 도구 미설정 — § 7.1 수기 체크리스트로 대체
 
@@ -461,7 +459,7 @@
 
 | 항목 | 위치 | 메모 |
 | --- | --- | --- |
-| Bedrock 호출 region 확정 (`ap-south-1` vs `us-east-1` cross-region) | Phase 1 Step 8 | Bedrock 가용 모델 목록 확인 후 ADR 0016 부록 추가 |
+| Bedrock 호출 region 확정 (`ap-south-1` vs `us-east-1` cross-region) | 팀원/후속 LLM 보고서 작업 | Bedrock 가용 모델 목록 확인 후 ADR 0016 부록 추가 |
 | 신규 Dashboard 도메인명 | Phase 1 Step 0 | Gabia 구매 후 ADR 0010 부록에 도메인명 + NS 4개 기록 (전체 NS 풀세트는 별도 보관) |
 | RDS PostgreSQL 운영 백업 / PITR 정책 (데모 운영 vs 상시 운영) | Phase 1 Step 3 / Phase 2 | 상시 운영 결정 시점에 ADR 작성 |
 | `aegis-pi-gitops` repo 와 본 repo 분리/통합 최종 정책 | M7 Issue 0 | 통합 검증 시 결정 |
@@ -530,3 +528,4 @@
 | --- | --- | --- |
 | 2026-05-19 | v1.0 | 초안. 워크스트림 B Phase 1 통합 결정 (ADR 0012~0017) 반영, 마일스톤↔Phase 매핑 표 + 검증 명령 + 데이터/계약/Needs Decision 정리 |
 | 2026-05-26 | v1.1 | Step 6 완료 반영. TL;DR·§ 2·§ 10.1 갱신. Step 1 frontend/ vs apps/dashboard-web/ 경로 구분 추가. Known Gaps에서 apps/dashboard-backend/ 완료 처리. |
+| 2026-05-26 | v1.2 | Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거. |
