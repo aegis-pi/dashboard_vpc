@@ -364,11 +364,11 @@ Phase 1 Step 7.5 Route53 Hosted Zone 영구 분리: 2026-05-26 완료.
   + terraform validate: infra/data-dashboard-dns 통과, infra/data-dashboard 통과
   + terraform fmt -check: 양쪽 통과
   + git diff --check: 통과
-  + 사용자가 직접 실행해야 할 state 이전 절차 (infra/data-dashboard-dns init → import → state rm):
+  + state 이전 완료 (infra/data-dashboard-dns init → import → state rm):
       a. terraform -chdir=infra/data-dashboard-dns init
       b. terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard <ZONE_ID>
       c. terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
-      d. terraform -chdir=infra/data-dashboard plan (zone destroy/create 없어야 함)
+      d. terraform -chdir=infra/data-dashboard plan (No changes, zone destroy/create 없음)
       e. terraform -chdir=infra/data-dashboard-dns plan (No changes)
       state rm은 AWS 리소스를 삭제하지 않는다 (Terraform state에서만 추적 해제)
   + Route53 hosted zone은 infra/data-dashboard destroy 대상에서 제외됨 ($0.50/월 영구 비용 유지)
@@ -664,11 +664,10 @@ Step 7.5 완료 내용:
   + infra/data-dashboard/route53.tf: data source로 전환 (aws_route53_zone.dashboard resource 제거)
   + ACM/outputs.tf route53 참조 → data source
   + Terraform validate/fmt-check: 양쪽 통과
-  + state 이전: 사용자가 직접 실행 대기 (terraform import → state rm)
+  + state 이전 완료: import → state rm → 양쪽 plan No changes
 ```
 
 사용자가 직접 실행해야 할 것:
-- State 이전: `terraform -chdir=infra/data-dashboard-dns init` → import → state rm
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 등록 (ECR push용 OIDC role ARN)
 - ECR `aegis/dashboard-backend` 이미지 push (docker build → ecr login → push)
 - `ecs_backend_desired_count=1` 로 `infra/data-dashboard` apply → ECS 서비스 동작 검증
@@ -932,7 +931,9 @@ Step 7.5 Route53 Hosted Zone 영구 분리 완료 (2026-05-26):
   + infra/data-dashboard route53.tf → data source 전환 (resource 블록 제거)
   + acm.tf, outputs.tf route53 참조 → data source
   + terraform fmt-check, validate: 양쪽 통과 / git diff --check: 통과
-  + state 이전(import + state rm)은 사용자가 직접 실행 대기
+  + state 이전(import + state rm) 완료
+  + infra/data-dashboard plan: No changes
+  + infra/data-dashboard-dns plan: No changes
 
 frontend 경로 정리:
   + frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ 정리됨)
@@ -940,7 +941,7 @@ frontend 경로 정리:
   + frontend/ → S3/CloudFront 직접 배포 금지
 
 다음 작업 (워크스트림 B):
-  State 이전 실행 → GitHub Secret 등록 → ECR 이미지 push → ECS 활성화 → Phase 1 Step 8 Frontend 마이그레이션
+  GitHub Secret 등록 → ECR 이미지 push → ECS 활성화 → Phase 1 Step 8 Frontend 마이그레이션
 
 워크스트림 A 잔여 (본 환경 실행 안 함):
   M3 Issue 2 - ECR image push/pull 검증, Spoke K3s imagePullSecret 방식 확정

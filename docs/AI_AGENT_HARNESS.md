@@ -271,22 +271,18 @@
   - `infra/data-dashboard/route53.tf` 에서 `resource "aws_route53_zone"` 제거 → `data "aws_route53_zone"` 대체
   - `infra/data-dashboard/acm.tf`, `outputs.tf` zone_id 참조 → data source
   - `terraform validate`, `fmt -check` 양쪽 통과
-  - state 이전 절차 (import → state rm) 문서화
+  - state 이전 완료 (import → state rm → 양쪽 plan No changes)
 - 완료 내용:
   - `infra/data-dashboard-dns/` 5개 파일 생성 (main.tf, providers.tf, versions.tf, variables.tf, outputs.tf)
   - `infra/data-dashboard/route53.tf`, `acm.tf`, `outputs.tf` 수정
-  - state 이전은 사용자가 직접 실행 (ZONE_ID 확인 후 import → state rm)
-- 사용자가 실행해야 할 state 이전 절차:
+  - `infra/data-dashboard-dns` state가 hosted zone을 소유
+  - `infra/data-dashboard` state에는 hosted zone resource가 없고 DNS records만 남음
+- 실행된 state 이전 절차:
   ```bash
-  # 1. data-dashboard-dns init (backend 연결)
   terraform -chdir=infra/data-dashboard-dns init
-  # 2. 현재 hosted zone을 data-dashboard-dns state로 import (ZONE_ID는 terraform output route53_zone_id 또는 aws route53 확인)
   terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard <ZONE_ID>
-  # 3. data-dashboard state에서 hosted zone 추적 해제 (AWS 리소스는 삭제되지 않음)
   terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
-  # 4. data-dashboard plan으로 zone destroy/create 없음 확인
-  terraform -chdir=infra/data-dashboard plan
-  # 5. data-dashboard-dns plan으로 No changes 확인
+  terraform -chdir=infra/data-dashboard plan -var="dashboard_domain_name=aegis-pi.cloud"
   terraform -chdir=infra/data-dashboard-dns plan
   ```
 - 허용 파일: `infra/data-dashboard-dns/**`, `infra/data-dashboard/route53.tf`, `infra/data-dashboard/acm.tf`, `infra/data-dashboard/outputs.tf`

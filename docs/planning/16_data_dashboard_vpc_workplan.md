@@ -291,13 +291,13 @@ Step 1 진행 시:
   + infra/data-dashboard/outputs.tf: route53_zone_id / route53_name_servers → data source
   + terraform fmt-check, validate: 양쪽 통과 / git diff --check: 통과
 
-사용자가 직접 실행해야 할 state 이전 절차:
+완료된 state 이전 절차:
   a. terraform -chdir=infra/data-dashboard-dns init
   b. terraform -chdir=infra/data-dashboard-dns import aws_route53_zone.dashboard <ZONE_ID>
      (ZONE_ID: terraform -chdir=infra/data-dashboard output route53_zone_id 로 확인)
   c. terraform -chdir=infra/data-dashboard state rm aws_route53_zone.dashboard
      ※ state rm은 AWS 리소스를 삭제하지 않는다. Terraform state 추적에서만 제외한다.
-  d. terraform -chdir=infra/data-dashboard plan  ← zone destroy/create 없어야 함
+  d. terraform -chdir=infra/data-dashboard plan  ← No changes, zone destroy/create 없음
   e. terraform -chdir=infra/data-dashboard-dns plan  ← No changes
 
 비용:
