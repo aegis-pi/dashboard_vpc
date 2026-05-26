@@ -3,7 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
-  - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 반영. dashboard-web.yml 워크플로우, IAM web deploy role(ADR 0023), Terraform apply 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 end-to-end 통합 검증.
+  - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 end-to-end 통합 검증.
   - 2026-05-26  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. TL;DR·현재 구현 상태·Known Gaps 갱신. 다음 작업 Step 9로 전환.
   - 2026-05-26  Step 7 Backend 활성화 검증 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26  Step 7 apply 완료 + Step 7.5 Route53 영구 분리 완료 반영. infra/data-dashboard-dns/ allowlist 추가. TL;DR 갱신.
@@ -22,7 +22,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 9 end-to-end 통합 검증 (Step 9 CI/CD 구현 및 IAM apply 완료 — GitHub repo-level Secret/Variables 등록 완료, workflow 실행 후 실제 배포 진행)
+- **본 환경의 다음 작업**: Phase 1 Step 9 end-to-end 통합 검증 (Step 9 CI/CD 구현/IAM apply/SPA 배포 완료 — GitHub repo-level Secret/Variables 등록 완료)
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -48,7 +48,7 @@
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
-- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 S3+CloudFront 배포 CI/CD 구현 및 IAM apply 완료 (2026-05-26). GitHub Actions dashboard-web.yml, IAM OIDC web deploy role, Terraform apply 2 add 0 change 확인. repo-level Secret/Variables 등록 완료, workflow 실행 후 실제 배포 가능
+- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 S3+CloudFront 배포 CI/CD 구현/IAM apply/SPA 배포 완료 (2026-05-26). GitHub Actions dashboard-web.yml, IAM OIDC web deploy role, Terraform apply 2 add 0 change, repo-level Secret/Variables 등록, S3 sync + CloudFront invalidation 확인
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
 - **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 Backend 활성화 완료(ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
 
@@ -303,12 +303,12 @@
 
 #### Phase 1 Step 9 — S3+CloudFront 배포 CI/CD + End-to-end 통합 검증
 
-- **Part 1 — S3+CloudFront 배포 CI/CD (2026-05-26 구현 및 IAM apply 완료, 배포 대기)**:
+- **Part 1 — S3+CloudFront 배포 CI/CD (2026-05-26 구현 및 배포 완료)**:
   - GitHub Actions `.github/workflows/dashboard-web.yml` 신설 (push main + workflow_dispatch 트리거)
   - IAM role `KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy` 신설 (ADR 0023, 별도 role, 최소권한)
   - Terraform apply: 2 added, 0 changed, 0 destroyed
   - 등록 완료: repo-level Secret `AWS_OIDC_DASHBOARD_WEB_ROLE_ARN`, repo-level Variables 9종 (`DASHBOARD_WEB_BUCKET`, `DASHBOARD_CLOUDFRONT_DISTRIBUTION_ID`, `VITE_*` 7종)
-  - 다음 액션: workflow 실행 → S3/CloudFront 확인
+  - 배포 확인: dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료, dashboard/API health HTTP 200 확인
 - **Part 2 — End-to-end 통합 검증** (SPA 배포 후 진행):
   - 목표: factory-a → IoT Core → Lambda data processor → DDB LATEST → Streams → notifier → Redis → WebSocket push 의 전체 경로 측정
   - DoD (수치 목표, `16_data_dashboard_vpc_workplan.md` § Step 9):
@@ -486,7 +486,7 @@
 - EKS API endpoint public CIDR 축소: 보류
 - `apps/dashboard-backend/` — **완료** (Phase 1 Step 6~7, 2026-05-26). pytest 18 passed, docker build 통과, ECS Fargate 배포 및 `/healthz` 200 확인
 - `apps/dashboard-web/` — **완료** (Phase 1 Step 8, 2026-05-26). Vite+React SPA, npm build/lint/test 통과.
-- `.github/workflows/dashboard-web.yml` — **구현 완료** (Phase 1 Step 9, 2026-05-26). test + build-and-deploy jobs. Terraform apply 2 add 0 change. repo-level Secret/Variable 등록 후 실제 배포 가능
+- `.github/workflows/dashboard-web.yml` — **구현/배포 완료** (Phase 1 Step 9, 2026-05-26). test + build-and-deploy jobs 성공. Terraform apply 2 add 0 change. repo-level Secret/Variable 등록 완료
 - `infra/data-dashboard/ecr.tf` — Step 9: `github_oidc_web_deploy` IAM role 추가 완료 (ADR 0023)
 - `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
@@ -569,4 +569,4 @@
 | 2026-05-26 | v1.1 | Step 6 완료 반영. TL;DR·§ 2·§ 10.1 갱신. Step 1 frontend/ vs apps/dashboard-web/ 경로 구분 추가. Known Gaps에서 apps/dashboard-backend/ 완료 처리. |
 | 2026-05-26 | v1.2 | Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거. |
 | 2026-05-26 | v1.3 | Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현 완료. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 S3+CloudFront 배포 CI/CD. |
-| 2026-05-26 | v1.4 | Step 9 S3+CloudFront 배포 CI/CD 구현 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. |
+| 2026-05-26 | v1.4 | Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. |

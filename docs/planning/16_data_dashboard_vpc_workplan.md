@@ -3,7 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
-  - 2026-05-26 v1.4  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions workflow, IAM OIDC web deploy role(ADR 0023), Terraform apply 2 add 0 change 완료. GitHub repo-level Secret/Variable 등록 후 실제 배포 가능.
+  - 2026-05-26 v1.4  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 완료 반영. GitHub Actions workflow, IAM OIDC web deploy role(ADR 0023), Terraform apply 2 add 0 change, repo-level Secret/Variable 등록, S3 sync + CloudFront invalidation 완료.
   - 2026-05-26 v1.3  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. npm build/lint/test 통과. Step 9 배포 CI/CD 방향 명시.
   - 2026-05-26 v1.2  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
   - 2026-05-26 v1.1  Step 7 apply 완료 반영. Step 7.5 Route53 Hosted Zone 영구 분리 추가. Route53 hosted zone을 destroy 대상에서 제외, $0.50/월 영구 비용으로 분리. infra/data-dashboard-dns/ allowlist 추가.
@@ -394,9 +394,11 @@ GitHub 설정:
        VITE_COGNITO_AUTHORITY, VITE_COGNITO_DOMAIN, VITE_COGNITO_CLIENT_ID
        VITE_COGNITO_REDIRECT_URI, VITE_COGNITO_LOGOUT_URI
 
-미실행:
-  1. workflow_dispatch 또는 push로 실제 배포 트리거
-  2. https://dashboard.aegis-pi.cloud 접속 수기 확인
+배포 검증:
+  - dashboard-web workflow push run 성공
+  - S3 sync + CloudFront invalidation 완료
+  - https://dashboard.aegis-pi.cloud/ HTTP 200 확인
+  - https://api.aegis-pi.cloud/healthz HTTP 200 확인
 ```
 
 #### Step 9 Part 2 — End-to-end 통합 검증 (SPA 배포 후 진행)

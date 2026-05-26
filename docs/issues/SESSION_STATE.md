@@ -336,7 +336,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9 S3+CloudFront 배포 CI/CD 구현 및 IAM apply 완료. GitHub Actions secret/variables는 repo 수준 등록 완료. 다음: workflow 배포 실행 및 Step 9 end-to-end 통합 검증
+현재 단계: Phase 1 Step 9 S3+CloudFront 배포 CI/CD 구현/IAM apply/SPA 배포 완료. GitHub Actions secret/variables는 repo 수준 등록 완료. 다음: Step 9 end-to-end 통합 검증
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -690,7 +690,13 @@ Step 9 CI/CD 구현 완료 내용 (2026-05-26):
       - org-level 등록 시도는 현재 gh token의 admin:org 권한 부족으로 실패
       - repo-level secret AWS_OIDC_DASHBOARD_WEB_ROLE_ARN 등록 완료
       - repo-level variables 9종 등록 완료
-  + 미실행: 실제 S3 sync / CloudFront invalidation (workflow 실행 또는 push 후)
+  + 실제 배포:
+      - dashboard-web workflow push run 성공
+      - test job: 성공
+      - build-and-deploy job: 성공
+      - S3 sync + CloudFront invalidation 완료
+      - https://dashboard.aegis-pi.cloud/ HTTP 200 확인
+      - https://api.aegis-pi.cloud/healthz HTTP 200 확인
 
 등록된 GitHub Secret/Variable:
   GitHub Secrets (aegis-pi/dashboard_vpc repo 수준):
@@ -707,10 +713,8 @@ Step 9 CI/CD 구현 완료 내용 (2026-05-26):
     VITE_COGNITO_LOGOUT_URI          → https://dashboard.aegis-pi.cloud/
 
 다음 작업:
-  1. Step 9 변경분 commit/push
-  2. push로 실행되는 dashboard-web workflow 확인
-  3. https://dashboard.aegis-pi.cloud 접속 수기 확인
-  4. Step 9 end-to-end 통합 검증 (IoT → DDB → WebSocket → Dashboard SPA 전체 경로)
+  1. Step 9 end-to-end 통합 검증 (IoT → DDB → WebSocket → Dashboard SPA 전체 경로)
+  2. GitHub Actions Node 24 전환 경고/호환성 추적
 ```
 
 ### 2. 완료: Phase 1 Step 8 운영용 Frontend Vite + React 마이그레이션

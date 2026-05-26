@@ -166,6 +166,19 @@ aws s3 sync apps/dashboard-web/dist/ s3://kjw-aegis-data-web/ \
 - GitHub Actions workflow_dispatch 또는 push to main (apps/dashboard-web/** 변경)
 - 배포 후 `https://dashboard.aegis-pi.cloud` 접속 수기 확인
 
+### Step 9 검증 결과
+
+2026-05-26 기준:
+- Terraform apply: 2 added, 0 changed, 0 destroyed
+- Terraform post-apply plan: No changes
+- GitHub Actions `dashboard-web` push run: 성공
+- `test` job: 성공
+- `build-and-deploy` job: 성공
+- S3 sync: 성공
+- CloudFront invalidation: 성공
+- `https://dashboard.aegis-pi.cloud/`: HTTP 200
+- `https://api.aegis-pi.cloud/healthz`: HTTP 200
+
 ## Apply
 
 기본 도메인 `aegis-pi.cloud`:
