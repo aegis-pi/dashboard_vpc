@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 9.5 설계 완료 반영. ADR 0024 작성. § 5.4 Step 9.5 DoD 추가. TL;DR·§ 2·§ 10.1·§ 13 갱신.
   - 2026-05-26  Step 9 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. TL;DR·§ 2 갱신.
   - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공, Node 24 workflow runtime 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 end-to-end 통합 검증.
   - 2026-05-26  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. TL;DR·현재 구현 상태·Known Gaps 갱신. 다음 작업 Step 9로 전환.
@@ -23,7 +24,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 9 end-to-end 통합 검증 완료(2026-05-26). 다음: Step 10 LLM 보고서(팀원/후속) 또는 factory-a Edge Agent 재활성화 후 IoT→DDB 실시간 경로 재검증
+- **본 환경의 다음 작업**: Phase 1 Step 9.5 permanent resource split 설계 완료(2026-05-26). ADR 0024. 다음: infra/data-dashboard-permanent/ 신설 + terraform import/state rm + data-dashboard remote_state 참조 교체 (다음 세션)
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -49,7 +50,7 @@
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
-- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 end-to-end 통합 검증 완료 (2026-05-26). Backend HTTP 200, Dashboard Web HTTP 200, /factories 무인증 401, DDB ACTIVE+Streams, Lambda Active+ESM Enabled, IoT Rules Disabled=false, Cognito MFA=ON+Callback URL 일치, CloudFront Deployed, ECS running=1. 미검증: IoT→DDB 실시간 경로(factory-a Edge Agent 비활성), WebSocket 실시간 push(Cognito JWT 필요), Cognito 로그인 UI 수기
+- **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 end-to-end 통합 검증 완료 (2026-05-26). Phase 1 Step 9.5 permanent resource split 설계 완료 (2026-05-26). ADR 0024 작성. infra/data-dashboard-permanent/ 신규 root 구조, 의존성 분석, migration 순서 문서화 완료. 다음: migration 실행 세션
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
 - **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Step 7 Backend 활성화 완료(ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
 
@@ -322,6 +323,40 @@
 - 허용 파일: `.github/workflows/dashboard-web.yml`, `infra/data-dashboard/ecr.tf`, `infra/data-dashboard/outputs.tf`, `docs/ops/22_data_dashboard_vpc_runbook.md`, `docs/changes/0NNN-*`
 - 검증: 측정값을 `docs/ops/22_data_dashboard_vpc_runbook.md`의 `Step 9 검증 결과` 섹션에 시간·조건·해석과 함께 기록
 
+#### Phase 1 Step 9.5 — Permanent Resource Split (infra/data-dashboard-permanent/ 분리)
+
+- **이번 세션(설계)** 완료 (2026-05-26). **다음 세션에서 migration 실행**.
+- 목표: destroy/apply 반복 시 재설정 비용이 큰 자원을 `infra/data-dashboard-permanent/` 영구 root로 분리. Step 7.5의 Route53 분리 패턴 동일 적용 (import → state rm, No changes 확인).
+- DoD (다음 실행 세션):
+  - `infra/data-dashboard-permanent/` 신규 root 생성 (providers: ap-south-1 + us-east-1)
+  - `terraform -chdir=infra/data-dashboard-permanent plan` → No changes (import 완료 후)
+  - `terraform -chdir=infra/data-dashboard plan` → No changes (state rm 및 remote_state 참조 교체 후)
+  - destroy 없이 두 plan 모두 No changes를 동시에 얻어야 완료
+  - ADR 0024에 명시된 migration checklist 전 항목 완료
+- 이번 설계 세션 DoD:
+  - ADR 0024 작성 완료 ✅
+  - 영구화 리소스 분류 (그룹 A/B/C) 완료 ✅
+  - cross-root dependency 분석 완료 (ecs.tf 5개 참조 위치) ✅
+  - migration 순서 및 runbook checklist 문서화 완료 ✅
+  - git diff --check 통과 ✅
+- 허용 파일 (이번 설계 세션):
+  - `docs/changes/0024-data-dashboard-permanent-resource-split.md` (신규)
+  - `docs/planning/16_data_dashboard_vpc_workplan.md`
+  - `docs/issues/SESSION_STATE.md`
+  - `docs/AI_AGENT_HARNESS.md`
+  - `docs/ops/22_data_dashboard_vpc_runbook.md`
+  - `docs/ops/15_aws_cost_baseline.md`
+- 허용 파일 (다음 migration 실행 세션):
+  - `infra/data-dashboard-permanent/**` (신설)
+  - `infra/data-dashboard/*.tf` (remote_state 참조 교체)
+  - 문서 갱신
+- 금지 (이번 설계 세션 및 다음 migration 실행 세션 공통):
+  - `terraform apply`, `terraform import`, `terraform state mv/rm` — 이번 세션에서 실행 금지
+  - `infra/data-dashboard-permanent/` 실제 tf 파일 생성 — 이번 설계 세션에서 생성 금지
+  - `scripts/destroy/*` 실행 금지 (사용자 승인 없이)
+  - `infra/foundation/**`, `infra/hub/**` 수정 금지 (워크스트림 A)
+- 참조: `docs/changes/0024-data-dashboard-permanent-resource-split.md`, `docs/ops/22_data_dashboard_vpc_runbook.md § Permanent resource split migration checklist`
+
 #### Phase 1 Step 10 — 운영 문서 + 자동화 스크립트
 
 - 목표: `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh`, runbook, drawio 갱신, 비용 baseline 실측 재갱신
@@ -491,6 +526,7 @@
 - `.github/workflows/dashboard-web.yml` — **구현/배포 완료** (Phase 1 Step 9, 2026-05-26). test + build-and-deploy jobs 성공. Terraform apply 2 add 0 change. repo-level Secret/Variable 등록 완료
 - `infra/data-dashboard/ecr.tf` — Step 9: `github_oidc_web_deploy` IAM role 추가 완료 (ADR 0023)
 - `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
+- `infra/data-dashboard-permanent/` 미존재 — Phase 1 Step 9.5 migration 실행 세션에서 신설 예정 (ADR 0024)
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
 - `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (**Step 8 완료**)
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` — `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
@@ -571,4 +607,5 @@
 | 2026-05-26 | v1.1 | Step 6 완료 반영. TL;DR·§ 2·§ 10.1 갱신. Step 1 frontend/ vs apps/dashboard-web/ 경로 구분 추가. Known Gaps에서 apps/dashboard-backend/ 완료 처리. |
 | 2026-05-26 | v1.2 | Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 작업으로 분리. Backend Bedrock 권한/환경변수 제거. |
 | 2026-05-26 | v1.3 | Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현 완료. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. 다음 단계 Step 9 S3+CloudFront 배포 CI/CD. |
+| 2026-05-26 | v1.5 | Step 9.5 설계 완료 반영. ADR 0024. § 5.4 Step 9.5 DoD/허용/금지 추가. TL;DR·§ 2·§ 10.1·§ 13 갱신. |
 | 2026-05-26 | v1.4 | Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공, Node 24 workflow runtime 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. |

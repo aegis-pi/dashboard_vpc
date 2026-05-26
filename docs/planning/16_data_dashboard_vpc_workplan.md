@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v1.5  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. Step 9.5 추가. 다음: Step 9.5 migration 실행 세션.
   - 2026-05-26 v1.4  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 완료 반영. GitHub Actions workflow, IAM OIDC web deploy role(ADR 0023), Terraform apply 2 add 0 change, repo-level Secret/Variable 등록, S3 sync + CloudFront invalidation 완료. Workflow Node runtime은 Node 24 기준으로 확정.
   - 2026-05-26 v1.3  Step 8 완료 반영. apps/dashboard-web/ Vite+React SPA 구현. npm build/lint/test 통과. Step 9 배포 CI/CD 방향 명시.
   - 2026-05-26 v1.2  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. GitHub Secret은 organization 수준 등록으로 갱신.
@@ -416,6 +417,60 @@ GitHub 설정:
 - Redis hit/miss ratio
 - 운영 SPA: S3 + CloudFront 산출물 배포/캐시 무효화 후 주요 화면 수기 확인
 - 부하 테스트: k6/artillery WebSocket 100 concurrent connection
+```
+
+### Step 9.5 — Permanent Resource Split (infra/data-dashboard-permanent/ 분리) — 설계 완료, migration 대기 (2026-05-26, ADR 0024)
+
+```text
+목적:
+  destroy/apply 반복 시 재설정 비용이 큰 자원을 infra/data-dashboard-permanent/ 영구 root로 분리한다.
+  Cognito 도메인 유예 기간 충돌, ECR 이미지 이력 삭제, CloudFront ID 변경 등을 방지한다.
+  Step 7.5의 Route53 Hosted Zone 분리와 동일한 "import → state rm" 패턴 적용.
+
+이번 세션에서 완료한 내용 (2026-05-26):
+  + ADR 0024 작성 (docs/changes/0024-data-dashboard-permanent-resource-split.md)
+  + 의존성 분석 완료 (cross-root 참조 위치: ecs.tf 환경변수/IAM 5개 항목)
+  + migration 순서 및 checklist 문서화
+  + 허용 파일 및 금지 명령 정의
+
+다음 세션에서 실행할 내용:
+  1. infra/data-dashboard-permanent/ 신규 root 생성 (tf 파일 작성)
+     - backend: kjw-aegis-terraform-state / data-dashboard-permanent/terraform.tfstate
+     - providers: ap-south-1 (primary) + us-east-1 (ACM cloudfront cert)
+  2. terraform import (그룹 A 우선: Cognito → DynamoDB → ECR/OIDC → 그룹 B: S3 → CF → ACM → Route53)
+  3. terraform plan permanent → No changes 확인
+  4. terraform state rm (data-dashboard에서 영구 리소스 제거)
+  5. infra/data-dashboard/*.tf 수정: remote_state_permanent.tf 추가, resource 블록 제거, 참조 교체
+  6. terraform plan data-dashboard → No changes 확인
+
+영구 root (infra/data-dashboard-permanent/) 관리 리소스:
+  그룹 A: Cognito User Pool / App Client / Hosted UI Domain
+          DynamoDB aegis-daily-report
+          ECR aegis/dashboard-backend + lifecycle policy
+          GitHub OIDC roles (ECR push, web deploy)
+  그룹 B: S3 Web bucket kjw-aegis-data-web
+          CloudFront distribution + OAC
+          ACM CloudFront cert (us-east-1)
+          dashboard.aegis-pi.cloud Route53 record
+          CloudFront ACM validation records
+
+일시 root (infra/data-dashboard/) 유지 리소스:
+  VPC / NAT GW / Subnets / Route Tables / Endpoints
+  ECS / ALB / RDS / Redis / Lambda / IoT Rules / Notifier
+  api.aegis-pi.cloud Route53 record
+  ALB ACM cert (ap-south-1) + validation records
+  Secrets Manager / SGs / CloudWatch Logs
+
+cross-root 참조 (data-dashboard → permanent remote_state):
+  cognito_user_pool_id, cognito_app_client_id, ecr_repository_url,
+  dynamodb_daily_report_name, dynamodb_daily_report_arn
+
+destroy 후 잔여 비용 추가:
+  ~$0.50~0.55/월 (ECR storage ~$0.05/월 신규. Route53 $0.50/월 기존 포함)
+
+RDS 미영구화 결정:
+  비용 절감 목적($15.33/월)으로 일시 자원 유지.
+  Step 10에서 final snapshot restore runbook / automation을 별도 과제로 둔다.
 ```
 
 ### Step 10 — 운영 문서화 + 자동화 스크립트

@@ -4,6 +4,7 @@
 기준일: 2026-05-26
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-26 v2.2  Step 9.5 설계 완료 반영. infra/data-dashboard-permanent/ 영구 root 계획. destroy 후 잔여 비용에 permanent root 잔여 ~$0.50~0.55/월 추가 명세.
   - 2026-05-26 v2.1  Step 9 CI/CD 구현/적용/SPA 배포 반영. IAM role 1개 추가(상시 비용 없음). S3 PUT/GET/DELETE + CloudFront invalidation: usage-based 소량. 고정 비용 변화 없음.
   - 2026-05-26 v2.0  Step 8 Frontend SPA 로컬 구현 완료 반영. 신규 AWS 리소스 없음, 기존 S3/CloudFront 배포는 Step 9에서 진행.
   - 2026-05-26 v1.9  Step 7 Backend 활성화 반영. ECR `sha-9d2c200`, ECS desired/running 1, `/healthz` 200 확인. 리소스 상태 표를 active로 갱신.
@@ -56,6 +57,7 @@
 | ACM | public certificate for Admin UI hosts | 1 regional certificate set | active / ISSUED |
 | ALB | `aegis-admin-ui` | 1 | active |
 | Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 112 state objects | active (Step 7~9 apply 완료). `terraform plan` No changes |
+| Data/Dashboard VPC | `infra/data-dashboard-permanent/` Terraform | 계획 중 | **planning** (Step 9.5 migration 실행 세션에서 신설 예정). Cognito / ECR / DDB daily-report / S3-web / CloudFront / ACM CF cert / OIDC roles 영구화 대상 |
 | Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | active, 유지 |
 | Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 1 zone | **active (영구 자원)**. Step 7.5 이후 `infra/data-dashboard-dns/` root가 관리. `infra/data-dashboard` destroy 대상에서 제외. `$0.50/월` 상시 발생 |
 | Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs × 5 / Cognito / S3-web | 1 set | active (Step 7 apply 이후) |
@@ -220,9 +222,28 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | --- | ---: | ---: | ---: |
 | 상시 가동 (24/7) | ~$123.08/월 | ~$1.85/월 | **`~$124.93 / month`** |
 | 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.85/월 | **`~$8.40 / month`** |
-| destroy 후 (Terraform backend S3 + RDS PostgreSQL snapshot + Route53 hosted zone) | snapshot/storage 기준 + hosted zone $0.50/월 | ~$0.60/월 | **Route53 hosted zone은 영구 자원 (Step 7.5 분리). snapshot 크기에 따라 추가** |
+| destroy 후 (Step 9.5 이전 — Route53 hosted zone + RDS snapshot) | snapshot/storage 기준 + hosted zone $0.50/월 | ~$0.60/월 | Route53 hosted zone은 영구 자원 (Step 7.5 분리). snapshot 크기에 따라 추가 |
+| destroy 후 (Step 9.5 migration 완료 후 — permanent root 잔여) | permanent root 고정 $0.50/월 + ECR ~$0.05/월 | ~$0.05/월 | **~$0.50~0.55/월 (Route53 $0.50 + ECR ~$0.05)**. Cognito/DDB/S3-web/CloudFront/ACM/IAM: ~$0.00. 상세는 아래 표 참조 |
 
 factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write/Bedrock token이 메시지 수에 가장 민감.
+
+### infra/data-dashboard destroy 후 잔여 비용 (Step 9.5 permanent root 분리 완료 후)
+
+Step 9.5 migration 완료 후 `infra/data-dashboard`를 destroy해도 아래 리소스는 `infra/data-dashboard-permanent/`와 `infra/data-dashboard-dns/`가 관리하므로 삭제되지 않는다.
+
+| 영구 root | 리소스 | 월 비용 | 비고 |
+| --- | --- | ---: | --- |
+| `infra/data-dashboard-dns/` | Route53 hosted zone `aegis-pi.cloud` | `$0.50` | 고정 (Step 7.5 분리 완료) |
+| `infra/data-dashboard-permanent/` | Cognito User Pool (0 MAU) | `$0.00` | 50,000 MAU 무료 티어 |
+| `infra/data-dashboard-permanent/` | ECR `aegis/dashboard-backend` 이미지 스토리지 (~0.5 GB) | `~$0.05` | `$0.10/GB-month` |
+| `infra/data-dashboard-permanent/` | DynamoDB `aegis-daily-report` (빈 테이블, on-demand) | `$0.00` | 0 req → WCU/RCU 0 |
+| `infra/data-dashboard-permanent/` | S3 web bucket `kjw-aegis-data-web` (< 50 MB) | `~$0.00` | usage-based 소량 |
+| `infra/data-dashboard-permanent/` | CloudFront distribution (비가동 시) | `~$0.00` | HTTP request 0이면 $0 |
+| `infra/data-dashboard-permanent/` | ACM CloudFront cert (us-east-1) | `$0.00` | 무료 |
+| `infra/data-dashboard-permanent/` | GitHub OIDC IAM roles (ECR push + web deploy) | `$0.00` | IAM 무료 |
+| **합계** | | **`~$0.55/월`** | Route53 $0.50 + ECR ~$0.05 |
+
+> RDS PostgreSQL final snapshot은 Step 9.5 이후에도 destroy 시 S3 snapshot storage로 발생. Step 10에서 snapshot restore runbook / automation 완료 후 snapshot 삭제 가능.
 
 > **참고**: ADR 0017 이후 17_expansion_roadmap.md의 Phase 1 비용 추정은 RDS PostgreSQL 기준으로 낮아졌다. 본 표가 실비 산정 기준이다.
 

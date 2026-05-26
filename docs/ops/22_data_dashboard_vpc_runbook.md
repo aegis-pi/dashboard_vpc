@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26 v0.5  Step 9.5 permanent resource split migration checklist 추가. ADR 0024 참조.
   - 2026-05-26 v0.4  Step 9 end-to-end 통합 검증 결과 섹션 추가. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료 항목과 미검증 항목 분리 기록.
   - 2026-05-26 v0.3  Step 9 S3+CloudFront 배포 CI/CD 구현 반영. GitHub Actions workflow, IAM role, GitHub Secret/Variable 목록 추가.
   - 2026-05-26 v0.2  Step 7.5 Route53 Hosted Zone 영구 분리 반영. `infra/data-dashboard-dns/`와 state 이전 절차 추가.
@@ -98,6 +99,279 @@ terraform state rm은 AWS 리소스를 삭제하지 않는다.
 Terraform state에서만 추적을 해제한다.
 
 이 절차 중 destroy 명령은 실행하지 않는다.
+```
+
+## Permanent Resource Split Migration Checklist (Step 9.5, ADR 0024)
+
+이 절차는 **destroy 없이** infra/data-dashboard 상태에서 infra/data-dashboard-permanent/ 신규 root로 리소스를 이전한다. 각 단계 완료 후 체크하고 다음으로 진행한다.
+
+참조: `docs/changes/0024-data-dashboard-permanent-resource-split.md`
+
+### 전제 확인
+
+```bash
+# 두 root 모두 No changes 상태여야 한다
+terraform -chdir=infra/data-dashboard plan -detailed-exitcode
+terraform -chdir=infra/data-dashboard-dns plan -detailed-exitcode
+```
+
+- [ ] infra/data-dashboard plan: No changes (exit 0)
+- [ ] infra/data-dashboard-dns plan: No changes (exit 0)
+
+### Phase 1 — infra/data-dashboard-permanent/ 신규 root 생성
+
+```bash
+# 1. 파일 생성 후 init
+terraform -chdir=infra/data-dashboard-permanent init
+
+# 2. validate/fmt-check
+terraform -chdir=infra/data-dashboard-permanent validate
+terraform -chdir=infra/data-dashboard-permanent fmt -check
+
+# 3. plan (import 전, 모든 resource가 "will be created" 상태)
+terraform -chdir=infra/data-dashboard-permanent plan
+```
+
+- [ ] providers.tf: ap-south-1 (primary) + us-east-1 (ACM cloudfront) 구성
+- [ ] backend: `kjw-aegis-terraform-state` / `data-dashboard-permanent/terraform.tfstate`
+- [ ] validate 통과
+- [ ] fmt-check 통과
+
+### Phase 2 — terraform import (그룹 A 우선)
+
+각 import 후 plan을 실행해 drift 없음을 확인한다.
+
+```bash
+# 현재 리소스 ID 확인 (apply 전)
+terraform -chdir=infra/data-dashboard output cognito_user_pool_id
+terraform -chdir=infra/data-dashboard output cognito_app_client_id
+terraform -chdir=infra/data-dashboard output s3_web_bucket_name
+terraform -chdir=infra/data-dashboard output cloudfront_distribution_id
+terraform -chdir=infra/data-dashboard output dynamodb_daily_report_name
+terraform -chdir=infra/data-dashboard output dashboard_backend_ecr_repository_url
+```
+
+그룹 A import 순서:
+
+```bash
+# Cognito User Pool
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_cognito_user_pool.this <USER_POOL_ID>
+
+# Cognito App Client
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_cognito_user_pool_client.this "<USER_POOL_ID>/<CLIENT_ID>"
+
+# Cognito Hosted UI Domain
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_cognito_user_pool_domain.this <DOMAIN_PREFIX>
+
+# DynamoDB aegis-daily-report
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_dynamodb_table.daily_report aegis-daily-report
+
+# ECR repository
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_ecr_repository.dashboard_backend aegis/dashboard-backend
+
+# ECR lifecycle policy
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_ecr_lifecycle_policy.dashboard_backend aegis/dashboard-backend
+
+# OIDC role: ECR push
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_iam_role.github_oidc_ecr_push KJW-AEGIS-Data-IAMRole-OIDC-ECRPush
+
+# OIDC role: web deploy
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_iam_role.github_oidc_web_deploy KJW-AEGIS-Data-IAMRole-OIDC-WebDeploy
+```
+
+그룹 B import 순서:
+
+```bash
+# S3 web bucket
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_s3_bucket.web kjw-aegis-data-web
+
+# S3 public access block
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_s3_bucket_public_access_block.web kjw-aegis-data-web
+
+# S3 versioning
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_s3_bucket_versioning.web kjw-aegis-data-web
+
+# S3 bucket policy
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_s3_bucket_policy.web kjw-aegis-data-web
+
+# CloudFront OAC
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_cloudfront_origin_access_control.web <OAC_ID>
+
+# CloudFront distribution
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_cloudfront_distribution.web <DISTRIBUTION_ID>
+
+# ACM cloudfront cert (us-east-1)
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_acm_certificate.cloudfront <CF_CERT_ARN>
+
+# ACM cloudfront cert validation resource
+terraform -chdir=infra/data-dashboard-permanent import \
+  aws_acm_certificate_validation.cloudfront <CF_CERT_ARN>
+
+# Route53 dashboard record
+terraform -chdir=infra/data-dashboard-permanent import \
+  "aws_route53_record.web_cloudfront" "<ZONE_ID>_dashboard.aegis-pi.cloud_A"
+```
+
+- [ ] 그룹 A import 완료 (Cognito / DynamoDB / ECR / OIDC roles)
+- [ ] 그룹 B import 완료 (S3 / CloudFront / ACM / Route53 record)
+
+### Phase 3 — permanent plan No changes 확인
+
+```bash
+terraform -chdir=infra/data-dashboard-permanent plan -detailed-exitcode
+# exit 0 기대
+```
+
+- [ ] permanent plan: No changes (exit 0)
+
+### Phase 4 — data-dashboard state rm (역순)
+
+```bash
+# state rm은 AWS 리소스를 삭제하지 않는다
+terraform -chdir=infra/data-dashboard state rm \
+  aws_route53_record.web_cloudfront
+terraform -chdir=infra/data-dashboard state rm \
+  aws_acm_certificate_validation.cloudfront
+terraform -chdir=infra/data-dashboard state rm \
+  "aws_route53_record.cf_cert_validation[\"dashboard.aegis-pi.cloud\"]"
+terraform -chdir=infra/data-dashboard state rm \
+  aws_acm_certificate.cloudfront
+terraform -chdir=infra/data-dashboard state rm \
+  aws_cloudfront_distribution.web
+terraform -chdir=infra/data-dashboard state rm \
+  aws_cloudfront_origin_access_control.web
+terraform -chdir=infra/data-dashboard state rm \
+  aws_s3_bucket_policy.web
+terraform -chdir=infra/data-dashboard state rm \
+  aws_s3_bucket_versioning.web
+terraform -chdir=infra/data-dashboard state rm \
+  aws_s3_bucket_public_access_block.web
+terraform -chdir=infra/data-dashboard state rm \
+  aws_s3_bucket.web
+terraform -chdir=infra/data-dashboard state rm \
+  aws_iam_role_policy.github_oidc_web_deploy
+terraform -chdir=infra/data-dashboard state rm \
+  aws_iam_role.github_oidc_web_deploy
+terraform -chdir=infra/data-dashboard state rm \
+  aws_iam_role_policy.github_oidc_ecr_push
+terraform -chdir=infra/data-dashboard state rm \
+  aws_iam_role.github_oidc_ecr_push
+terraform -chdir=infra/data-dashboard state rm \
+  aws_ecr_lifecycle_policy.dashboard_backend
+terraform -chdir=infra/data-dashboard state rm \
+  aws_ecr_repository.dashboard_backend
+terraform -chdir=infra/data-dashboard state rm \
+  aws_dynamodb_table.daily_report
+terraform -chdir=infra/data-dashboard state rm \
+  aws_cognito_user_pool_domain.this
+terraform -chdir=infra/data-dashboard state rm \
+  aws_cognito_user_pool_client.this
+terraform -chdir=infra/data-dashboard state rm \
+  aws_cognito_user_pool.this
+```
+
+- [ ] state rm 완료
+
+### Phase 5 — infra/data-dashboard/*.tf 수정
+
+변경 사항:
+
+```text
+신설:
+  infra/data-dashboard/remote_state_permanent.tf
+    data "terraform_remote_state" "permanent" {
+      backend = "s3"
+      config = {
+        bucket = "kjw-aegis-terraform-state"
+        key    = "data-dashboard-permanent/terraform.tfstate"
+        region = "ap-south-1"
+      }
+    }
+
+제거 대상 resource 블록:
+  cognito.tf: aws_cognito_user_pool, aws_cognito_user_pool_client, aws_cognito_user_pool_domain
+  dynamodb.tf: aws_dynamodb_table.daily_report
+  ecr.tf: aws_ecr_repository.dashboard_backend, aws_ecr_lifecycle_policy.dashboard_backend
+          aws_iam_role.github_oidc_ecr_push, aws_iam_role_policy.github_oidc_ecr_push
+          aws_iam_role.github_oidc_web_deploy, aws_iam_role_policy.github_oidc_web_deploy
+          data/locals for OIDC provider (permanent에 이동)
+  s3_web.tf: 모든 resource 블록 (aws_s3_bucket.web*, data.aws_iam_policy_document.s3_web_oac)
+  cloudfront.tf: 모든 resource 블록
+  acm.tf: cloudfront 관련 resource 블록 (alb 관련은 유지)
+  route53.tf: aws_route53_record.web_cloudfront (api_alb는 유지)
+
+참조 교체 위치 (ecs.tf):
+  aws_ecr_repository.dashboard_backend.repository_url
+    → data.terraform_remote_state.permanent.outputs.ecr_repository_url
+  aws_cognito_user_pool.this.id
+    → data.terraform_remote_state.permanent.outputs.cognito_user_pool_id
+  aws_cognito_user_pool_client.this.id
+    → data.terraform_remote_state.permanent.outputs.cognito_app_client_id
+  aws_dynamodb_table.daily_report.name
+    → data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_name
+  aws_dynamodb_table.daily_report.arn
+    → data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_arn
+```
+
+- [ ] remote_state_permanent.tf 신설
+- [ ] cognito.tf resource 블록 제거
+- [ ] dynamodb.tf daily_report resource 블록 제거
+- [ ] ecr.tf 영구 resource 블록 제거
+- [ ] s3_web.tf 모든 resource 블록 제거
+- [ ] cloudfront.tf 모든 resource 블록 제거
+- [ ] acm.tf cloudfront 관련 블록 제거
+- [ ] route53.tf web_cloudfront record 제거
+- [ ] ecs.tf 참조 교체 완료
+
+### Phase 6 — data-dashboard plan No changes 확인
+
+```bash
+terraform -chdir=infra/data-dashboard validate
+terraform -chdir=infra/data-dashboard fmt -check
+terraform -chdir=infra/data-dashboard plan -detailed-exitcode
+# exit 0 기대
+```
+
+- [ ] data-dashboard validate 통과
+- [ ] data-dashboard fmt-check 통과
+- [ ] data-dashboard plan: No changes (exit 0)
+
+### 최종 확인
+
+```bash
+# 워크스트림 A 영향 없음 확인
+terraform -chdir=infra/hub plan -detailed-exitcode
+terraform -chdir=infra/foundation plan -detailed-exitcode
+git diff --check
+```
+
+- [ ] hub plan: No changes
+- [ ] foundation plan: No changes
+- [ ] git diff --check 통과
+- [ ] 민감 정보 미포함 확인
+
+주의:
+
+```text
+- state rm 각 단계 후 plan을 실행해 의도치 않은 destroy가 계획되지 않는지 확인한다.
+- state rm은 AWS 리소스를 삭제하지 않는다. Terraform state에서만 추적을 해제한다.
+- destroy 명령은 절대 실행하지 않는다.
+- import 순서가 잘못되면 plan에 diff가 생긴다. 반드시 각 import 후 plan 확인 후 진행한다.
 ```
 
 ## Step 9 CI/CD — Dashboard Web S3+CloudFront 배포

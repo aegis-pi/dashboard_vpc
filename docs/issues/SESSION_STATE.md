@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-26
 수정 이력:
+  - 2026-05-26  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. 의존성 분석, migration 순서 문서화. 다음: Step 9.5 migration 실행 (다음 세션, infra/data-dashboard-permanent/ 신설 + import/state rm/apply).
   - 2026-05-26  Step 9 Part 2 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. 다음: Step 10(LLM 보고서, 팀원) 또는 데모 준비.
   - 2026-05-26  Step 9 S3+CloudFront 배포 CI/CD 구현 완료 반영. GitHub Actions dashboard-web.yml, IAM OIDC web deploy role(ADR 0023), Terraform plan 2 add 0 change 확인. Workflow Node runtime은 Node 24 기준으로 확정.
   - 2026-05-26  Step 8 운영용 Frontend Vite + React 마이그레이션 완료 반영. apps/dashboard-web/ SPA 구현. npm run build/lint/test 통과.
@@ -337,7 +338,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9 end-to-end 통합 검증 완료(2026-05-26). Backend/Web/Auth/DDB/ECS/IoT/Cognito/CloudFront 검증 항목 통과. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증(인프라 정상). 다음: Step 10(LLM 보고서, 팀원/후속) 또는 데모 준비
+현재 단계: Phase 1 Step 9.5 permanent resource split 설계 완료(2026-05-26). ADR 0024 작성. infra/data-dashboard-permanent/ 신규 root에 관리할 리소스 분류 및 의존성 분석 완료. 다음: Step 9.5 migration 실행 (infra/data-dashboard-permanent/ 신설 + terraform import/state rm + data-dashboard remote_state 참조 교체)
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -657,7 +658,24 @@ secret exists, DATA=4
 
 ## 다음에 할 일
 
-### 0. 완료: Phase 1 Step 9 Part 2 end-to-end 통합 검증 (2026-05-26)
+### 0. 다음: Phase 1 Step 9.5 — Permanent Resource Split migration 실행
+
+```text
+설계 완료 (2026-05-26): ADR 0024, migration checklist 작성 완료
+다음 세션에서 실행:
+  1. infra/data-dashboard-permanent/ 신규 root 생성 (tf 파일 작성)
+     - backend: kjw-aegis-terraform-state / data-dashboard-permanent/terraform.tfstate
+     - providers: ap-south-1 (primary) + us-east-1 (ACM cloudfront)
+  2. terraform import: Cognito → DynamoDB → ECR/OIDC roles → S3 → CloudFront/OAC → ACM → Route53 record
+  3. terraform plan permanent → No changes 확인
+  4. terraform state rm: data-dashboard root에서 영구 리소스 제거 (역순)
+  5. infra/data-dashboard/*.tf: remote_state_permanent.tf 추가, resource 블록 제거, 참조 교체
+  6. terraform plan data-dashboard → No changes 확인
+상세: docs/changes/0024-data-dashboard-permanent-resource-split.md
+     docs/ops/22_data_dashboard_vpc_runbook.md § Permanent resource split migration checklist
+```
+
+### 1. 완료: Phase 1 Step 9 Part 2 end-to-end 통합 검증 (2026-05-26)
 
 ```text
 검증 완료 항목:
