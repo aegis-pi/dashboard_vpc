@@ -3,10 +3,12 @@ export type RiskLevel = 'safe' | 'warning' | 'danger'
 export type PipelineStatus = 'normal' | 'warning' | 'critical'
 
 // ─── Top cause entry ─────────────────────────────────────────────────
+// Real DDB data from risk.py uses `field` key; legacy/test data uses `name`.
 export interface TopCause {
-  name: string
-  value: number
-  contribution: number
+  name?: string
+  field?: string
+  value?: number
+  contribution?: number
 }
 
 // ─── Factory summary (from GET /factories) ───────────────────────

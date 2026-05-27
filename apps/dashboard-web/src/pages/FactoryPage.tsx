@@ -193,7 +193,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
             : (
               <div className="grid row3">
                 {causes.slice(0, 3).map((c, i) => {
-                  const name = typeof c === 'string' ? c : c.name
+                  const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
                   const value = typeof c === 'string' ? null : c.value
                   const contribution = typeof c === 'string' ? null : c.contribution
                   return (

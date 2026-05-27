@@ -18,7 +18,7 @@ export function adaptFactorySummary(f: FactorySummary): FactoryViewModel {
   const rawCauses = f.top_causes ?? f.risk?.top_causes ?? []
   const top_causes = rawCauses.map((c) => {
     if (typeof c === 'string') return { name: c }
-    return { name: c.name, value: c.value, contribution: c.contribution }
+    return { name: c.name ?? c.field ?? '?', value: c.value, contribution: c.contribution }
   })
   return {
     factory_id: f.factory_id,
@@ -28,7 +28,7 @@ export function adaptFactorySummary(f: FactorySummary): FactoryViewModel {
     node_ready: f.node_ready ?? f.infra_state?.node_summary?.ready,
     node_total: f.node_total ?? f.infra_state?.node_summary?.total,
     pipeline: (f.pipeline_status as string | undefined) ?? 'normal',
-    env_type: (f as unknown as Record<string, unknown>).environment_type as string | undefined,
+    env_type: f.environment_type,
     updated_at: f.updated_at,
     last_factory_state_at: f.last_factory_state_at,
     last_infra_state_at: f.last_infra_state_at,

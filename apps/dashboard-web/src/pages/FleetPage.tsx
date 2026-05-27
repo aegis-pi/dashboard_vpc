@@ -358,7 +358,7 @@ function FactoryCard({
         {causes.length === 0
           ? <div className="micro">미계산</div>
           : causes.slice(0, 3).map((c, i) => {
-              const name = typeof c === 'string' ? c : c.name
+              const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
               const contribution = typeof c === 'string' ? null : c.contribution
               return (
                 <div key={i} style={{
