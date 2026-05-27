@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27  Aegis-frontend reference 추가와 운영 Dashboard UI 포팅 진행 상태 반영. web `e055583`, backend ECS image `sha-3b8439f`, `/healthz` 200, post-apply plan No changes.
   - 2026-05-27  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. commit `439e27a`, backend/web CI 성공, ECS backend image `sha-439e27a`, `/healthz` 200, post-apply plan No changes.
   - 2026-05-27  post-migration permanent diff 정리 완료 반영. infra/data-dashboard-permanent apply: 0 added, 3 changed, 0 destroyed. 이후 permanent/dns plan No changes, state count 0/25/1 확인.
   - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신규 root, 25 resources import, data-dashboard state rm 20개, 엔드포인트 HTTP 200 확인. 다음은 post-migration plan diff 정리 및 Step 10.
@@ -27,7 +28,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 9.5 permanent resource split migration, 임시 root 재기동, 운영 Dashboard UI/실데이터 shape 정합성 수정 배포 완료. 다음: 사용자 수동 테스트/캡처 후 Step 10 운영 자동화/문서화
+- **본 환경의 다음 작업**: Aegis-frontend 기준 운영 Dashboard UI 포팅 진행 중. web `e055583` 배포 완료, backend ECS image `sha-3b8439f` 적용 완료. 다음: 사용자 수동 화면 비교/캡처 후 남은 시각 차이 정리 또는 Step 10 운영 자동화/문서화
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -55,7 +56,7 @@
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
 - **완료(워크스트림 B · 본 환경)**: Phase 1 Step 9 end-to-end 통합 검증 완료 (2026-05-26). Phase 1 Step 9.5 permanent resource split migration 완료 (2026-05-26). `infra/data-dashboard-permanent/` 신규 root 생성, 25 resources import, `infra/data-dashboard` state rm 20개 완료. 양쪽 plan에 permanent destroy 없음
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Data/Dashboard Backend 활성(ECR `sha-439e27a`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
+- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Data/Dashboard Backend 활성(ECR `sha-3b8439f`, ECS desired/running 1, `/healthz` 200). Route53 hosted zone aegis-pi.cloud 활성 (`infra/data-dashboard-dns`가 영구 관리)
 
 본 환경의 시점별 정확한 상태 스냅샷은 항상 `docs/issues/SESSION_STATE.md`를 우선한다. 본 harness 본문은 phase 경계와 책임 경계만 정의한다.
 
