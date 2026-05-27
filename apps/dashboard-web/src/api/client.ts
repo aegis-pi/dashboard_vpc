@@ -73,7 +73,7 @@ export async function fetchFactory(factoryId: string): Promise<FactoryDetail> {
 
 export async function fetchFactoryHistory(
   factoryId: string,
-  window: '1h' | '2h' | '24h' = '1h',
+  window: '1h' | '6h' | '12h' | '24h' = '1h',
 ): Promise<HistoryItem[]> {
   const raw = await apiFetch<unknown>(`/factories/${factoryId}/history?window=${window}`)
 

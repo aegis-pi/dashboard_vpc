@@ -9,9 +9,10 @@ export interface TopCause {
   contribution: number
 }
 
-// ─── Factory summary (from GET /factories) ───────────────────────────
+// ─── Factory summary (from GET /factories) ───────────────────────
 export interface FactorySummary {
   factory_id: string
+  environment_type?: string
   display_status?: string
   risk_score?: number
   risk_level?: RiskLevel
@@ -48,9 +49,23 @@ export interface FleetResponse {
   factories: FactorySummary[]
 }
 
+// ─── Device entry (nested format from infra_state.devices) ──────────
+export interface DeviceEntry {
+  available?: boolean | null
+  last_seen_at?: string | null
+}
+
+// ─── Heartbeat ───────────────────────────────────────────────────────
+export interface HeartbeatState {
+  agent_status?: string | null
+  last_spool_write_status?: string | null
+  last_spool_write_at?: string | null
+}
+
 // ─── Factory detail (from GET /factories/{id}) ───────────────────────
 export interface FactoryDetail {
   factory_id: string
+  environment_type?: string
   display_status?: string
   risk?: {
     score?: number
@@ -94,11 +109,20 @@ export interface FactoryDetail {
       restart_count_total?: number
     }
     workloads?: WorkloadStatus[]
+    // nested device format: { bme280: { available, last_seen_at }, ... }
+    devices?: {
+      bme280?: DeviceEntry
+      camera?: DeviceEntry
+      microphone?: DeviceEntry
+    }
+    // flat legacy format
     device_summary?: {
       bme280_available?: boolean | null
       camera_available?: boolean | null
       microphone_available?: boolean | null
     }
+    heartbeat?: HeartbeatState
+    source_timestamp?: string
   }
   pipeline_status?: {
     status?: PipelineStatus
@@ -114,15 +138,19 @@ export interface FactoryDetail {
 // ─── Node / workload status ──────────────────────────────────────────
 export interface NodeStatus {
   node_id: string
+  role?: string | null
   ready?: boolean
   cpu_usage_percent?: number | null
   memory_usage_percent?: number | null
   disk_usage_percent?: number | null
+  network_reachability?: string | null
 }
 
 export interface WorkloadStatus {
   name: string
+  namespace?: string | null
   status?: string
+  ready?: boolean | null
   node_id?: string
   restart_count?: number
 }

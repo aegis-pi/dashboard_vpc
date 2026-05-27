@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutGrid,
@@ -12,7 +13,7 @@ import { ConnStatus } from './ConnStatus'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────
 interface SidebarProps {
-  factories?: { factory_id: string; risk_level?: string }[]
+  factories?: { factory_id: string; risk_level?: string; risk_score?: number }[]
 }
 
 export function Sidebar({ factories = [] }: SidebarProps) {
@@ -22,47 +23,77 @@ export function Sidebar({ factories = [] }: SidebarProps) {
   const isFleet = location.pathname === '/'
   const isReports = location.pathname === '/reports'
 
+  // Parse current factory ID from the URL so the Factories section never
+  // disappears during loading — even on direct URL access or page refresh.
+  const urlFactoryId = location.pathname.startsWith('/factory/')
+    ? location.pathname.slice('/factory/'.length).split('/')[0] ?? null
+    : null
+
+  // If the prop list is empty but we're on a factory route, show a placeholder
+  // row for the current factory so the section header stays visible.
+  const visibleFactories =
+    factories.length > 0
+      ? factories
+      : urlFactoryId
+        ? [{ factory_id: urlFactoryId, risk_level: undefined as string | undefined, risk_score: undefined as number | undefined }]
+        : []
+
   return (
     <nav className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-mark">π</div>
-        <div>
-          <div className="sidebar-title">Aegis·π</div>
+        <div className="sidebar-logo-mark">
+          <span className="serif" style={{ fontSize: 18, lineHeight: 1 }}>π</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+          <div className="sidebar-title">
+            Aegis<span style={{ color: 'var(--chrome-ink-3)' }}>·</span>
+            <span style={{ fontFamily: 'var(--font-serif)', fontSize: 17 }}>π</span>
+          </div>
           <div className="sidebar-subtitle">Risk Twin</div>
         </div>
       </div>
 
       {/* Navigation */}
       <div className="sidebar-nav">
-        <div className="sidebar-nav-label">관제</div>
+        <div className="sidebar-nav-label">Fleet</div>
 
         <button
           className={`nav-item ${isFleet ? 'active' : ''}`}
           onClick={() => navigate('/')}
         >
           <LayoutGrid size={15} />
-          Fleet Overview
+          <span style={{ flex: 1 }}>전체 개요</span>
+          {factories.length > 0 && (
+            <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
+              {factories.length}
+            </span>
+          )}
         </button>
 
-        {factories.length > 0 && (
+        {visibleFactories.length > 0 && (
           <>
             <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Factories</div>
-            {factories.map((f) => {
+            {visibleFactories.map((f) => {
               const isActive = location.pathname === `/factory/${f.factory_id}`
-              const tone =
-                f.risk_level === 'danger' ? 'crit' :
-                f.risk_level === 'warning' ? 'warn' : ''
+              const dotColor =
+                f.risk_level === 'danger' ? 'var(--crit)' :
+                f.risk_level === 'warning' ? 'var(--warn)' :
+                f.risk_level === 'safe' ? 'var(--safe)' : 'var(--chrome-ink-3)'
               return (
                 <button
                   key={f.factory_id}
                   className={`nav-item ${isActive ? 'active' : ''}`}
                   onClick={() => navigate(`/factory/${f.factory_id}`)}
                 >
-                  <span className="mono" style={{ fontSize: 12 }}>{f.factory_id}</span>
-                  {tone && (
-                    <span className={`nav-item-badge ${tone}`}>
-                      {f.risk_level === 'danger' ? '위험' : '주의'}
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: dotColor, flexShrink: 0,
+                  }} />
+                  <span style={{ flex: 1 }}>{f.factory_id}</span>
+                  {f.risk_score != null && (
+                    <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
+                      {f.risk_score}
                     </span>
                   )}
                 </button>
@@ -71,13 +102,13 @@ export function Sidebar({ factories = [] }: SidebarProps) {
           </>
         )}
 
-        <div className="sidebar-nav-label" style={{ marginTop: 8 }}>보고서</div>
+        <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Workspace</div>
         <button
           className={`nav-item ${isReports ? 'active' : ''}`}
           onClick={() => navigate('/reports')}
         >
           <FileText size={15} />
-          일간 보고서
+          <span style={{ flex: 1 }}>일간 보고서</span>
         </button>
       </div>
 
@@ -111,6 +142,16 @@ interface TopBarProps {
 }
 
 export function TopBar({ crumbs, onBack, wsStatus, wsMessage, onRefresh }: TopBarProps) {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const ss = String(now.getSeconds()).padStart(2, '0')
+
   return (
     <div className="topbar">
       {onBack && (
@@ -132,12 +173,23 @@ export function TopBar({ crumbs, onBack, wsStatus, wsMessage, onRefresh }: TopBa
 
       <div className="topbar-actions">
         {wsStatus && <ConnStatus status={wsStatus} lastMessage={wsMessage} />}
+
         {onRefresh && (
-          <button className="btn" onClick={onRefresh}>
+          <button className="btn ghost" onClick={onRefresh} title="수동 새로고침" style={{ padding: '4px 8px' }}>
             <RefreshCw size={13} />
-            새로고침
           </button>
         )}
+
+        {/* Live clock */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          fontSize: 11.5, color: 'var(--ink-3)',
+          whiteSpace: 'nowrap', flexShrink: 0,
+          borderLeft: '1px solid var(--line)',
+          marginLeft: 4, paddingLeft: 12,
+        }}>
+          <span className="mono tnum">{hh}:{mm}:{ss}</span>
+        </div>
       </div>
     </div>
   )
@@ -146,7 +198,7 @@ export function TopBar({ crumbs, onBack, wsStatus, wsMessage, onRefresh }: TopBa
 // ─── Shell layout wrapper ─────────────────────────────────────────────
 interface ShellProps {
   children: React.ReactNode
-  factories?: { factory_id: string; risk_level?: string }[]
+  factories?: { factory_id: string; risk_level?: string; risk_score?: number }[]
   crumbs: Crumb[]
   onBack?: (() => void) | null
   wsStatus?: WsStatus
