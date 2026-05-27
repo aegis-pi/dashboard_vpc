@@ -4,6 +4,7 @@
 기준일: 2026-05-27
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-27 v2.7  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. backend image `sha-439e27a`, web/backend GitHub Actions 성공. 신규 AWS 리소스/고정 비용 변화 없음.
   - 2026-05-27 v2.6  사용자 요청으로 infra/data-dashboard 일시 root 재기동 완료 반영. VPC/NAT/ALB/ECS/RDS/Redis/Lambda/IoT Rules active, API /healthz HTTP 200. 비용 기준은 Phase 1 가동 시 표 적용.
   - 2026-05-27 v2.5  post-migration permanent diff 정리 완료 반영. DynamoDB daily-report PITR/deletion protection 활성화. 빈 테이블 기준 비용 영향은 미미하며 PITR은 데이터 증가 시 사용량 기반.
   - 2026-05-26 v2.4  Step 9.5 이후 infra/data-dashboard destroy 완료 반영. 일시 root state empty, permanent/dns root 유지, 잔여 비용 기준 갱신.
@@ -82,8 +83,8 @@
 | Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 | active |
 | Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 | active |
 | Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 | active |
-| Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과 |
-| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-9d2c200` push 확인 |
+| Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료. 2026-05-27 UI/data shape 정합성 수정 후 pytest 25 passed |
+| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-439e27a` push 확인 |
 | Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 1 running task | active, desired/running 1, target healthy |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 | active |
@@ -95,7 +96,7 @@
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- 1번 Data/Dashboard VPC Step 7 Backend는 active. ECS desired/running 1, ECR image `sha-9d2c200`, `/healthz` 200 확인
+- 1번 Data/Dashboard VPC Backend는 active. ECS desired/running 1, ECR image `sha-439e27a`, `/healthz` 200 확인
 - Lambda report-generator / Bedrock 일간 보고서는 팀원/후속 작업으로 현재 Step 8 범위가 아님
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산

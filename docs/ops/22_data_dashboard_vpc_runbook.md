@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27 v1.0  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. backend/web workflow 성공, ECS backend image `sha-439e27a` 적용, API /healthz HTTP 200, post-apply plan No changes.
   - 2026-05-27 v0.9  사용자 요청으로 infra/data-dashboard 재기동 완료 기준 반영. apply 73 added, post-apply plan No changes, ECS running 1, target healthy, API /healthz HTTP 200.
   - 2026-05-27 v0.8  post-migration permanent diff 정리 완료 반영. permanent root 3개 in-place change 적용 후 permanent/dns plan No changes, state count 0/25/1 확인.
   - 2026-05-26 v0.7  Step 9.5 이후 infra/data-dashboard destroy 완료 기준 반영. permanent/dns root 유지와 API DNS 제거 상태 명시.
@@ -38,6 +39,7 @@ scripts/destroy/destroy-all.sh
 ## 현재 Active 기준 (2026-05-27 재기동 후)
 
 사용자 요청으로 `infra/data-dashboard/` 일시 root를 다시 올렸다.
+이후 운영 Dashboard UI가 실제 DDB flat/nested 데이터 shape를 모두 처리하도록 수정되어 backend/web CI가 성공했고, backend ECS image는 `sha-439e27a`로 갱신했다.
 
 ```text
 terraform apply: 73 added, 0 changed, 0 destroyed
@@ -47,7 +49,7 @@ ECS backend service: desired 1 / running 1 / rollout completed
 ALB target group: healthy
 dashboard.aegis-pi.cloud: HTTP 200
 api.aegis-pi.cloud/healthz: HTTP 200
-backend image: sha-9d2c200
+backend image: sha-439e27a
 ```
 
 ## Destroy 후 잔여 기준

@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27  운영 Dashboard UI/실데이터 shape 정합성 수정 배포 완료. backend/web 테스트 통과, commit `439e27a` push 완료. GitHub Actions dashboard-web/dashboard-backend 성공. ECS backend image `sha-439e27a` 적용, API `/healthz` HTTP 200, post-apply plan No changes.
   - 2026-05-27  사용자 요청으로 infra/data-dashboard 일시 root 재기동 완료. apply 73 added, 0 changed, 0 destroyed. ECS desired/running 1, rollout completed, target healthy, https://api.aegis-pi.cloud/healthz HTTP 200. post-apply plan No changes.
   - 2026-05-27  세션 시작 상태 검증 및 post-migration permanent diff 정리 완료. state count: infra/data-dashboard=0, infra/data-dashboard-permanent=25, infra/data-dashboard-dns=1. permanent/dns plan No changes. dashboard 웹 HTTP 200, API DNS 미해결은 정상.
   - 2026-05-26  Step 9.5 이후 비용 절감을 위해 infra/data-dashboard destroy 완료 반영. 73 resources destroyed, state empty. permanent/dns root는 유지. dashboard 웹은 HTTP 200, API DNS 제거는 정상 상태.
