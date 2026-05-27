@@ -43,7 +43,8 @@ function SummaryStrip({ factories }: { factories: ReturnType<typeof normalizeFac
 
       {/* Pulse track */}
       <div style={{ padding: '4px 20px 18px' }}>
-        <div className="pulse-track">
+        {/* Track with band tints + threshold gridlines */}
+        <div className="pulse-track" style={{ overflow: 'hidden', borderRadius: 8, border: '1px solid var(--line-2)' }}>
           {/* Bands */}
           <div style={{ position: 'absolute', left: 0, width: '50%', top: 0, bottom: 0,
             background: 'color-mix(in srgb, var(--crit) 6%, transparent)' }} />
@@ -51,6 +52,27 @@ function SummaryStrip({ factories }: { factories: ReturnType<typeof normalizeFac
             background: 'color-mix(in srgb, var(--warn) 6%, transparent)' }} />
           <div style={{ position: 'absolute', left: '85%', width: '15%', top: 0, bottom: 0,
             background: 'color-mix(in srgb, var(--safe) 6%, transparent)' }} />
+          {/* Band labels */}
+          {[
+            { from: 0,  to: 50, color: 'var(--crit)', label: '위험' },
+            { from: 50, to: 85, color: 'var(--warn)', label: '주의' },
+            { from: 85, to: 100, color: 'var(--safe)', label: '안전' },
+          ].map((b) => (
+            <div key={b.label} style={{
+              position: 'absolute', left: `${b.from}%`, width: `${b.to - b.from}%`,
+              top: 0, bottom: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              pointerEvents: 'none',
+            }}>
+              <span className="mono" style={{
+                fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase',
+                color: b.color, fontWeight: 700, opacity: 0.9,
+              }}>{b.label}</span>
+            </div>
+          ))}
+          {/* Threshold gridlines */}
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'var(--line-3)' }} />
+          <div style={{ position: 'absolute', left: '85%', top: 0, bottom: 0, width: 1, background: 'var(--line-3)' }} />
           {/* Factory dots */}
           {factories.map((f) => {
             const x = Math.max(1, Math.min(99, f.riskScore ?? 50))
@@ -61,22 +83,52 @@ function SummaryStrip({ factories }: { factories: ReturnType<typeof normalizeFac
                 transform: 'translate(-50%, -50%)',
               }}>
                 <div style={{
-                  width: 12, height: 12, borderRadius: '50%', background: color,
-                  boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 18%, transparent)`,
+                  width: 14, height: 14, borderRadius: '50%', background: color,
+                  boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 18%, transparent), 0 0 0 1px var(--surface)`,
                 }} title={`${f.factory_id}: ${f.riskScore}`} />
               </div>
             )
           })}
         </div>
+
+        {/* Factory labels below track: score + factory_id at dot position */}
+        <div style={{ position: 'relative', height: 48, marginTop: 6 }}>
+          {factories.map((f) => {
+            const x = Math.max(4, Math.min(96, f.riskScore ?? 50))
+            const color = riskColor(f.riskLevel)
+            return (
+              <div key={f.factory_id} style={{
+                position: 'absolute', left: `${x}%`,
+                transform: 'translateX(-50%)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              }}>
+                <span className="tnum" style={{
+                  fontSize: 20, fontWeight: 700, color, lineHeight: 1.05,
+                  letterSpacing: '-0.01em',
+                }}>
+                  {f.riskScore ?? '—'}
+                </span>
+                <span className="mono" style={{
+                  fontSize: 10, color: 'var(--ink-2)', whiteSpace: 'nowrap', fontWeight: 500,
+                }}>
+                  {f.factory_id}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Scale axis */}
         <div style={{
           display: 'flex', justifyContent: 'space-between',
-          marginTop: 6, fontSize: 10, color: 'var(--ink-4)',
+          marginTop: 4, fontSize: 10, color: 'var(--ink-4)',
           fontFamily: 'var(--font-mono)',
+          borderTop: '1px dashed var(--line-2)', paddingTop: 4,
         }}>
-          <span>0 위험</span>
+          <span>0</span>
           <span>50</span>
           <span>85</span>
-          <span>100 안전</span>
+          <span>100</span>
         </div>
       </div>
     </div>
@@ -162,11 +214,25 @@ function FactoryCard({ f, onClick }: { f: ReturnType<typeof normalizeFactory>; o
         <div className="eyebrow" style={{ marginBottom: 6 }}>top_causes</div>
         {causes.length === 0
           ? <span className="micro">미계산</span>
-          : causes.map((name, i) => (
-              <div key={i} className="micro" style={{ color: 'var(--ink-3)', marginBottom: 2 }}>
-                · {name}
-              </div>
-            ))}
+          : f.topCauses!.slice(0, 3).map((c, i) => {
+              const name = typeof c === 'string' ? c : c.name
+              const contribution = typeof c === 'string' ? null : c.contribution
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  marginBottom: 2,
+                }}>
+                  {contribution != null && (
+                    <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--crit)', width: 30, textAlign: 'right', flexShrink: 0 }}>
+                      −{contribution.toFixed(1)}
+                    </span>
+                  )}
+                  <span className="micro" style={{ color: 'var(--ink-3)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {name}
+                  </span>
+                </div>
+              )
+            })}
       </div>
 
       {/* Footer */}

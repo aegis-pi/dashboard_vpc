@@ -120,17 +120,65 @@ def _since_iso(window: str) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
-def _extract(item: dict) -> dict:
-    """Extract only risk / factory_state / infra_state from a HISTORY#STATE item.
+def _coalesce_fs(fs: dict, *dot_paths: str):
+    """Return first non-None value from fs using dot-notation paths."""
+    for path in dot_paths:
+        v: object = fs
+        for key in path.split("."):
+            if not isinstance(v, dict):
+                v = None
+                break
+            v = v.get(key)
+        if v is not None:
+            return v
+    return None
 
+
+def _extract(item: dict) -> dict:
+    """Extract risk / factory_state / infra_state from a HISTORY#STATE item
+    and also promote flat fields for chart consumption.
+
+    Handles both flat DDB format (factory_state.temperature_celsius) and
+    nested format (factory_state.sensor.temperature_celsius_avg / factory_state.temperature_celsius_avg).
     The sk format is HISTORY#STATE#{iso_timestamp}.  No other HISTORY# prefix
     is queried or produced by this function.
     """
     sk = item.get("sk", "")
     timestamp = sk.removeprefix(HISTORY_STATE_PREFIX) or item.get("updated_at", "")
+
+    risk = item.get("risk") or {}
+    fs = item.get("factory_state") or {}
+    infra = item.get("infra_state") or {}
+
+    top_cause_names = [
+        (c.get("name") if isinstance(c, dict) else str(c))
+        for c in (risk.get("top_causes") or [])
+    ]
+
     return {
         "timestamp": timestamp,
-        "risk": item.get("risk"),
-        "factory_state": item.get("factory_state"),
-        "infra_state": item.get("infra_state"),
+        "risk": risk if risk else None,
+        "factory_state": fs if fs else None,
+        "infra_state": infra if infra else None,
+        # ── flattened risk ───────────────────────────────────────────────
+        "risk_score": risk.get("score"),
+        "risk_level": risk.get("level"),
+        "top_cause_names": top_cause_names,
+        # ── flattened sensor (flat / avg / sensor.* nested) ──────────────
+        "temperature_celsius_avg": _coalesce_fs(
+            fs, "temperature_celsius", "temperature_celsius_avg", "sensor.temperature_celsius_avg"
+        ),
+        "humidity_percent_avg": _coalesce_fs(
+            fs, "humidity_percent", "humidity_percent_avg", "sensor.humidity_percent_avg"
+        ),
+        "pressure_hpa_avg": _coalesce_fs(
+            fs, "pressure_hpa", "pressure_hpa_avg", "sensor.pressure_hpa_avg"
+        ),
+        # ── flattened AI scores (flat / ai_result.* nested) ──────────────
+        "fire_score": _coalesce_fs(fs, "fire_score", "ai_result.fire_score"),
+        "fall_score": _coalesce_fs(fs, "fall_score", "ai_result.fall_score"),
+        "bend_score": _coalesce_fs(fs, "bend_score", "ai_result.bend_score"),
+        # ── infra (for NodeResourceChart) ────────────────────────────────
+        "node_summary": infra.get("node_summary"),
+        "nodes": infra.get("nodes"),
     }

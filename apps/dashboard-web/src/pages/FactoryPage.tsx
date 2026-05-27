@@ -4,6 +4,7 @@ import { AlertTriangle, RefreshCw, Thermometer, Droplets, Gauge, Flame, Activity
 import { Shell } from '../components/Layout'
 import { LevelBadge, PipelineBadge } from '../components/Badge'
 import { relTime, riskColor } from '../utils/format'
+import { extractSensor, extractAI } from '../utils/normalize'
 import { RiskScoreChart, SensorChart, AIScoreChart, NodeResourceChart } from '../components/Chart'
 import { ConnStatus } from '../components/ConnStatus'
 import { useFactory } from '../hooks/useFactory'
@@ -36,14 +37,16 @@ function DeviceChip({ label, available }: { label: string; available: boolean | 
 // ─── Overview tab ─────────────────────────────────────────────────────
 function OverviewTab({ data }: { data: FactoryDetail }) {
   const risk = data.risk
-  const env = data.factory_state?.sensor
-  const ai = data.factory_state?.ai_result
+  // Normalize both flat and nested factory_state shapes
+  const sensor = extractSensor(data.factory_state)
+  const ai = extractAI(data.factory_state)
   const infra = data.infra_state
   const ns = infra?.node_summary
   const ws = infra?.workload_summary
   const ds = infra?.device_summary
   const ps = data.pipeline_status
   const color = riskColor(risk?.level)
+  const abnormal = ai.abnormal_sound
 
   const causes = risk?.top_causes ?? []
 
@@ -85,12 +88,18 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
             {causes.slice(0, 3).map((c, i) => {
               const name = typeof c === 'string' ? c : c.name
               const value = typeof c === 'string' ? null : c.value
+              const contribution = typeof c === 'string' ? null : c.contribution
               return (
                 <div key={i} className="card" style={{ padding: '14px 16px' }}>
                   <div className="eyebrow" style={{ marginBottom: 6 }}>{name}</div>
                   {value != null && (
                     <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color }}>
                       {value.toFixed(2)}
+                    </div>
+                  )}
+                  {contribution != null && (
+                    <div className="micro" style={{ color: 'var(--crit)', marginTop: 4 }}>
+                      −{contribution.toFixed(1)}
                     </div>
                   )}
                 </div>
@@ -100,18 +109,30 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
         </div>
       )}
 
-      {/* Current environment */}
+      {/* Current environment — flat + nested both handled via extractSensor/extractAI */}
       <div className="card">
         <div className="card-header"><h3 className="h3">현재 환경</h3></div>
         <div className="card-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
-            <EnvItem icon={<Thermometer size={14} />} label="온도" value={env?.temperature_celsius_avg} unit="°C" />
-            <EnvItem icon={<Droplets size={14} />} label="습도" value={env?.humidity_percent_avg} unit="%" />
-            <EnvItem icon={<Gauge size={14} />} label="기압" value={env?.pressure_hpa_avg} unit="hPa" />
-            <EnvItem icon={<Flame size={14} />} label="화재" value={ai?.fire_score} />
-            <EnvItem icon={<Activity size={14} />} label="넘어짐" value={ai?.fall_score} />
-            <EnvItem icon={<Activity size={14} />} label="굽힘" value={ai?.bend_score} />
+            <EnvItem icon={<Thermometer size={14} />} label="온도" value={sensor.temperature} unit="°C" />
+            <EnvItem icon={<Droplets size={14} />} label="습도" value={sensor.humidity} unit="%" />
+            <EnvItem icon={<Gauge size={14} />} label="기압" value={sensor.pressure} unit="hPa" />
+            <EnvItem icon={<Flame size={14} />} label="화재" value={ai.fire} />
+            <EnvItem icon={<Activity size={14} />} label="넘어짐" value={ai.fall} />
+            <EnvItem icon={<Activity size={14} />} label="굽힘" value={ai.bend} />
           </div>
+          {abnormal != null && (
+            <div style={{
+              marginTop: 14, padding: '8px 12px', borderRadius: 8,
+              background: 'var(--surface-2)', border: '1px solid var(--line-2)',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 600 }}>
+                abnormal_sound
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{abnormal}</span>
+            </div>
+          )}
         </div>
       </div>
 

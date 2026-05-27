@@ -46,3 +46,37 @@ def test_ddb_latest_mapping_has_infra_state(client, ddb_mock):
 def test_get_factory_not_found_returns_404(client, ddb_mock):
     r = client.get("/factories/nonexistent")
     assert r.status_code == 404
+
+
+# ── Expanded list_factories fields ────────────────────────────────────────────
+
+def test_list_factories_expanded_node_ready_total(client, ddb_mock):
+    items = client.get("/factories").json()
+    fa = next(i for i in items if i["factory_id"] == "factory-a")
+    assert fa["node_ready"] == 3
+    assert fa["node_total"] == 3
+
+
+def test_list_factories_expanded_top_causes(client, ddb_mock):
+    items = client.get("/factories").json()
+    fa = next(i for i in items if i["factory_id"] == "factory-a")
+    assert isinstance(fa["top_causes"], list)
+    assert len(fa["top_causes"]) == 2
+    assert fa["top_causes"][0]["name"] == "temperature"
+
+
+def test_list_factories_expanded_last_state_at(client, ddb_mock):
+    items = client.get("/factories").json()
+    fa = next(i for i in items if i["factory_id"] == "factory-a")
+    assert fa["last_factory_state_at"] is not None
+    assert fa["last_infra_state_at"] is not None
+
+
+def test_list_factories_flat_format_factory_b(client, ddb_mock):
+    """factory-b uses flat DDB format; node fields must still be extracted."""
+    items = client.get("/factories").json()
+    fb = next((i for i in items if i["factory_id"] == "factory-b"), None)
+    assert fb is not None
+    assert fb["node_ready"] == 2
+    assert fb["node_total"] == 2
+    assert fb["risk_level"] == "warning"

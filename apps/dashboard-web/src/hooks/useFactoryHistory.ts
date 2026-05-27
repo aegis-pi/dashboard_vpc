@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchFactoryHistory } from '../api/client'
+import { normalizeHistoryItem } from '../utils/normalize'
 import type { HistoryItem } from '../api/types'
 
 export type HistoryWindow = '1h' | '2h' | '24h'
@@ -14,7 +15,7 @@ export function useFactoryHistory(factoryId: string, window: HistoryWindow = '1h
     setError(null)
     try {
       const res = await fetchFactoryHistory(factoryId, window)
-      setData(res)
+      setData(res.map(normalizeHistoryItem))
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)))
     } finally {

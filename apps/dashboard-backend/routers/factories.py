@@ -11,20 +11,30 @@ async def list_factories(
     _claims: dict = Depends(verify_cognito_token),
 ):
     items = await ddb.list_factories()
-    return [
-        {
-            "factory_id": (
-                i.get("factory_id")
-                or i.get("pk", "").removeprefix("FACTORY#")
-            ),
-            "risk_level": (i.get("risk") or {}).get("level"),
-            "risk_score": (i.get("risk") or {}).get("score"),
-            "updated_at": i.get("updated_at"),
-            "pipeline_status": (i.get("pipeline_status") or {}).get("status"),
-            "display_status": (i.get("dashboard") or {}).get("display_status"),
-        }
-        for i in items
-    ]
+    result = []
+    for i in items:
+        factory_id = i.get("factory_id") or i.get("pk", "").removeprefix("FACTORY#")
+        risk = i.get("risk") or {}
+        infra = i.get("infra_state") or {}
+        fs = i.get("factory_state") or {}
+        ps = i.get("pipeline_status") or {}
+        ns = infra.get("node_summary") or {}
+        result.append(
+            {
+                "factory_id": factory_id,
+                "risk_level": risk.get("level"),
+                "risk_score": risk.get("score"),
+                "top_causes": risk.get("top_causes"),
+                "updated_at": i.get("updated_at"),
+                "pipeline_status": ps.get("status"),
+                "display_status": (i.get("dashboard") or {}).get("display_status"),
+                "last_factory_state_at": fs.get("source_timestamp"),
+                "last_infra_state_at": infra.get("source_timestamp"),
+                "node_ready": ns.get("ready"),
+                "node_total": ns.get("total"),
+            }
+        )
+    return result
 
 
 @router.get("/{factory_id}")

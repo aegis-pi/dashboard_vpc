@@ -200,14 +200,21 @@ def ddb_mock():
         ts_30 = _now_minus(30)
 
         items = [
-            # LATEST item
+            # LATEST item — factory-a (nested _avg format, existing tests depend on this shape)
             {
                 "pk": "FACTORY#factory-a",
                 "sk": "LATEST",
                 "factory_id": "factory-a",
                 "schema_version": "0.1.0",
                 "updated_at": _now_minus(1),
-                "risk": {"score": 27.6, "level": "danger", "top_causes": []},
+                "risk": {
+                    "score": 27.6,
+                    "level": "danger",
+                    "top_causes": [
+                        {"name": "temperature", "value": 38.2, "contribution": 12.5},
+                        {"name": "fire_score", "value": 0.85, "contribution": 10.1},
+                    ],
+                },
                 "factory_state": {
                     "message_id": "msg-001",
                     "source_timestamp": _now_minus(1),
@@ -215,12 +222,34 @@ def ddb_mock():
                 },
                 "infra_state": {
                     "message_id": "infra-001",
-                    "node_summary": {"total": 3, "ready": 3},
+                    "source_timestamp": _now_minus(2),
+                    "node_summary": {"total": 3, "ready": 3, "not_ready": 0},
                 },
                 "pipeline_status": {"status": "normal"},
                 "dashboard": {"display_status": "위험"},
             },
-            # HISTORY#STATE item 1 (45 min ago)
+            # LATEST item — factory-b (flat DDB format to test alias normalization)
+            {
+                "pk": "FACTORY#factory-b",
+                "sk": "LATEST",
+                "factory_id": "factory-b",
+                "updated_at": _now_minus(5),
+                "risk": {"score": 72.0, "level": "warning", "top_causes": []},
+                "factory_state": {
+                    "source_timestamp": _now_minus(5),
+                    "temperature_celsius": 26.5,
+                    "humidity_percent": 55.0,
+                    "fire_score": 0.2,
+                    "fall_score": 0.1,
+                    "bend_score": 0.05,
+                },
+                "infra_state": {
+                    "source_timestamp": _now_minus(6),
+                    "node_summary": {"total": 2, "ready": 2, "not_ready": 0},
+                },
+                "pipeline_status": {"status": "normal"},
+            },
+            # HISTORY#STATE item 1 (45 min ago) — _avg format
             {
                 "pk": "FACTORY#factory-a",
                 "sk": f"HISTORY#STATE#{ts_45}",
@@ -230,7 +259,7 @@ def ddb_mock():
                 "factory_state": {"temperature_celsius_avg": 22.0},
                 "infra_state": {"node_summary": {"total": 3, "ready": 3}},
             },
-            # HISTORY#STATE item 2 (30 min ago)
+            # HISTORY#STATE item 2 (30 min ago) — _avg format
             {
                 "pk": "FACTORY#factory-a",
                 "sk": f"HISTORY#STATE#{ts_30}",

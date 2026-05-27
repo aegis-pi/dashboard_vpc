@@ -58,6 +58,7 @@ export interface FactoryDetail {
     top_causes?: (TopCause | string)[]
   }
   factory_state?: {
+    // nested format (legacy / test data)
     sensor?: {
       temperature_celsius_avg?: number | null
       humidity_percent_avg?: number | null
@@ -69,6 +70,19 @@ export interface FactoryDetail {
       bend_score?: number | null
       abnormal_sound?: string | null
     }
+    // flat format (real DDB data-processor output)
+    temperature_celsius?: number | null
+    temperature_celsius_avg?: number | null
+    humidity_percent?: number | null
+    humidity_percent_avg?: number | null
+    pressure_hpa?: number | null
+    pressure_hpa_avg?: number | null
+    fire_score?: number | null
+    fall_score?: number | null
+    bend_score?: number | null
+    abnormal_sound?: string | null
+    source_timestamp?: string
+    message_id?: string
   }
   infra_state?: {
     node_summary?: { ready?: number; total?: number; not_ready?: number }

@@ -58,3 +58,29 @@ def test_history_empty_window_returns_empty(client, ddb_mock):
     r = client.get("/factories/factory-a/history?window=1m")
     assert r.status_code == 200
     assert r.json() == []
+
+
+# ── Flattened fields ──────────────────────────────────────────────────────────
+
+def test_history_items_have_flattened_risk_fields(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=1h").json()
+    for item in items:
+        assert "risk_score" in item
+        assert "risk_level" in item
+    scores = {i["risk_score"] for i in items}
+    assert scores == {10.0, 20.0}
+
+
+def test_history_items_have_flattened_sensor_fields(client, ddb_mock):
+    """temperature_celsius_avg must be promoted from factory_state._avg format."""
+    items = client.get("/factories/factory-a/history?window=1h").json()
+    temps = [i["temperature_celsius_avg"] for i in items if i.get("temperature_celsius_avg") is not None]
+    assert len(temps) == 2
+    assert set(temps) == {22.0, 30.0}
+
+
+def test_history_items_have_node_summary(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=1h").json()
+    for item in items:
+        assert item.get("node_summary") is not None
+        assert "total" in item["node_summary"]
