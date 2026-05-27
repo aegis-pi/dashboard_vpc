@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27 v1.2  dashboard-web frontend auto refresh/subsampling 개선 반영. WS 인증 실패 4001 재시도 차단, refresh throttle, chart subsampling 방어 로직 검증 완료.
   - 2026-05-27 v1.1  Aegis-frontend 기준 운영 UI 포팅 진행 상태와 top_causes 표시 보정 반영. web `e055583` 배포 완료, backend ECS image `sha-3b8439f` 적용, API /healthz HTTP 200, post-apply plan No changes.
   - 2026-05-27 v1.0  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. backend/web workflow 성공, ECS backend image `sha-439e27a` 적용, API /healthz HTTP 200, post-apply plan No changes.
   - 2026-05-27 v0.9  사용자 요청으로 infra/data-dashboard 재기동 완료 기준 반영. apply 73 added, post-apply plan No changes, ECS running 1, target healthy, API /healthz HTTP 200.
@@ -41,6 +42,7 @@ scripts/destroy/destroy-all.sh
 
 사용자 요청으로 `infra/data-dashboard/` 일시 root를 다시 올렸다.
 이후 운영 Dashboard UI가 실제 DDB flat/nested 데이터 shape를 모두 처리하도록 수정되었고, Aegis-frontend 기준 UI 포팅과 `top_causes` field/name 양식 보정이 진행됐다. 현재 web 배포 기준은 `e055583`, backend ECS image는 `sha-3b8439f`다.
+추가로 frontend auto refresh/subsampling 개선이 반영되어 WS 메시지 기반 refresh는 3초 throttle을 적용하고, 인증 실패 close code 4001은 재시도 없이 offline 처리한다.
 
 ```text
 terraform apply: 73 added, 0 changed, 0 destroyed
