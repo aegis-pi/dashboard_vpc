@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # AWS
     aws_region: str = "ap-south-1"
 
+    # Browser clients allowed to call the Dashboard API.
+    cors_allow_origins: str = "https://dashboard.aegis-pi.cloud,http://localhost:5173"
+
 
 @lru_cache
 def get_settings() -> Settings:
