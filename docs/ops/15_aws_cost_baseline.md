@@ -1,9 +1,10 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-26
+기준일: 2026-05-27
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-27 v2.5  post-migration permanent diff 정리 완료 반영. DynamoDB daily-report PITR/deletion protection 활성화. 빈 테이블 기준 비용 영향은 미미하며 PITR은 데이터 증가 시 사용량 기반.
   - 2026-05-26 v2.4  Step 9.5 이후 infra/data-dashboard destroy 완료 반영. 일시 root state empty, permanent/dns root 유지, 잔여 비용 기준 갱신.
   - 2026-05-26 v2.3  Step 9.5 migration 완료 반영. infra/data-dashboard-permanent/ active root로 갱신. Cognito/ECR/DDB daily-report/S3-web/CloudFront/ACM CF cert/OIDC roles는 permanent root 관리로 재분류.
   - 2026-05-26 v2.2  Step 9.5 설계 완료 반영. infra/data-dashboard-permanent/ 영구 root 계획. destroy 후 잔여 비용에 permanent root 잔여 ~$0.50~0.55/월 추가 명세.
@@ -241,7 +242,7 @@ Step 9.5 migration 완료 후 `infra/data-dashboard`를 destroy해도 아래 리
 | `infra/data-dashboard-dns/` | Route53 hosted zone `aegis-pi.cloud` | `$0.50` | 고정 (Step 7.5 분리 완료) |
 | `infra/data-dashboard-permanent/` | Cognito User Pool (0 MAU) | `$0.00` | 50,000 MAU 무료 티어 |
 | `infra/data-dashboard-permanent/` | ECR `aegis/dashboard-backend` 이미지 스토리지 (~0.5 GB) | `~$0.05` | `$0.10/GB-month` |
-| `infra/data-dashboard-permanent/` | DynamoDB `aegis-daily-report` (빈 테이블, on-demand) | `$0.00` | 0 req → WCU/RCU 0 |
+| `infra/data-dashboard-permanent/` | DynamoDB `aegis-daily-report` (빈 테이블, on-demand, PITR enabled) | `$0.00` | 0 req → WCU/RCU 0. PITR은 데이터 증가 시 사용량 기반 |
 | `infra/data-dashboard-permanent/` | S3 web bucket `kjw-aegis-data-web` (< 50 MB) | `~$0.00` | usage-based 소량 |
 | `infra/data-dashboard-permanent/` | CloudFront distribution (비가동 시) | `~$0.00` | HTTP request 0이면 $0 |
 | `infra/data-dashboard-permanent/` | ACM CloudFront cert (us-east-1) | `$0.00` | 무료 |

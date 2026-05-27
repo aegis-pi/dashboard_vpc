@@ -1,8 +1,9 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-26
+기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27  세션 시작 상태 검증 및 post-migration permanent diff 정리 완료. state count: infra/data-dashboard=0, infra/data-dashboard-permanent=25, infra/data-dashboard-dns=1. permanent/dns plan No changes. dashboard 웹 HTTP 200, API DNS 미해결은 정상.
   - 2026-05-26  Step 9.5 이후 비용 절감을 위해 infra/data-dashboard destroy 완료 반영. 73 resources destroyed, state empty. permanent/dns root는 유지. dashboard 웹은 HTTP 200, API DNS 제거는 정상 상태.
   - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설(25 resources import). data-dashboard state rm 20개. 양쪽 plan No destroy. HTTP 200 엔드포인트 확인. 다음: post-migration plan diff 정리 후 Step 10 운영 자동화/데모 준비.
   - 2026-05-26  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. 의존성 분석, migration 순서 문서화. 다음: Step 9.5 migration 실행 (다음 세션, infra/data-dashboard-permanent/ 신설 + import/state rm/apply).
@@ -340,7 +341,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent resource split migration 완료 후 임시 root destroy 완료(2026-05-26). infra/data-dashboard-permanent/ 25 resources와 infra/data-dashboard-dns/ hosted zone은 유지. infra/data-dashboard/는 73 resources destroyed, state empty. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz는 API/ALB/DNS 제거로 미응답이 정상. 다음: post-migration permanent 3 in-place diff 정리 후 Step 10 운영 자동화/데모 준비.
+현재 단계: Phase 1 Step 9.5 permanent resource split migration, post-migration permanent diff 정리, 임시 root destroy 완료. infra/data-dashboard-permanent/ 25 resources와 infra/data-dashboard-dns/ hosted zone은 유지. infra/data-dashboard/는 73 resources destroyed, state empty. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz는 API/ALB/DNS 제거로 미응답이 정상. 다음: Step 10 운영 자동화/데모 준비 또는 사용자의 수동 테스트/캡처 진행.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -671,8 +672,8 @@ secret exists, DATA=4
             ecr.tf / s3_web.tf / cloudfront.tf / acm.tf / route53.tf / outputs.tf
   + terraform import: 25 resources 모두 import 완료
     - Cognito 3 + DynamoDB 1 + ECR 2 + OIDC 4 + S3 4 + CloudFront 2 + ACM 1 + Route53 2 + data sources
-  + permanent plan: Plan: 0 to add, 3 to change, 0 to destroy (destroy 없음)
-    - 3 in-place change: token_validity_units 추가, DDB deletion_protection+PITR, allow_overwrite=true
+  + permanent plan: No changes (2026-05-27 post-migration diff apply 완료)
+    - 적용 완료: token_validity_units 추가, DDB deletion_protection+PITR, allow_overwrite=true
   + terraform state rm: data-dashboard root에서 영구 리소스 20개 제거 완료
   + infra/data-dashboard/*.tf 수정 완료:
     - remote_state_permanent.tf 신설 (data.terraform_remote_state.permanent)
@@ -747,8 +748,8 @@ secret exists, DATA=4
 다음:
   1. factory-a Edge Agent 재활성화 시 IoT→DDB→Redis→WebSocket 경로 검증
   2. 브라우저에서 Cognito 로그인/콜백/로그아웃 수기 확인
-  3. post-migration plan diff 정리 (permanent 3 in-place change, data-dashboard ECS task definition diff)
-  4. Step 10 운영 자동화/문서화. LLM 일간 보고서는 팀원/후속 작업으로 분리
+  3. 사용자의 수동 테스트/캡처 이후 Step 10 운영 자동화/문서화 진행
+  4. LLM 일간 보고서는 팀원/후속 작업으로 분리
 ```
 
 ### 1. 완료: Phase 1 Step 9 S3+CloudFront 배포 CI/CD (workflow + IAM apply)

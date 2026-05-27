@@ -1,8 +1,9 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-05-26
+기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27 v0.8  post-migration permanent diff 정리 완료 반영. permanent root 3개 in-place change 적용 후 permanent/dns plan No changes, state count 0/25/1 확인.
   - 2026-05-26 v0.7  Step 9.5 이후 infra/data-dashboard destroy 완료 기준 반영. permanent/dns root 유지와 API DNS 제거 상태 명시.
   - 2026-05-26 v0.6  Step 9.5 migration 완료 결과 반영. checklist 체크 완료. 엔드포인트 검증 확인.
   - 2026-05-26 v0.5  Step 9.5 permanent resource split migration checklist 추가. ADR 0024 참조.
@@ -60,13 +61,15 @@ scripts/destroy/destroy-all.sh
 - 기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3`
 - Hub/Foundation/EKS/Admin UI 리소스
 
-2026-05-26 실제 destroy 결과:
+2026-05-27 재검증 결과:
 
 ```text
 infra/data-dashboard apply destroy: 73 destroyed
 infra/data-dashboard state list: 0
 infra/data-dashboard-permanent state list: 25
 infra/data-dashboard-dns state list: 1
+infra/data-dashboard-permanent plan: No changes
+infra/data-dashboard-dns plan: No changes
 dashboard.aegis-pi.cloud: HTTP 200
 api.aegis-pi.cloud: DNS 미해결 (API/ALB destroy 후 정상)
 RDS final snapshot: available
@@ -254,7 +257,7 @@ terraform -chdir=infra/data-dashboard-permanent plan -detailed-exitcode
 # exit 0 기대
 ```
 
-- [x] permanent plan: No changes (exit 0) — 실제 결과: Plan: 0 to add, 3 to change, 0 to destroy (destroy 없음, 3 in-place change 허용)
+- [x] permanent plan: No changes (exit 0) — 2026-05-27 post-migration 3 in-place change 적용 후 확인
 
 ### Phase 4 — data-dashboard state rm (역순)
 

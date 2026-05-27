@@ -1,8 +1,9 @@
 # AI Agent Harness — Aegis-Pi Risk Twin
 
 상태: source of truth
-기준일: 2026-05-26
+기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27  post-migration permanent diff 정리 완료 반영. infra/data-dashboard-permanent apply: 0 added, 3 changed, 0 destroyed. 이후 permanent/dns plan No changes, state count 0/25/1 확인.
   - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신규 root, 25 resources import, data-dashboard state rm 20개, 엔드포인트 HTTP 200 확인. 다음은 post-migration plan diff 정리 및 Step 10.
   - 2026-05-26  Step 9.5 설계 완료 반영. ADR 0024 작성. § 5.4 Step 9.5 DoD 추가. TL;DR·§ 2·§ 10.1·§ 13 갱신.
   - 2026-05-26  Step 9 end-to-end 통합 검증 완료 반영. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료. IoT→DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증. TL;DR·§ 2 갱신.
@@ -25,7 +26,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 9.5 permanent resource split migration 완료(2026-05-26). 다음: post-migration plan diff 정리(permanent 3 in-place change, data-dashboard ECS task definition diff) 후 Step 10 운영 자동화/문서화
+- **본 환경의 다음 작업**: Phase 1 Step 9.5 permanent resource split migration, 임시 root destroy, post-migration permanent diff 정리 완료. 다음: Step 10 운영 자동화/문서화 또는 사용자 수동 테스트/캡처
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -333,8 +334,8 @@
   - `terraform import`: 25 resources import 완료 ✅
   - `terraform state rm`: `infra/data-dashboard` root에서 영구 리소스 20개 제거 완료 ✅
   - `infra/data-dashboard` → `infra/data-dashboard-permanent` remote state 참조 교체 완료 ✅
-  - permanent plan: `0 to add, 3 to change, 0 to destroy` (destroy 없음, 3개 in-place change 후속 판단) ✅
-  - data-dashboard plan: ECS task definition diff만 존재, 영구 리소스 destroy/create 없음 ✅
+  - permanent plan: 2026-05-27 post-migration diff apply 후 No changes ✅
+  - data-dashboard state empty. 재생성 전까지 plan은 apply 후보로만 확인하고 destroy 대상 아님 ✅
   - dashboard/API 엔드포인트 HTTP 200 확인 ✅
 - 설계 세션 DoD:
   - ADR 0024 작성 완료 ✅
@@ -530,7 +531,7 @@
 - `.github/workflows/dashboard-web.yml` — **구현/배포 완료** (Phase 1 Step 9, 2026-05-26). test + build-and-deploy jobs 성공. Terraform apply 2 add 0 change. repo-level Secret/Variable 등록 완료
 - `infra/data-dashboard/ecr.tf` — Step 9: `github_oidc_web_deploy` IAM role 추가 완료 (ADR 0023)
 - `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
-- `infra/data-dashboard-permanent/` — **신설 완료** (Phase 1 Step 9.5, 2026-05-26). 25 resources import 완료. permanent plan은 destroy 없음, 3개 in-place change 후속 판단 필요
+- `infra/data-dashboard-permanent/` — **신설 완료** (Phase 1 Step 9.5, 2026-05-26). 25 resources import 완료. 2026-05-27 post-migration 3개 in-place change 적용 후 permanent plan No changes
 - `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
 - `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (**Step 8 완료**)
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` — `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
@@ -614,3 +615,4 @@
 | 2026-05-26 | v1.4 | Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 반영. dashboard-web.yml, IAM web deploy role(ADR 0023), Terraform apply, GitHub Actions 배포 성공, Node 24 workflow runtime 확인. TL;DR·§ 2·§ 5.4·§ 10.1·§ 13 갱신. |
 | 2026-05-26 | v1.5 | Step 9.5 설계 완료 반영. ADR 0024. § 5.4 Step 9.5 DoD/허용/금지 추가. TL;DR·§ 2·§ 10.1·§ 13 갱신. |
 | 2026-05-26 | v1.6 | Step 9.5 migration 완료 반영. infra/data-dashboard-permanent/ 신설, 25 resources import, data-dashboard state rm 20개, post-migration plan diff 후속 확인사항 기록. |
+| 2026-05-27 | v1.7 | post-migration permanent diff 정리 완료. permanent/dns plan No changes, state count 0/25/1 확인. |

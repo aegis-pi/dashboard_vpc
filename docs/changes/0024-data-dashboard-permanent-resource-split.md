@@ -221,3 +221,19 @@ destroy 명령은 절대 실행하지 않는다.
     CloudFront는 `aws_acm_certificate.cloudfront.arn` 직접 참조. cert ISSUED 상태라 안전.
   - `generate_secret = false`: ForceNew 속성. import 후 추가 시 Cognito client 교체 발생. permanent root에서 제거.
     public client는 항상 secret 없이 생성되므로 동작에 영향 없음.
+
+## 후속 정리 결과 (2026-05-27)
+
+- post-migration permanent diff 정리 완료.
+- infra/data-dashboard-permanent apply: `0 added, 3 changed, 0 destroyed`
+  - Cognito App Client token_validity_units 명시
+  - DynamoDB `aegis-daily-report` deletion protection + PITR 활성화
+  - CloudFront ACM validation CNAME `allow_overwrite=true` 반영
+- 재검증:
+  - infra/data-dashboard state count: 0
+  - infra/data-dashboard-permanent state count: 25
+  - infra/data-dashboard-dns state count: 1
+  - infra/data-dashboard-permanent plan: No changes
+  - infra/data-dashboard-dns plan: No changes
+  - https://dashboard.aegis-pi.cloud/ HTTP 200
+  - https://api.aegis-pi.cloud/healthz DNS 미해결 (API/ALB destroy 후 정상)

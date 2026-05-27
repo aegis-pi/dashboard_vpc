@@ -1,8 +1,9 @@
 # Data / Dashboard VPC Workplan (이 작업 환경)
 
 상태: source of truth
-기준일: 2026-05-26
+기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27 v1.7  post-migration permanent diff 정리 완료 반영. infra/data-dashboard-permanent apply 0 add, 3 change, 0 destroy 후 permanent/dns plan No changes. state count 0/25/1 확인.
   - 2026-05-26 v1.6  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설, 25 resources import, data-dashboard state rm 20개, 엔드포인트 HTTP 200 확인.
   - 2026-05-26 v1.5  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. Step 9.5 추가. 다음: Step 9.5 migration 실행 세션.
   - 2026-05-26 v1.4  Step 9 S3+CloudFront 배포 CI/CD 구현/적용/SPA 배포 완료 반영. GitHub Actions workflow, IAM OIDC web deploy role(ADR 0023), Terraform apply 2 add 0 change, repo-level Secret/Variable 등록, S3 sync + CloudFront invalidation 완료. Workflow Node runtime은 Node 24 기준으로 확정.
