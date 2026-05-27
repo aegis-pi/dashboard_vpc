@@ -12,7 +12,7 @@ export function useFactories() {
   const [error, setError] = useState<Error | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(_cache === null)
     setError(null)
     try {
       const res = await fetchFactories()

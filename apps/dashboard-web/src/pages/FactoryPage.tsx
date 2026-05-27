@@ -1301,6 +1301,7 @@ export function FactoryPage() {
   const wsThrottleRef = useRef<number>(0)
 
   const { data, loading, error, refresh } = useFactory(factoryId)
+  const hasFactoryData = data !== null
   const { status: wsStatus, lastMessage } = useWebSocket(factoryId)
   const { data: fleetData, refresh: refreshFleet } = useFactories()
 
@@ -1370,14 +1371,14 @@ export function FactoryPage() {
       refreshInterval={refreshInterval}
       onIntervalChange={setRefreshInterval}
     >
-      {loading && (
+      {loading && !hasFactoryData && (
         <div className="empty-state" style={{ paddingTop: 60 }}>
           <div className="spinner" />
           <span className="sub">공장 상태 로드 중...</span>
         </div>
       )}
 
-      {!loading && error && (
+      {!hasFactoryData && error && (
         <div className="card" style={{ padding: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--crit)' }}>
             <AlertTriangle size={18} />
@@ -1390,7 +1391,7 @@ export function FactoryPage() {
         </div>
       )}
 
-      {!loading && !error && data && (
+      {data && (
         <>
           {/* Hero header */}
           <FactoryHeader f={data} sparkData={sparkData} />

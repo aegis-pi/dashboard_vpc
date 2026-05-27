@@ -464,6 +464,7 @@ export function FleetPage() {
   const navigate = useNavigate()
   const [refreshInterval, setRefreshInterval] = useState(0)
   const { data, loading, error, refresh } = useFactories()
+  const hasFleetData = data !== null
 
   const factories = (data?.factories ?? []).map(normalizeFactory)
   const sorted = [...factories].sort((a, b) => (a.riskScore ?? 50) - (b.riskScore ?? 50))
@@ -526,14 +527,14 @@ export function FleetPage() {
         </p>
       </div>
 
-      {loading && (
+      {loading && !hasFleetData && (
         <div className="empty-state" style={{ paddingTop: 80 }}>
           <div className="spinner" />
           <span className="sub">공장 상태 로드 중...</span>
         </div>
       )}
 
-      {!loading && error && (
+      {!hasFleetData && error && (
         <div className="card" style={{ padding: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--crit)' }}>
             <AlertTriangle size={18} />
@@ -546,7 +547,7 @@ export function FleetPage() {
         </div>
       )}
 
-      {!loading && !error && (
+      {hasFleetData && (
         <>
           {sorted.length > 0 && <FleetPulse factories={sorted} />}
 
