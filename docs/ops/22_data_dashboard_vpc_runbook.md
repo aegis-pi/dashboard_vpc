@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27 v1.5  세션 종료 전 infra/data-dashboard destroy 완료 반영. 73 destroyed, state empty, permanent/dns No changes.
   - 2026-05-27 v1.4  dashboard-backend CORS 운영 origin 명시 수정 반영. backend image `sha-f6422a7` ECS 적용, API health/preflight 정상.
   - 2026-05-27 v1.3  TopBar refresh interval + Fleet/Factory auto polling 반영. Fleet은 선택 간격 단순 갱신, Factory는 WS 우선 + 미연결 시 polling 구조.
   - 2026-05-27 v1.2  dashboard-web frontend auto refresh/subsampling 개선 반영. WS 인증 실패 4001 재시도 차단, refresh throttle, chart subsampling 방어 로직 검증 완료.
@@ -40,21 +41,22 @@ scripts/destroy/destroy-hub.sh
 scripts/destroy/destroy-all.sh
 ```
 
-## 현재 Active 기준 (2026-05-27 재기동 후)
+## 현재 Active 기준 (2026-05-27 destroy 후)
 
-사용자 요청으로 `infra/data-dashboard/` 일시 root를 다시 올렸다.
+사용자 요청으로 세션 종료 전 `infra/data-dashboard/` 일시 root를 destroy 했다.
 이후 운영 Dashboard UI가 실제 DDB flat/nested 데이터 shape를 모두 처리하도록 수정되었고, Aegis-frontend 기준 UI 포팅과 `top_causes` field/name 양식 보정이 진행됐다.
 추가로 frontend refresh/subsampling 개선이 반영되어 WS 메시지 기반 refresh는 3초 throttle을 적용하고, 인증 실패 close code 4001은 재시도 없이 offline 처리한다. TopBar refresh interval과 Fleet/Factory auto polling도 반영됐다. Fleet은 선택 간격으로 목록과 최근 변화를 갱신하고, Factory는 WS 우선 + 미연결 시 polling 구조를 사용한다.
 Backend는 CORS 운영 origin을 명시하도록 수정되어 `https://dashboard.aegis-pi.cloud` preflight와 인증 API 호출을 허용한다.
 
 ```text
-terraform apply: 73 added, 0 changed, 0 destroyed
-terraform post-apply plan: No changes
-infra/data-dashboard managed resource count: 73
-ECS backend service: desired 1 / running 1 / rollout completed
-ALB target group: healthy
+terraform destroy: 73 destroyed
+infra/data-dashboard state count: 0
+infra/data-dashboard-permanent state count: 25
+infra/data-dashboard-dns state count: 1
+infra/data-dashboard-permanent plan: No changes
+infra/data-dashboard-dns plan: No changes
 dashboard.aegis-pi.cloud: HTTP 200
-api.aegis-pi.cloud/healthz: HTTP 200
+api.aegis-pi.cloud: DNS 미해결 (API/ALB destroy 후 정상)
 backend image: sha-f6422a7
 web commit: 51e82bb
 ```
