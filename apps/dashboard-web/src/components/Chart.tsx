@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import type { HistoryItem } from '../api/types'
+import { subsampleData } from '../utils/subsample'
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function extractTimestamp(item: HistoryItem): string | undefined {
@@ -34,7 +35,8 @@ function fmtTime(ts?: string): string {
 
 // ─── Risk score chart ─────────────────────────────────────────────────
 export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
-  const data = items
+  const sampledItems = subsampleData(items)
+  const data = sampledItems
     .map((it) => ({
       ts: fmtTime(extractTimestamp(it)),
       score: it.risk_score ?? (it.payload as Record<string, unknown> | undefined)?.['risk_score'],
@@ -81,7 +83,8 @@ export function SensorChart({ items, field, label, unit }: {
   label: string
   unit: string
 }) {
-  const data = items
+  const sampledItems = subsampleData(items)
+  const data = sampledItems
     .map((it) => {
       const val = it[field] as number | null | undefined
       return { ts: fmtTime(extractTimestamp(it)), value: val ?? null }
@@ -120,7 +123,8 @@ export function SensorChart({ items, field, label, unit }: {
 
 // ─── AI score chart ───────────────────────────────────────────────────
 export function AIScoreChart({ items }: { items: HistoryItem[] }) {
-  const data = items
+  const sampledItems = subsampleData(items)
+  const data = sampledItems
     .map((it) => ({
       ts: fmtTime(extractTimestamp(it)),
       fire:  it.fire_score ?? null,
@@ -161,15 +165,16 @@ export function NodeResourceChart({ items, field, label }: {
   field: 'cpu_usage_percent' | 'memory_usage_percent' | 'disk_usage_percent'
   label: string
 }) {
+  const sampledItems = subsampleData(items)
   // Extract per-node series
   const nodeIds = new Set<string>()
-  items.forEach((it) => {
+  sampledItems.forEach((it) => {
     if (Array.isArray(it.nodes)) {
       it.nodes.forEach((n) => nodeIds.add(n.node_id))
     }
   })
 
-  const data = items.map((it) => {
+  const data = sampledItems.map((it) => {
     const row: Record<string, string | number | null> = {
       ts: fmtTime(extractTimestamp(it)),
     }

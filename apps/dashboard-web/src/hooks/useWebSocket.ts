@@ -51,8 +51,12 @@ export function useWebSocket(factoryId: string) {
       if (!unmountedRef.current) setStatus('reconnecting')
     }
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (unmountedRef.current) return
+      if (event.code === 4001) {
+        setStatus('offline')
+        return
+      }
       const attempt = retryRef.current
       if (attempt >= MAX_RETRIES) {
         setStatus('offline')

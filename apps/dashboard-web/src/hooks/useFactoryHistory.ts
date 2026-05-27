@@ -5,9 +5,9 @@ import type { HistoryItem } from '../api/types'
 
 export type HistoryWindow = '1h' | '6h' | '12h' | '24h'
 
-export function useFactoryHistory(factoryId: string, window: HistoryWindow = '1h') {
+export function useFactoryHistory(factoryId: string, window: HistoryWindow = '1h', enabled = true) {
   const [data, setData] = useState<HistoryItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
   const load = useCallback(async () => {
@@ -23,7 +23,10 @@ export function useFactoryHistory(factoryId: string, window: HistoryWindow = '1h
     }
   }, [factoryId, window])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (!enabled) return
+    void load()
+  }, [load, enabled])
 
   return { data, loading, error, refresh: load }
 }
