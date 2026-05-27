@@ -72,6 +72,13 @@ def test_list_factories_expanded_last_state_at(client, ddb_mock):
     assert fa["last_infra_state_at"] is not None
 
 
+def test_list_factories_environment_type(client, ddb_mock):
+    """environment_type is passed through from DDB item."""
+    items = client.get("/factories").json()
+    fa = next(i for i in items if i["factory_id"] == "factory-a")
+    assert fa.get("environment_type") == "physical-rpi"
+
+
 def test_list_factories_flat_format_factory_b(client, ddb_mock):
     """factory-b uses flat DDB format; node fields must still be extracted."""
     items = client.get("/factories").json()

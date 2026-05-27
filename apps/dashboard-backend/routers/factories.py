@@ -22,6 +22,7 @@ async def list_factories(
         result.append(
             {
                 "factory_id": factory_id,
+                "environment_type": i.get("environment_type"),
                 "risk_level": risk.get("level"),
                 "risk_score": risk.get("score"),
                 "top_causes": risk.get("top_causes"),

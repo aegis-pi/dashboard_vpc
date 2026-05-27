@@ -205,6 +205,7 @@ def ddb_mock():
                 "pk": "FACTORY#factory-a",
                 "sk": "LATEST",
                 "factory_id": "factory-a",
+                "environment_type": "physical-rpi",
                 "schema_version": "0.1.0",
                 "updated_at": _now_minus(1),
                 "risk": {
