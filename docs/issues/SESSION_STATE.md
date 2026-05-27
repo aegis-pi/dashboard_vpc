@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27  dashboard-web refresh interval controls 구현 완료. TopBar interval selector(Off/5s/10s/30s/1m), Fleet 단순 auto refresh, Factory WS 우선 + 미연결 시 polling 연결. useFleetRecentChanges refresh 추가. 검증: npm run lint 통과, npm test -- --run 32 passed, npm run build 통과, git diff --check 통과. code commit `51e82bb`.
   - 2026-05-27  dashboard-web refresh/subsampling hardening 완료. chart subsampling 유틸에 maxPoints <= 1 방어 추가, WS 인증 실패 close code 4001 재시도 차단, FactoryPage WS refresh 3초 throttle/lazy tab cache 반영. 검증: npm run lint 통과, npm test -- --run 31 passed, npm run build 통과, git diff --check 통과. code commit `6f53e6e` push 완료.
   - 2026-05-27  Aegis-frontend 화면설계 reference 추가 및 운영 Dashboard UI 포팅 진행 상태 커밋/푸시 완료. top_causes `field`/`name` 양식 모두 표시하도록 web 수정. dashboard-web workflow 성공, CloudFront invalidation 완료. backend image `sha-3b8439f` ECS 적용 완료, rollout completed, `/healthz` HTTP 200, post-apply plan No changes.
   - 2026-05-27  운영 Dashboard UI/실데이터 shape 정합성 수정 배포 완료. backend/web 테스트 통과, commit `439e27a` push 완료. GitHub Actions dashboard-web/dashboard-backend 성공. ECS backend image `sha-439e27a` 적용, API `/healthz` HTTP 200, post-apply plan No changes.
