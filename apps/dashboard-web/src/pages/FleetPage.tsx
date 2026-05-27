@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, AlertTriangle } from 'lucide-react'
 import { Shell } from '../components/Layout'
@@ -461,6 +462,7 @@ function RecentSection({
 // ─── Main page ────────────────────────────────────────────────────────
 export function FleetPage() {
   const navigate = useNavigate()
+  const [refreshInterval, setRefreshInterval] = useState(0)
   const { data, loading, error, refresh } = useFactories()
 
   const factories = (data?.factories ?? []).map(normalizeFactory)
@@ -473,7 +475,24 @@ export function FleetPage() {
   }))
 
   const factoryIds = sorted.map((f) => f.factory_id)
-  const { events: recentChanges, loading: recentLoading } = useFleetRecentChanges(factoryIds)
+  const {
+    events: recentChanges,
+    loading: recentLoading,
+    refresh: refreshRecentChanges,
+  } = useFleetRecentChanges(factoryIds)
+
+  const handleRefresh = useCallback(() => {
+    void refresh()
+    void refreshRecentChanges()
+  }, [refresh, refreshRecentChanges])
+
+  useEffect(() => {
+    if (refreshInterval <= 0) return
+    const id = window.setInterval(() => {
+      handleRefresh()
+    }, refreshInterval)
+    return () => window.clearInterval(id)
+  }, [handleRefresh, refreshInterval])
 
   if (error instanceof AuthError) {
     return (
@@ -492,7 +511,9 @@ export function FleetPage() {
     <Shell
       factories={sidebarFactories}
       crumbs={[{ label: 'Aegis-π' }, { label: 'Fleet Overview' }]}
-      onRefresh={refresh}
+      onRefresh={handleRefresh}
+      refreshInterval={refreshInterval}
+      onIntervalChange={setRefreshInterval}
     >
       {/* Page header */}
       <div className="page-header">
@@ -519,7 +540,7 @@ export function FleetPage() {
             <span style={{ fontWeight: 600 }}>데이터 로드 실패</span>
           </div>
           <p className="sub" style={{ marginTop: 8 }}>{error.message}</p>
-          <button className="btn" style={{ marginTop: 14 }} onClick={refresh}>
+          <button className="btn" style={{ marginTop: 14 }} onClick={handleRefresh}>
             <RefreshCw size={13} />다시 시도
           </button>
         </div>

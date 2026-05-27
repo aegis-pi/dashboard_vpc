@@ -257,6 +257,20 @@ input { font-family: inherit; }
 .topbar-breadcrumb .crumb.clickable:hover { color: var(--ink-2); }
 .topbar-breadcrumb .crumb.current { color: var(--ink-2); font-weight: 500; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
+.refresh-select {
+  height: 28px;
+  min-width: 112px;
+  padding: 0 28px 0 9px;
+  border: 1px solid var(--line-3);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+.refresh-select:hover { border-color: var(--ink-4); background: var(--surface-2); }
+.refresh-select:focus { outline: 2px solid var(--focus-tint); outline-offset: 1px; }
 
 /* ─── Content area ──────────────────────────────────────────────── */
 .content {

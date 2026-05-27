@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Shell } from '../components/Layout'
@@ -479,14 +479,14 @@ function ThresholdSwatch({ color, label }: { color: string; label: string }) {
 // ─── Environment History tab ──────────────────────────────────────────
 const HISTORY_WINDOWS: HistoryWindow[] = ['1h', '6h', '12h', '24h']
 
-function HistoryTab({ factoryId, wsRefreshKey }: { factoryId: string; wsRefreshKey: number }) {
+function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refreshSignalKey: number }) {
   const [win, setWin] = useState<HistoryWindow>('1h')
   const { data: history, loading, refresh } = useFactoryHistory(factoryId, win)
 
   useEffect(() => {
-    if (wsRefreshKey === 0) return
+    if (refreshSignalKey === 0) return
     void refresh()
-  }, [wsRefreshKey, refresh])
+  }, [refreshSignalKey, refresh])
 
   const isEmpty = history.length === 0
 
@@ -810,14 +810,14 @@ function HeartbeatCard({ hb }: { hb: NonNullable<FactoryDetail['infra_state']>['
   )
 }
 
-function InfraTab({ data, factoryId, wsRefreshKey }: { data: FactoryDetail; factoryId: string; wsRefreshKey: number }) {
+function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; factoryId: string; refreshSignalKey: number }) {
   const [win, setWin] = useState<HistoryWindow>('1h')
   const { data: history, loading, refresh } = useFactoryHistory(factoryId, win)
 
   useEffect(() => {
-    if (wsRefreshKey === 0) return
+    if (refreshSignalKey === 0) return
     void refresh()
-  }, [wsRefreshKey, refresh])
+  }, [refreshSignalKey, refresh])
 
   const nodes: NodeStatus[]         = data.infra_state?.nodes ?? []
   const workloads: WorkloadStatus[] = data.infra_state?.workloads ?? []
@@ -1105,14 +1105,14 @@ function RestartCount({ value }: { value?: number | null }) {
 }
 
 // ─── Timeline tab ─────────────────────────────────────────────────────
-function TimelineTab({ factoryId, wsRefreshKey }: { factoryId: string; wsRefreshKey: number }) {
+function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refreshSignalKey: number }) {
   const [win, setWin] = useState<HistoryWindow>('1h')
   const { data: history, loading, refresh } = useFactoryHistory(factoryId, win)
 
   useEffect(() => {
-    if (wsRefreshKey === 0) return
+    if (refreshSignalKey === 0) return
     void refresh()
-  }, [wsRefreshKey, refresh])
+  }, [refreshSignalKey, refresh])
 
   const events = deriveTimelineEvents(history)
 
@@ -1293,7 +1293,8 @@ export function FactoryPage() {
   const { factoryId = '' } = useParams<{ factoryId: string }>()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabId>('overview')
-  const [wsRefreshKey, setWsRefreshKey] = useState(0)
+  const [refreshSignalKey, setRefreshSignalKey] = useState(0)
+  const [refreshInterval, setRefreshInterval] = useState(0)
   // Tracks which tabs have ever been visited so their components stay mounted
   // (display:none instead of unmount), preserving cached data across tab switches.
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(() => new Set<TabId>(['overview']))
@@ -1309,6 +1310,13 @@ export function FactoryPage() {
     .map((h) => h.risk_score)
     .filter((v): v is number => v != null)
 
+  const refreshPageData = useCallback(() => {
+    void refresh()
+    void refreshHistory24h()
+    void refreshFleet()
+    setRefreshSignalKey((k) => k + 1)
+  }, [refresh, refreshHistory24h, refreshFleet])
+
   // WS-triggered refresh — throttled to at most once per 3 s.
   // Manual refresh button (onRefresh) is not subject to this throttle.
   useEffect(() => {
@@ -1316,11 +1324,16 @@ export function FactoryPage() {
     const now = Date.now()
     if (now - wsThrottleRef.current < 3000) return
     wsThrottleRef.current = now
-    void refresh()
-    void refreshHistory24h()
-    void refreshFleet()
-    setWsRefreshKey((k) => k + 1)
-  }, [lastMessage, wsStatus, refresh, refreshHistory24h, refreshFleet])
+    refreshPageData()
+  }, [lastMessage, wsStatus, refreshPageData])
+
+  useEffect(() => {
+    if (refreshInterval <= 0 || wsStatus === 'connected') return
+    const id = window.setInterval(() => {
+      refreshPageData()
+    }, refreshInterval)
+    return () => window.clearInterval(id)
+  }, [refreshInterval, refreshPageData, wsStatus])
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId)
@@ -1353,7 +1366,9 @@ export function FactoryPage() {
       onBack={() => navigate('/')}
       wsStatus={wsStatus}
       wsMessage={lastMessage}
-      onRefresh={refresh}
+      onRefresh={refreshPageData}
+      refreshInterval={refreshInterval}
+      onIntervalChange={setRefreshInterval}
     >
       {loading && (
         <div className="empty-state" style={{ paddingTop: 60 }}>
@@ -1369,7 +1384,7 @@ export function FactoryPage() {
             <span style={{ fontWeight: 600 }}>데이터 로드 실패</span>
           </div>
           <p className="sub" style={{ marginTop: 8 }}>{error.message}</p>
-          <button className="btn" style={{ marginTop: 14 }} onClick={refresh}>
+          <button className="btn" style={{ marginTop: 14 }} onClick={refreshPageData}>
             <RefreshCw size={13} />다시 시도
           </button>
         </div>
@@ -1399,17 +1414,17 @@ export function FactoryPage() {
               so cached data survives without re-fetch on return visits. */}
           {visitedTabs.has('history') && (
             <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
-              <HistoryTab factoryId={factoryId} wsRefreshKey={wsRefreshKey} />
+              <HistoryTab factoryId={factoryId} refreshSignalKey={refreshSignalKey} />
             </div>
           )}
           {visitedTabs.has('infrastructure') && (
             <div style={{ display: activeTab === 'infrastructure' ? 'block' : 'none' }}>
-              <InfraTab data={data} factoryId={factoryId} wsRefreshKey={wsRefreshKey} />
+              <InfraTab data={data} factoryId={factoryId} refreshSignalKey={refreshSignalKey} />
             </div>
           )}
           {visitedTabs.has('timeline') && (
             <div style={{ display: activeTab === 'timeline' ? 'block' : 'none' }}>
-              <TimelineTab factoryId={factoryId} wsRefreshKey={wsRefreshKey} />
+              <TimelineTab factoryId={factoryId} refreshSignalKey={refreshSignalKey} />
             </div>
           )}
         </>

@@ -139,9 +139,29 @@ interface TopBarProps {
   wsStatus?: WsStatus
   wsMessage?: Record<string, unknown> | null
   onRefresh?: () => void
+  refreshInterval?: number
+  onIntervalChange?: (ms: number) => void
 }
 
-export function TopBar({ crumbs, onBack, wsStatus, wsMessage, onRefresh }: TopBarProps) {
+export const REFRESH_INTERVAL_OPTIONS = [
+  { label: 'Refresh: Off', value: 0 },
+  { label: '5s', value: 5000 },
+  { label: '10s', value: 10000 },
+  { label: '30s', value: 30000 },
+  { label: '1m', value: 60000 },
+] as const
+
+export type RefreshIntervalMs = (typeof REFRESH_INTERVAL_OPTIONS)[number]['value']
+
+export function TopBar({
+  crumbs,
+  onBack,
+  wsStatus,
+  wsMessage,
+  onRefresh,
+  refreshInterval = 0,
+  onIntervalChange,
+}: TopBarProps) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)
@@ -174,6 +194,21 @@ export function TopBar({ crumbs, onBack, wsStatus, wsMessage, onRefresh }: TopBa
       <div className="topbar-actions">
         {wsStatus && <ConnStatus status={wsStatus} lastMessage={wsMessage} />}
 
+        {onRefresh && onIntervalChange && (
+          <select
+            className="refresh-select"
+            value={refreshInterval}
+            onChange={(e) => onIntervalChange(Number(e.target.value))}
+            title="자동 새로고침 간격"
+          >
+            {REFRESH_INTERVAL_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
+
         {onRefresh && (
           <button className="btn ghost" onClick={onRefresh} title="수동 새로고침" style={{ padding: '4px 8px' }}>
             <RefreshCw size={13} />
@@ -204,6 +239,8 @@ interface ShellProps {
   wsStatus?: WsStatus
   wsMessage?: Record<string, unknown> | null
   onRefresh?: () => void
+  refreshInterval?: number
+  onIntervalChange?: (ms: number) => void
 }
 
 export function Shell({
@@ -214,6 +251,8 @@ export function Shell({
   wsStatus,
   wsMessage,
   onRefresh,
+  refreshInterval,
+  onIntervalChange,
 }: ShellProps) {
   return (
     <div className="shell">
@@ -225,6 +264,8 @@ export function Shell({
           wsStatus={wsStatus}
           wsMessage={wsMessage}
           onRefresh={onRefresh}
+          refreshInterval={refreshInterval}
+          onIntervalChange={onIntervalChange}
         />
         <div className="content">
           {children}
