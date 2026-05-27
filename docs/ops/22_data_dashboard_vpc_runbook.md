@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27 v0.9  사용자 요청으로 infra/data-dashboard 재기동 완료 기준 반영. apply 73 added, post-apply plan No changes, ECS running 1, target healthy, API /healthz HTTP 200.
   - 2026-05-27 v0.8  post-migration permanent diff 정리 완료 반영. permanent root 3개 in-place change 적용 후 permanent/dns plan No changes, state count 0/25/1 확인.
   - 2026-05-26 v0.7  Step 9.5 이후 infra/data-dashboard destroy 완료 기준 반영. permanent/dns root 유지와 API DNS 제거 상태 명시.
   - 2026-05-26 v0.6  Step 9.5 migration 완료 결과 반영. checklist 체크 완료. 엔드포인트 검증 확인.
@@ -34,6 +35,21 @@ scripts/destroy/destroy-hub.sh
 scripts/destroy/destroy-all.sh
 ```
 
+## 현재 Active 기준 (2026-05-27 재기동 후)
+
+사용자 요청으로 `infra/data-dashboard/` 일시 root를 다시 올렸다.
+
+```text
+terraform apply: 73 added, 0 changed, 0 destroyed
+terraform post-apply plan: No changes
+infra/data-dashboard managed resource count: 73
+ECS backend service: desired 1 / running 1 / rollout completed
+ALB target group: healthy
+dashboard.aegis-pi.cloud: HTTP 200
+api.aegis-pi.cloud/healthz: HTTP 200
+backend image: sha-9d2c200
+```
+
 ## Destroy 후 잔여 기준
 
 `scripts/destroy/destroy-data-dashboard.sh` 이후 남는 리소스:
@@ -61,7 +77,7 @@ scripts/destroy/destroy-all.sh
 - 기존 IoT Rule `AEGIS_IoTRule_factory_a_raw_s3`
 - Hub/Foundation/EKS/Admin UI 리소스
 
-2026-05-27 재검증 결과:
+2026-05-27 재기동 전 destroy-state 재검증 결과:
 
 ```text
 infra/data-dashboard apply destroy: 73 destroyed

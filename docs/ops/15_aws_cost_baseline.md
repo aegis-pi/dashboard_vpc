@@ -4,6 +4,7 @@
 기준일: 2026-05-27
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-27 v2.6  사용자 요청으로 infra/data-dashboard 일시 root 재기동 완료 반영. VPC/NAT/ALB/ECS/RDS/Redis/Lambda/IoT Rules active, API /healthz HTTP 200. 비용 기준은 Phase 1 가동 시 표 적용.
   - 2026-05-27 v2.5  post-migration permanent diff 정리 완료 반영. DynamoDB daily-report PITR/deletion protection 활성화. 빈 테이블 기준 비용 영향은 미미하며 PITR은 데이터 증가 시 사용량 기반.
   - 2026-05-26 v2.4  Step 9.5 이후 infra/data-dashboard destroy 완료 반영. 일시 root state empty, permanent/dns root 유지, 잔여 비용 기준 갱신.
   - 2026-05-26 v2.3  Step 9.5 migration 완료 반영. infra/data-dashboard-permanent/ active root로 갱신. Cognito/ECR/DDB daily-report/S3-web/CloudFront/ACM CF cert/OIDC roles는 permanent root 관리로 재분류.
@@ -38,7 +39,7 @@
 
 ## 현재 Aegis 리소스 상태
 
-2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 2026-05-26 Data/Dashboard Step 9.5 permanent split + 일시 root destroy 완료 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard의 VPC/NAT/ALB/ECS/RDS/Redis/Lambda 일시 자원은 내려간 상태이며, `infra/data-dashboard-dns/`와 `infra/data-dashboard-permanent/`가 관리하는 영구 리소스만 유지된다.
+2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성 상태와 2026-05-27 Data/Dashboard Step 9.5 permanent split + 일시 root 재기동 완료 기준이다. Hub active 비용 산정은 아래 "Hub active 시 비용" 섹션에 별도로 유지한다. 1번 Data/Dashboard의 VPC/NAT/ALB/ECS/RDS/Redis/Lambda 일시 자원은 현재 active이며, `infra/data-dashboard-dns/`와 `infra/data-dashboard-permanent/`가 관리하는 영구 리소스도 유지된다. 비용 기준은 아래 "고정 시간 비용 — Phase 1 가동 시" 표를 적용한다.
 
 | 영역 | 리소스 | 수량/크기 | 상태 |
 | --- | --- | ---: | --- |
@@ -59,33 +60,33 @@
 | Route53 | public hosted zone `minsoo-tech.cloud` | 1 zone | active |
 | ACM | public certificate for Admin UI hosts | 1 regional certificate set | active / ISSUED |
 | ALB | `aegis-admin-ui` | 1 | active |
-| Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 일시 root | destroyed. 2026-05-26 73 destroyed, state empty |
+| Data/Dashboard VPC | `infra/data-dashboard/` Terraform | 일시 root | active. 2026-05-27 apply 73 added, post-apply plan No changes |
 | Data/Dashboard VPC | `infra/data-dashboard-permanent/` Terraform | 25 imported resources | **active (영구 자원)**. Cognito / ECR / DDB daily-report / S3-web / CloudFront / ACM CF cert / OIDC roles 관리 |
 | Data/Dashboard VPC | backend-bootstrap: `kjw-aegis-terraform-state` S3 backend bucket + S3 native lockfile | 1 bucket (+ ownership/public-block/versioning/SSE) | active, 유지 |
 | Data/Dashboard VPC | Route53 hosted zone `aegis-pi.cloud` | 1 zone | **active (영구 자원)**. Step 7.5 이후 `infra/data-dashboard-dns/` root가 관리. `infra/data-dashboard` destroy 대상에서 제외. `$0.50/월` 상시 발생 |
-| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs | 0 | destroyed, 일시 root |
+| Data/Dashboard VPC | 1번 VPC / NAT GW (Azone 단일) / ALB / SGs | 1 set | active, 일시 root |
 | Data/Dashboard VPC | Cognito User Pool / App Client / Hosted UI Domain | 1 set | active, permanent root |
 | Data/Dashboard VPC | S3-web bucket / CloudFront / OAC / dashboard Route53 record | 1 set | active, permanent root |
-| Data/Dashboard VPC | ACM alb (ap-south-1) | 0 | destroyed, 일시 root |
+| Data/Dashboard VPC | ACM alb (ap-south-1) | 1 certificate | active / ISSUED, 일시 root |
 | Data/Dashboard VPC | ACM cloudfront (us-east-1) | 1 certificate | active / ISSUED, permanent root |
-| Data/Dashboard VPC | HTTPS listener / api Route53 record | 0 | destroyed, 일시 root |
+| Data/Dashboard VPC | HTTPS listener / api Route53 record | 1 set | active, API `/healthz` HTTP 200 |
 | Data/Dashboard VPC | DynamoDB `AEGIS-DynamoDB-FactoryStatus` | 1 table | **active**. 공식 hot store(ADR 0022), Streams NEW_AND_OLD_IMAGES 활성(2026-05-21). data-dashboard 재생성 시 Lambda write 대상 |
 | Data/Dashboard VPC | DynamoDB `aegis-factory-status` | 0 | deleted |
 | Data/Dashboard VPC | DynamoDB `aegis-daily-report` | 1 table | active, on-demand, permanent root |
-| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | 0 instance | destroyed. final snapshot available |
-| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | 0 | destroyed |
-| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 0 | destroyed |
-| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 0 | destroyed |
-| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 0 | destroyed |
-| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 0 | destroyed |
-| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 0 | destroyed |
-| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 0 | destroyed |
-| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 0 | destroyed |
+| Data/Dashboard VPC | RDS PostgreSQL `kjw-aegis-data-pg` | 1 instance | active, db.t4g.micro Single-AZ |
+| Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | 1 node | active |
+| Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 2 | active |
+| Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 1 | active |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 1 | active |
+| Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 1 | active |
+| Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 | active |
+| Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 | active |
+| Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 | active |
 | Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료 (2026-05-26). pytest 18 passed, docker build 통과 |
 | Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-9d2c200` push 확인 |
-| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 0 | destroyed |
-| Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 0 | destroyed |
-| Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 0 | destroyed |
+| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 1 running task | active, desired/running 1, target healthy |
+| Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active |
+| Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 | active |
 | Data/Dashboard VPC | IAM OIDC roles (ECR push + web deploy) | 2 roles | active, permanent root. IAM: 무료 |
 | Data/Dashboard VPC | S3 web bucket deploy (PUT/DELETE/GET ops) | usage-based | Step 9 workflow 실행 완료. PUT ~$0.005/1000 req, GET ~$0.0004/1000 req |
 | Data/Dashboard VPC | CloudFront invalidation `//*` | usage-based | 월 1,000 paths 무료, 초과 $0.005/path |

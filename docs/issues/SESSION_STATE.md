@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-27
 수정 이력:
+  - 2026-05-27  사용자 요청으로 infra/data-dashboard 일시 root 재기동 완료. apply 73 added, 0 changed, 0 destroyed. ECS desired/running 1, rollout completed, target healthy, https://api.aegis-pi.cloud/healthz HTTP 200. post-apply plan No changes.
   - 2026-05-27  세션 시작 상태 검증 및 post-migration permanent diff 정리 완료. state count: infra/data-dashboard=0, infra/data-dashboard-permanent=25, infra/data-dashboard-dns=1. permanent/dns plan No changes. dashboard 웹 HTTP 200, API DNS 미해결은 정상.
   - 2026-05-26  Step 9.5 이후 비용 절감을 위해 infra/data-dashboard destroy 완료 반영. 73 resources destroyed, state empty. permanent/dns root는 유지. dashboard 웹은 HTTP 200, API DNS 제거는 정상 상태.
   - 2026-05-26  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설(25 resources import). data-dashboard state rm 20개. 양쪽 plan No destroy. HTTP 200 엔드포인트 확인. 다음: post-migration plan diff 정리 후 Step 10 운영 자동화/데모 준비.
@@ -341,7 +342,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent resource split migration, post-migration permanent diff 정리, 임시 root destroy 완료. infra/data-dashboard-permanent/ 25 resources와 infra/data-dashboard-dns/ hosted zone은 유지. infra/data-dashboard/는 73 resources destroyed, state empty. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz는 API/ALB/DNS 제거로 미응답이 정상. 다음: Step 10 운영 자동화/데모 준비 또는 사용자의 수동 테스트/캡처 진행.
+현재 단계: Phase 1 Step 9.5 permanent resource split migration과 post-migration permanent diff 정리 완료 후, 사용자 요청으로 infra/data-dashboard 일시 root를 재기동한 상태. infra/data-dashboard/ apply 73 added, post-apply plan No changes. ECS desired/running 1, rollout completed, target healthy. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. 다음: 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -353,7 +354,7 @@ Phase 1 Step 4 본 구현: 2026-05-21 완료 (ADR 0021). Lambda KJW-AEGIS-Data-L
 Phase 1 Step 5 본 구현: 2026-05-21 완료. Lambda notifier KJW-AEGIS-Data-Lambda-notifier active. DDB Streams ESM Enabled. DDB write → Redis PUBLISH 0.45초 검증. DLQ=0.
 backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
 S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
-Data/Dashboard VPC 일시 root: 2026-05-26 destroy 완료(73 destroyed). Terraform state empty. VPC/subnets/NAT GW/ALB/RDS/Redis/Lambda/SQS/API DNS/ALB ACM/런타임 Secrets 삭제 완료. CloudFront/Cognito/S3-web/CF ACM/aegis-daily-report/ECR/OIDC roles는 permanent root로 유지.
+Data/Dashboard VPC 일시 root: 2026-05-27 재기동 완료(73 added). VPC/subnets/NAT GW/ALB/RDS/Redis/Lambda/SQS/API DNS/ALB ACM/런타임 Secrets active. CloudFront/Cognito/S3-web/CF ACM/aegis-daily-report/ECR/OIDC roles는 permanent root로 유지.
 공식 DynamoDB hot store: AEGIS-DynamoDB-FactoryStatus (Streams NEW_AND_OLD_IMAGES 활성. data-dashboard 재생성 시 Lambda data processor write / notifier ESM 연결)
 중복 DynamoDB table: aegis-factory-status 삭제 완료 (2026-05-21, ADR 0022 cleanup)
 Data/Dashboard 잔여 리소스: kjw-aegis-terraform-state S3 backend bucket, infra/data-dashboard-dns hosted zone, infra/data-dashboard-permanent 리소스 25개, RDS final snapshot
