@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     ddb_table_status: str = "AEGIS-DynamoDB-FactoryStatus"
     ddb_table_report: str = "aegis-daily-report"
     dashboard_factory_ids: str = "factory-a,factory-b,factory-c"
-    dashboard_factory_discovery_mode: str = "scan_latest"
+    dashboard_factory_discovery_mode: str = "batch_get"
     dashboard_factory_scan_limit: int = 200
     ddb_connect_timeout_seconds: float = 2.0
     ddb_read_timeout_seconds: float = 5.0

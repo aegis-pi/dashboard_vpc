@@ -239,7 +239,7 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "DDB_TABLE_STATUS", value = data.aws_dynamodb_table.official_factory_status.name },
         { name = "DDB_TABLE_REPORT", value = data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_name },
         { name = "DASHBOARD_FACTORY_IDS", value = "factory-a,factory-b,factory-c" },
-        { name = "DASHBOARD_FACTORY_DISCOVERY_MODE", value = "scan_latest" },
+        { name = "DASHBOARD_FACTORY_DISCOVERY_MODE", value = "batch_get" },
         { name = "DASHBOARD_FACTORY_SCAN_LIMIT", value = "200" },
         { name = "DDB_CONNECT_TIMEOUT_SECONDS", value = "2" },
         { name = "DDB_READ_TIMEOUT_SECONDS", value = "5" },
