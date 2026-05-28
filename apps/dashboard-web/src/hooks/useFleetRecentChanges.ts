@@ -11,7 +11,7 @@ export interface RecentChange {
   ts: number
 }
 
-// Fetches 24h HISTORY#STATE for each factory, derives risk_level transitions.
+// Fetches 1h HISTORY#STATE for each factory, derives risk_level transitions.
 export function useFleetRecentChanges(factoryIds: string[]) {
   const [events, setEvents] = useState<RecentChange[]>([])
   const [loading, setLoading] = useState(false)
@@ -37,7 +37,7 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     }
     if (mounted.current) setLoading(true)
     try {
-      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '24h')))
+      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '1h')))
       if (!mounted.current || requestSeq.current !== seq) return
       const all: RecentChange[] = []
       ids.forEach((factoryId, idx) => {

@@ -63,14 +63,15 @@ async def get_factory(
 async def get_factory_history(
     factory_id: str,
     window: str = Query(default="1h", pattern=r"^\d+[hmd]$"),
+    limit: int = Query(default=500, ge=1, le=2000),
     _claims: dict = Depends(verify_cognito_token),
 ):
-    """Return HISTORY#STATE items with risk/factory_state/infra_state extracted.
+    """Return the most recent HISTORY#STATE items (newest-first cap, returned ascending).
 
     window examples: 1h, 2h, 24h, 7d, 30m
-    HISTORY#RISK / HISTORY#FACTORY / HISTORY#INFRA prefixes are not queried.
+    limit: hard cap on items returned (default 500, max 2000).
     """
     try:
-        return await ddb.get_factory_history(factory_id, window)
+        return await ddb.get_factory_history(factory_id, window, limit)
     except ddb.DynamoDBUnavailableError as exc:
         raise _ddb_gateway_timeout() from exc

@@ -151,25 +151,35 @@ def _list_factories_by_scan_sync(table_name: str, limit: int) -> list[dict]:
     )
 
 
-def _get_history_sync(table_name: str, factory_id: str, since_sk: str) -> list[dict]:
-    """Query only HISTORY#STATE items at or after since_sk."""
+def _get_history_sync(
+    table_name: str, factory_id: str, since_sk: str, max_items: int = 500
+) -> list[dict]:
+    """Query HISTORY#STATE items newest-first up to max_items, then re-sort ascending.
+
+    Paginates with ScanIndexForward=False so the hard cap always returns the
+    most recent data points rather than the oldest ones.  Without this cap,
+    a 24-hour window on a large table (100k+ items) can require 50+ DynamoDB
+    page calls, exceeding the operation timeout and saturating the semaphore.
+    """
+    page_size = min(300, max_items)
     table = _ddb().Table(table_name)
     kwargs: dict = dict(
         KeyConditionExpression=(
             Key("pk").eq(f"FACTORY#{factory_id}")
             & Key("sk").between(since_sk, f"{HISTORY_STATE_PREFIX}~")
         ),
-        ScanIndexForward=True,
+        ScanIndexForward=False,
+        Limit=page_size,
     )
     items: list = []
     while True:
         resp = table.query(**kwargs)
         items.extend(resp.get("Items", []))
-        if "LastEvaluatedKey" not in resp:
+        if len(items) >= max_items or "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
-    return [_from_ddb(i) for i in items]
+    return [_from_ddb(i) for i in reversed(items[:max_items])]
 
 
 # ─── Public async interface ───────────────────────────────────────────────────
@@ -191,12 +201,14 @@ async def list_factories() -> list[dict]:
     return await _run_ddb(_list_factories_sync, table_name, _factory_ids())
 
 
-async def get_factory_history(factory_id: str, window: str = "1h") -> list[dict]:
+async def get_factory_history(
+    factory_id: str, window: str = "1h", max_items: int = 500
+) -> list[dict]:
     """Query HISTORY#STATE items and extract risk/factory_state/infra_state."""
     since = _since_iso(window)
     since_sk = f"{HISTORY_STATE_PREFIX}{since}"
     table_name = get_settings().ddb_table_status
-    raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk)
+    raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items)
     return [_extract(i) for i in raw]
 
 
