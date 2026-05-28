@@ -1,8 +1,9 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-27
+기준일: 2026-05-28
 수정 이력:
+  - 2026-05-28  사용자 요청으로 변경을 역할별 커밋 후 push 완료. commits: web `9a5ff29`, infra `d4a14d3`, backend `21056d5`. GitHub Actions dashboard-web/dashboard-backend 성공. ECR image `sha-21056d5` push 확인, Terraform apply로 ECS task definition revision 9 반영, desired/running 1, `/healthz` 200, `/readyz` 200, post-apply plan No changes.
   - 2026-05-27  사용자 요청으로 infra/data-dashboard destroy 완료. Terraform destroy: 73 destroyed. Lambda VPC ENI 해제 지연으로 private_app subnet/SG 삭제가 오래 걸렸으나 최종 완료. state count: data-dashboard=0, permanent=25, dns=1. permanent/dns plan No changes. dashboard 웹 HTTP 200, API DNS 미해결은 정상.
   - 2026-05-27  dashboard-backend CORS 운영 origin 명시 수정 및 ECS backend image `sha-f6422a7` 적용 완료. 원인: 인증 API 응답의 wildcard CORS + credentials 조합으로 브라우저가 `Failed to fetch` 표시 가능. 검증: backend pytest 28 passed, web lint/test/build 통과, API `/healthz` 200, preflight `/factories` allow-origin 정상, ECS rollout completed.
   - 2026-05-27  dashboard-web refresh interval controls 구현 완료. TopBar interval selector(Off/5s/10s/30s/1m), Fleet 단순 auto refresh, Factory WS 우선 + 미연결 시 polling 연결. useFleetRecentChanges refresh 추가. 검증: npm run lint 통과, npm test -- --run 32 passed, npm run build 통과, git diff --check 통과. code commit `51e82bb`.
