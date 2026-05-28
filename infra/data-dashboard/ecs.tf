@@ -145,6 +145,7 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     effect = "Allow"
     actions = [
       "dynamodb:GetItem",
+      "dynamodb:BatchGetItem",
       "dynamodb:Query",
       "dynamodb:Scan",
     ]

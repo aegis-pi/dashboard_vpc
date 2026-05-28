@@ -54,6 +54,25 @@ async def log_http_request(request: Request, call_next):
         )
 
 
+@app.on_event("startup")
+async def _warmup_ddb():
+    """Establish DDB connection pool before ALB routes traffic.
+
+    Prevents semaphore cascade failures on cold starts: without this,
+    the first batch of concurrent requests each block on a slow cold-start
+    DDB call, saturate the semaphore, and the entire semaphore budget is
+    consumed by timeout waits — causing immediate 504s for all new requests.
+    """
+    settings = get_settings()
+    factory_ids = [f.strip() for f in settings.dashboard_factory_ids.split(",") if f.strip()]
+    probe = factory_ids[0] if factory_ids else "factory-a"
+    try:
+        await ddb.get_factory_latest(probe)
+        logger.info("ddb_warmup ok probe=%s", probe)
+    except Exception as exc:
+        logger.warning("ddb_warmup failed probe=%s err=%s", probe, exc)
+
+
 @app.get("/healthz", tags=["health"])
 async def healthz():
     return {"status": "ok"}
