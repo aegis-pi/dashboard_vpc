@@ -238,12 +238,32 @@ resource "aws_ecs_task_definition" "backend" {
       environment = [
         { name = "DDB_TABLE_STATUS", value = data.aws_dynamodb_table.official_factory_status.name },
         { name = "DDB_TABLE_REPORT", value = data.terraform_remote_state.permanent.outputs.dynamodb_daily_report_name },
+        { name = "DASHBOARD_FACTORY_IDS", value = "factory-a,factory-b,factory-c" },
+        { name = "DASHBOARD_FACTORY_DISCOVERY_MODE", value = "scan_latest" },
+        { name = "DASHBOARD_FACTORY_SCAN_LIMIT", value = "200" },
+        { name = "DDB_CONNECT_TIMEOUT_SECONDS", value = "2" },
+        { name = "DDB_READ_TIMEOUT_SECONDS", value = "5" },
+        { name = "DDB_OPERATION_TIMEOUT_SECONDS", value = "12" },
+        { name = "DDB_MAX_ATTEMPTS", value = "2" },
+        { name = "DDB_MAX_POOL_CONNECTIONS", value = "20" },
+        { name = "DDB_MAX_CONCURRENT_OPERATIONS", value = "10" },
         { name = "S3_BUCKET_DATA", value = var.shared_data_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "COGNITO_USER_POOL_ID", value = data.terraform_remote_state.permanent.outputs.cognito_user_pool_id },
         { name = "COGNITO_APP_CLIENT_ID", value = data.terraform_remote_state.permanent.outputs.cognito_app_client_id },
+        { name = "COGNITO_JWKS_TIMEOUT_SECONDS", value = "5" },
+        { name = "COGNITO_JWKS_TTL_SECONDS", value = "3600" },
         # REDIS_AUTH_TOKEN_SECRET_ARN: ARN only (not the token itself).
         { name = "REDIS_AUTH_TOKEN_SECRET_ARN", value = aws_secretsmanager_secret.redis_auth.arn },
+        { name = "REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", value = "2" },
+        { name = "REDIS_SOCKET_TIMEOUT_SECONDS", value = "5" },
+        { name = "REDIS_HEALTH_CHECK_INTERVAL_SECONDS", value = "30" },
+        { name = "REDIS_PUBSUB_OPERATION_TIMEOUT_SECONDS", value = "6" },
+        { name = "S3_CONNECT_TIMEOUT_SECONDS", value = "2" },
+        { name = "S3_READ_TIMEOUT_SECONDS", value = "5" },
+        { name = "S3_OPERATION_TIMEOUT_SECONDS", value = "12" },
+        { name = "S3_MAX_ATTEMPTS", value = "2" },
+        { name = "S3_MAX_POOL_CONNECTIONS", value = "10" },
       ]
 
       # Sensitive values injected from Secrets Manager at container launch.
