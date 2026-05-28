@@ -3,9 +3,11 @@
 Channel: factory:update:{factory_id}
 Token: passed as ?token=<JWT> query parameter (browsers cannot set WS headers).
 """
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from redis.exceptions import RedisError
 
 from config import Settings, get_settings
 from deps.auth import verify_ws_token
@@ -31,8 +33,11 @@ async def ws_factory(
     await websocket.accept()
     channel = f"factory:update:{factory_id}"
     pubsub = redis.pubsub()
-    await pubsub.subscribe(channel)
     try:
+        await asyncio.wait_for(
+            pubsub.subscribe(channel),
+            timeout=settings.redis_pubsub_operation_timeout_seconds,
+        )
         async for message in pubsub.listen():
             if message.get("type") == "message":
                 data = message.get("data", "")
@@ -40,6 +45,11 @@ async def ws_factory(
                 await websocket.send_text(payload)
     except WebSocketDisconnect:
         pass
+    except (asyncio.TimeoutError, RedisError):
+        await websocket.close(code=1011)
     finally:
-        await pubsub.unsubscribe(channel)
+        try:
+            await pubsub.unsubscribe(channel)
+        except RedisError:
+            pass
         await pubsub.aclose()

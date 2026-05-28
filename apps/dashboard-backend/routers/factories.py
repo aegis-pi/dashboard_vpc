@@ -6,11 +6,18 @@ from services import ddb
 router = APIRouter(prefix="/factories", tags=["factories"])
 
 
+def _ddb_gateway_timeout() -> HTTPException:
+    return HTTPException(status_code=504, detail="DynamoDB request timed out")
+
+
 @router.get("")
 async def list_factories(
     _claims: dict = Depends(verify_cognito_token),
 ):
-    items = await ddb.list_factories()
+    try:
+        items = await ddb.list_factories()
+    except ddb.DynamoDBUnavailableError as exc:
+        raise _ddb_gateway_timeout() from exc
     result = []
     for i in items:
         factory_id = i.get("factory_id") or i.get("pk", "").removeprefix("FACTORY#")
@@ -43,7 +50,10 @@ async def get_factory(
     factory_id: str,
     _claims: dict = Depends(verify_cognito_token),
 ):
-    item = await ddb.get_factory_latest(factory_id)
+    try:
+        item = await ddb.get_factory_latest(factory_id)
+    except ddb.DynamoDBUnavailableError as exc:
+        raise _ddb_gateway_timeout() from exc
     if item is None:
         raise HTTPException(status_code=404, detail=f"Factory '{factory_id}' not found")
     return item
@@ -60,4 +70,7 @@ async def get_factory_history(
     window examples: 1h, 2h, 24h, 7d, 30m
     HISTORY#RISK / HISTORY#FACTORY / HISTORY#INFRA prefixes are not queried.
     """
-    return await ddb.get_factory_history(factory_id, window)
+    try:
+        return await ddb.get_factory_history(factory_id, window)
+    except ddb.DynamoDBUnavailableError as exc:
+        raise _ddb_gateway_timeout() from exc

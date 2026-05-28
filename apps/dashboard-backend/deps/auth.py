@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Optional
 
@@ -12,7 +13,7 @@ security = HTTPBearer(auto_error=False)
 
 _jwks_cache: Optional[dict] = None
 _jwks_cache_at: float = 0.0
-_JWKS_TTL = 3600.0
+_jwks_lock: Optional[asyncio.Lock] = None
 
 
 def _jwks_url(settings: Settings) -> str:
@@ -22,17 +23,41 @@ def _jwks_url(settings: Settings) -> str:
     )
 
 
-async def _fetch_jwks(url: str) -> dict:
-    global _jwks_cache, _jwks_cache_at
-    now = time.monotonic()
-    if _jwks_cache and (now - _jwks_cache_at) < _JWKS_TTL:
-        return _jwks_cache
-    async with httpx.AsyncClient(timeout=5.0) as client:
+async def _fetch_jwks(url: str, timeout: float) -> dict:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.get(url)
         resp.raise_for_status()
-        _jwks_cache = resp.json()
+        return resp.json()
+
+
+def _get_jwks_lock() -> asyncio.Lock:
+    global _jwks_lock
+    if _jwks_lock is None:
+        _jwks_lock = asyncio.Lock()
+    return _jwks_lock
+
+
+async def _get_jwks(settings: Settings) -> dict:
+    global _jwks_cache, _jwks_cache_at
+    now = time.monotonic()
+    if _jwks_cache and (now - _jwks_cache_at) < settings.cognito_jwks_ttl_seconds:
+        return _jwks_cache
+
+    async with _get_jwks_lock():
+        now = time.monotonic()
+        if _jwks_cache and (now - _jwks_cache_at) < settings.cognito_jwks_ttl_seconds:
+            return _jwks_cache
+        try:
+            _jwks_cache = await _fetch_jwks(
+                _jwks_url(settings),
+                settings.cognito_jwks_timeout_seconds,
+            )
+        except Exception:
+            if _jwks_cache:
+                return _jwks_cache
+            raise
         _jwks_cache_at = now
-    return _jwks_cache
+        return _jwks_cache
 
 
 def _find_jwk(jwks: dict, kid: str) -> Optional[dict]:
@@ -58,7 +83,7 @@ async def _decode_token(token: str, settings: Settings) -> dict:
         raise ValueError("Malformed token header")
 
     kid = header.get("kid", "")
-    jwks = await _fetch_jwks(_jwks_url(settings))
+    jwks = await _get_jwks(settings)
     key = _find_jwk(jwks, kid)
     if key is None:
         raise ValueError("Unknown signing key")

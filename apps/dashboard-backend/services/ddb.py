@@ -11,21 +11,82 @@ exists in the data contract; querying them is explicitly forbidden.
 import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from functools import lru_cache
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
+from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 from config import get_settings
 
 LATEST_SK = "LATEST"
 HISTORY_STATE_PREFIX = "HISTORY#STATE#"
+MAX_BATCH_GET_KEYS = 100
+_ddb_semaphore: asyncio.Semaphore | None = None
+_ddb_semaphore_limit: int | None = None
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
 
+
+class DynamoDBUnavailableError(RuntimeError):
+    """Raised when DynamoDB cannot answer within the API budget."""
+
+
+@lru_cache(maxsize=8)
+def _ddb_resource(
+    region_name: str,
+    connect_timeout: float,
+    read_timeout: float,
+    max_attempts: int,
+    max_pool_connections: int,
+):
+    return boto3.resource(
+        "dynamodb",
+        region_name=region_name,
+        config=Config(
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            retries={"total_max_attempts": max_attempts, "mode": "standard"},
+            max_pool_connections=max_pool_connections,
+        ),
+    )
+
+
 def _ddb():
     s = get_settings()
-    return boto3.resource("dynamodb", region_name=s.aws_region)
+    return _ddb_resource(
+        s.aws_region,
+        s.ddb_connect_timeout_seconds,
+        s.ddb_read_timeout_seconds,
+        s.ddb_max_attempts,
+        s.ddb_max_pool_connections,
+    )
+
+
+def _operation_semaphore() -> asyncio.Semaphore:
+    global _ddb_semaphore, _ddb_semaphore_limit
+    limit = get_settings().ddb_max_concurrent_operations
+    if _ddb_semaphore is None or _ddb_semaphore_limit != limit:
+        _ddb_semaphore = asyncio.Semaphore(limit)
+        _ddb_semaphore_limit = limit
+    return _ddb_semaphore
+
+
+async def _run_ddb_in_thread(func, *args):
+    async with _operation_semaphore():
+        return await asyncio.to_thread(func, *args)
+
+
+async def _run_ddb(func, *args):
+    timeout = get_settings().ddb_operation_timeout_seconds
+    try:
+        return await asyncio.wait_for(_run_ddb_in_thread(func, *args), timeout=timeout)
+    except asyncio.TimeoutError as exc:
+        raise DynamoDBUnavailableError("DynamoDB operation timed out") from exc
+    except (BotoCoreError, ClientError) as exc:
+        raise DynamoDBUnavailableError("DynamoDB operation failed") from exc
 
 
 def _from_ddb(obj):
@@ -39,6 +100,11 @@ def _from_ddb(obj):
     return obj
 
 
+def _factory_ids() -> list[str]:
+    configured = get_settings().dashboard_factory_ids
+    return [factory_id.strip() for factory_id in configured.split(",") if factory_id.strip()]
+
+
 # ─── Synchronous DDB calls (run via asyncio.to_thread) ───────────────────────
 
 def _get_latest_sync(table_name: str, factory_id: str) -> dict | None:
@@ -48,26 +114,50 @@ def _get_latest_sync(table_name: str, factory_id: str) -> dict | None:
     return _from_ddb(item) if item else None
 
 
-def _list_factories_sync(table_name: str) -> list[dict]:
-    table = _ddb().Table(table_name)
-    resp = table.scan(FilterExpression=Attr("sk").eq(LATEST_SK))
-    items: list = resp.get("Items", [])
-    while "LastEvaluatedKey" in resp:
-        resp = table.scan(
-            FilterExpression=Attr("sk").eq(LATEST_SK),
-            ExclusiveStartKey=resp["LastEvaluatedKey"],
-        )
-        items.extend(resp.get("Items", []))
+def _list_factories_sync(table_name: str, factory_ids: list[str]) -> list[dict]:
+    if not factory_ids:
+        return []
+    keys = [{"pk": f"FACTORY#{factory_id}", "sk": LATEST_SK} for factory_id in factory_ids]
+    client = _ddb().meta.client
+    items: list = []
+    for offset in range(0, len(keys), MAX_BATCH_GET_KEYS):
+        request_items = {table_name: {"Keys": keys[offset : offset + MAX_BATCH_GET_KEYS]}}
+        while request_items:
+            resp = client.batch_get_item(RequestItems=request_items)
+            items.extend(resp.get("Responses", {}).get(table_name, []))
+            request_items = resp.get("UnprocessedKeys", {})
+
     return [_from_ddb(i) for i in items]
 
 
+def _list_factories_by_scan_sync(table_name: str, limit: int) -> list[dict]:
+    table = _ddb().Table(table_name)
+    kwargs: dict = {
+        "FilterExpression": Attr("sk").eq(LATEST_SK),
+        "Limit": 100,
+    }
+    items: list = []
+    while True:
+        resp = table.scan(**kwargs)
+        items.extend(resp.get("Items", []))
+        if len(items) >= limit or "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+    converted = [_from_ddb(i) for i in items[:limit]]
+    return sorted(
+        converted,
+        key=lambda item: str(item.get("factory_id") or item.get("pk", "")),
+    )
+
+
 def _get_history_sync(table_name: str, factory_id: str, since_sk: str) -> list[dict]:
-    """Query HISTORY#STATE items; filter to those at or after since_sk in Python."""
+    """Query only HISTORY#STATE items at or after since_sk."""
     table = _ddb().Table(table_name)
     kwargs: dict = dict(
         KeyConditionExpression=(
             Key("pk").eq(f"FACTORY#{factory_id}")
-            & Key("sk").begins_with(HISTORY_STATE_PREFIX)
+            & Key("sk").between(since_sk, f"{HISTORY_STATE_PREFIX}~")
         ),
         ScanIndexForward=True,
     )
@@ -79,19 +169,26 @@ def _get_history_sync(table_name: str, factory_id: str, since_sk: str) -> list[d
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
-    return [_from_ddb(i) for i in items if i.get("sk", "") >= since_sk]
+    return [_from_ddb(i) for i in items]
 
 
 # ─── Public async interface ───────────────────────────────────────────────────
 
 async def get_factory_latest(factory_id: str) -> dict | None:
     table_name = get_settings().ddb_table_status
-    return await asyncio.to_thread(_get_latest_sync, table_name, factory_id)
+    return await _run_ddb(_get_latest_sync, table_name, factory_id)
 
 
 async def list_factories() -> list[dict]:
     table_name = get_settings().ddb_table_status
-    return await asyncio.to_thread(_list_factories_sync, table_name)
+    settings = get_settings()
+    if settings.dashboard_factory_discovery_mode == "scan_latest":
+        return await _run_ddb(
+            _list_factories_by_scan_sync,
+            table_name,
+            settings.dashboard_factory_scan_limit,
+        )
+    return await _run_ddb(_list_factories_sync, table_name, _factory_ids())
 
 
 async def get_factory_history(factory_id: str, window: str = "1h") -> list[dict]:
@@ -99,7 +196,7 @@ async def get_factory_history(factory_id: str, window: str = "1h") -> list[dict]
     since = _since_iso(window)
     since_sk = f"{HISTORY_STATE_PREFIX}{since}"
     table_name = get_settings().ddb_table_status
-    raw = await asyncio.to_thread(_get_history_sync, table_name, factory_id, since_sk)
+    raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk)
     return [_extract(i) for i in raw]
 
 

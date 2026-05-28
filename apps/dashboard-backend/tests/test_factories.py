@@ -1,4 +1,5 @@
 """Factory endpoint tests — DDB LATEST mapping."""
+from services import ddb
 
 
 def test_list_factories_returns_200(client, ddb_mock):
@@ -87,3 +88,78 @@ def test_list_factories_flat_format_factory_b(client, ddb_mock):
     assert fb["node_ready"] == 2
     assert fb["node_total"] == 2
     assert fb["risk_level"] == "warning"
+
+
+def test_list_factories_scan_latest_discovers_unconfigured_factory(client, ddb_mock):
+    items = client.get("/factories").json()
+    ids = [i["factory_id"] for i in items]
+    assert "factory-d" in ids
+
+
+def test_configured_list_factories_does_not_use_table_scan(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def batch_get_item(self, RequestItems):
+            calls.append(RequestItems)
+            return {"Responses": {"status-table": []}}
+
+    class FakeResource:
+        meta = type("Meta", (), {"client": FakeClient()})()
+
+        def Table(self, table_name):
+            raise AssertionError("configured mode must not scan the table")
+
+    monkeypatch.setattr(ddb, "_ddb", lambda: FakeResource())
+
+    result = ddb._list_factories_sync("status-table", ["factory-a"])
+
+    assert result == []
+    assert calls
+
+
+def test_list_factories_chunks_batch_get_requests(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def batch_get_item(self, RequestItems):
+            keys = RequestItems["status-table"]["Keys"]
+            calls.append(len(keys))
+            return {"Responses": {"status-table": []}}
+
+    class FakeResource:
+        meta = type("Meta", (), {"client": FakeClient()})()
+
+    monkeypatch.setattr(ddb, "_ddb", lambda: FakeResource())
+    factory_ids = [f"factory-{i}" for i in range(205)]
+
+    result = ddb._list_factories_sync("status-table", factory_ids)
+
+    assert result == []
+    assert calls == [100, 100, 5]
+
+
+def test_ddb_client_uses_explicit_timeouts(ddb_mock):
+    config = ddb._ddb().meta.client.meta.config
+    assert config.connect_timeout == 2.0
+    assert config.read_timeout == 5.0
+    assert config.retries["mode"] == "standard"
+    assert config.retries["total_max_attempts"] == 2
+    assert config.max_pool_connections == 20
+
+
+def test_ddb_operations_use_concurrency_limit():
+    semaphore = ddb._operation_semaphore()
+    assert semaphore._value == 10
+
+
+def test_list_factories_ddb_timeout_returns_504(client, monkeypatch):
+    async def _raise_timeout():
+        raise ddb.DynamoDBUnavailableError("timeout")
+
+    monkeypatch.setattr(ddb, "list_factories", _raise_timeout)
+
+    r = client.get("/factories")
+
+    assert r.status_code == 504
+    assert r.json()["detail"] == "DynamoDB request timed out"

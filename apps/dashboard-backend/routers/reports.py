@@ -31,5 +31,7 @@ async def get_report(
     try:
         markdown = await s3.get_report_markdown(report_date, factory_id)
         return PlainTextResponse(markdown, media_type="text/markdown")
-    except Exception:
-        raise HTTPException(status_code=503, detail="Report not yet available")
+    except s3.S3ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Report not found") from exc
+    except s3.S3UnavailableError as exc:
+        raise HTTPException(status_code=504, detail="S3 request timed out") from exc

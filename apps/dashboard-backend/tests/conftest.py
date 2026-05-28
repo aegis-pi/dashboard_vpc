@@ -31,11 +31,31 @@ os.environ.update(
         "AWS_DEFAULT_REGION": "ap-south-1",
         "DATABASE_URL": "sqlite+aiosqlite://:memory:",
         "REDIS_URL": "redis://localhost:6379",
+        "REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS": "2",
+        "REDIS_SOCKET_TIMEOUT_SECONDS": "5",
+        "REDIS_HEALTH_CHECK_INTERVAL_SECONDS": "30",
+        "REDIS_PUBSUB_OPERATION_TIMEOUT_SECONDS": "6",
         "DDB_TABLE_STATUS": "AEGIS-DynamoDB-FactoryStatus",
         "DDB_TABLE_REPORT": "aegis-daily-report",
+        "DASHBOARD_FACTORY_IDS": "factory-a,factory-b,factory-c",
+        "DASHBOARD_FACTORY_DISCOVERY_MODE": "scan_latest",
+        "DASHBOARD_FACTORY_SCAN_LIMIT": "200",
+        "DDB_CONNECT_TIMEOUT_SECONDS": "2",
+        "DDB_READ_TIMEOUT_SECONDS": "5",
+        "DDB_OPERATION_TIMEOUT_SECONDS": "12",
+        "DDB_MAX_ATTEMPTS": "2",
+        "DDB_MAX_POOL_CONNECTIONS": "20",
+        "DDB_MAX_CONCURRENT_OPERATIONS": "10",
         "S3_BUCKET_DATA": "aegis-bucket-data",
+        "S3_CONNECT_TIMEOUT_SECONDS": "2",
+        "S3_READ_TIMEOUT_SECONDS": "5",
+        "S3_OPERATION_TIMEOUT_SECONDS": "12",
+        "S3_MAX_ATTEMPTS": "2",
+        "S3_MAX_POOL_CONNECTIONS": "10",
         "COGNITO_USER_POOL_ID": "ap-south-1_TESTPOOL",
         "COGNITO_APP_CLIENT_ID": "test-client-id",
+        "COGNITO_JWKS_TIMEOUT_SECONDS": "5",
+        "COGNITO_JWKS_TTL_SECONDS": "3600",
         "AWS_REGION": "ap-south-1",
     }
 )
@@ -124,8 +144,9 @@ def patch_jwks(mock_jwks, monkeypatch):
     """Replace _fetch_jwks with an in-memory stub and reset the module cache."""
     monkeypatch.setattr(auth_module, "_jwks_cache", None)
     monkeypatch.setattr(auth_module, "_jwks_cache_at", 0.0)
+    monkeypatch.setattr(auth_module, "_jwks_lock", None)
 
-    async def _stub(url: str) -> dict:
+    async def _stub(url: str, timeout: float) -> dict:
         return mock_jwks
 
     monkeypatch.setattr(auth_module, "_fetch_jwks", _stub)
@@ -181,6 +202,9 @@ def _now_minus(minutes: int) -> str:
 @pytest.fixture
 def ddb_mock():
     """Start moto mock, create AEGIS-DynamoDB-FactoryStatus with test items."""
+    import services.ddb as ddb_service
+
+    ddb_service._ddb_resource.cache_clear()
     with mock_aws():
         ddb = boto3.resource("dynamodb", region_name="ap-south-1")
         table = ddb.create_table(
@@ -250,6 +274,25 @@ def ddb_mock():
                 },
                 "pipeline_status": {"status": "normal"},
             },
+            # LATEST item — factory-d intentionally omitted from DASHBOARD_FACTORY_IDS
+            # so scan_latest discovery proves newly ingested factories appear.
+            {
+                "pk": "FACTORY#factory-d",
+                "sk": "LATEST",
+                "factory_id": "factory-d",
+                "updated_at": _now_minus(7),
+                "risk": {"score": 90.0, "level": "safe", "top_causes": []},
+                "factory_state": {
+                    "source_timestamp": _now_minus(7),
+                    "temperature_celsius": 24.0,
+                    "humidity_percent": 48.0,
+                },
+                "infra_state": {
+                    "source_timestamp": _now_minus(8),
+                    "node_summary": {"total": 1, "ready": 1, "not_ready": 0},
+                },
+                "pipeline_status": {"status": "normal"},
+            },
             # HISTORY#STATE item 1 (45 min ago) — _avg format
             {
                 "pk": "FACTORY#factory-a",
@@ -283,3 +326,4 @@ def ddb_mock():
             table.put_item(Item=_to_ddb(item))
 
         yield table
+    ddb_service._ddb_resource.cache_clear()

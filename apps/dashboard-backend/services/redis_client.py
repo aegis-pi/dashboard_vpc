@@ -16,5 +16,13 @@ _client: Optional[aioredis.Redis] = None
 async def get_redis() -> aioredis.Redis:
     global _client
     if _client is None:
-        _client = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        settings = get_settings()
+        _client = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_socket_connect_timeout_seconds,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+            health_check_interval=settings.redis_health_check_interval_seconds,
+            retry_on_timeout=True,
+        )
     return _client

@@ -19,6 +19,17 @@ def test_history_prefix_code_uses_only_history_state():
     assert "HISTORY#INFRA" not in source
 
 
+def test_history_query_filters_window_in_key_condition():
+    """Guard against reading all HISTORY#STATE items and filtering in Python."""
+    import inspect
+    import services.ddb as ddb_module
+
+    source = inspect.getsource(ddb_module._get_history_sync)
+    assert ".between(" in source
+    assert ".begins_with(" not in source
+    assert "if i.get" not in source
+
+
 def test_history_returns_200(client, ddb_mock):
     r = client.get("/factories/factory-a/history?window=1h")
     assert r.status_code == 200
