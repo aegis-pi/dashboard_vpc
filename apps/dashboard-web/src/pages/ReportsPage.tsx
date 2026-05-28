@@ -6,9 +6,9 @@ import {
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
 import { fetchReport } from '../api/client'
-import { ApiError, AuthError } from '../api/client'
 import { recentDates, todayStr } from '../adapters/reports'
 import { adaptSidebarFactory } from '../adapters/factory'
+import { classifyReportError } from '../utils/reportError'
 
 // ─── Markdown parser (no external deps) ────────────────────────────────
 
@@ -304,13 +304,7 @@ export function ReportsPage() {
       setReportContent(md || null)
       if (!md) setReportError('not_found')
     } catch (e) {
-      if (e instanceof ApiError && (e as ApiError).status === 404) {
-        setReportError('not_found')
-      } else if (e instanceof AuthError) {
-        setReportError('error')
-      } else {
-        setReportError('not_found')
-      }
+      setReportError(classifyReportError(e))
     } finally {
       setReportLoading(false)
     }

@@ -14,6 +14,10 @@ function assertEnv(val: string | undefined, name: string): string {
 
 let _userManager: UserManager | null = null
 
+export function hasValidSession(user: User | null | undefined): user is User {
+  return Boolean(user && !user.expired)
+}
+
 export function getUserManager(): UserManager {
   if (_userManager) return _userManager
 
@@ -42,7 +46,7 @@ export async function getAccessToken(): Promise<string | null> {
   try {
     const mgr = getUserManager()
     const user = await mgr.getUser()
-    if (!user || user.expired) return null
+    if (!hasValidSession(user)) return null
     return user.access_token
   } catch {
     return null
@@ -70,7 +74,9 @@ export async function logout(): Promise<void> {
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
-    return await getUserManager().getUser()
+    const user = await getUserManager().getUser()
+    if (!hasValidSession(user)) return null
+    return user
   } catch {
     return null
   }
