@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-29
 수정 이력:
+  - 2026-05-29 v1.8  Dashboard backend image `sha-3c20ec3` ECS revision 15 적용 완료. `/healthz`, `/readyz`, post-apply plan 정상.
   - 2026-05-29 v1.7  ADR 0025 구현 완료 반영. 알려진 이슈 섹션 현행화. window=6h/12h/24h → GRAPH#5M 분기 완료.
   - 2026-05-28 v1.6  알려진 이슈 섹션 추가. DynamoDB HISTORY cascade 504 사고 및 임시방편(max_items=500 cap), 근본 해결 방향(ADR 0025) 기록.
   - 2026-05-27 v1.5  세션 종료 전 infra/data-dashboard destroy 완료 반영. 73 destroyed, state empty, permanent/dns No changes.

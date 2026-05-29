@@ -4,6 +4,7 @@
 기준일: 2026-05-29
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-29 v3.0  Dashboard backend image `sha-3c20ec3` ECS revision 15 적용 완료. desired/running 1, rollout completed, `/healthz`와 `/readyz` 정상. 신규 AWS 리소스/고정 비용 변화 없음.
   - 2026-05-29 v2.9  ADR 0025 Multi-resolution history storage 반영. GraphAggregator5m/EventBridge와 GRAPH#5M 추가 write/storage는 무료 티어 또는 소액 usage-based이며 고정 시간 비용 변화 없음.
   - 2026-05-27 v2.8  Aegis-frontend 기준 운영 Dashboard UI 포팅 진행 상태와 top_causes 표시 보정 반영. web `e055583` 배포, backend image `sha-3b8439f` ECS 적용. 신규 AWS 리소스/고정 비용 변화 없음.
   - 2026-05-27 v2.7  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. backend image `sha-439e27a`, web/backend GitHub Actions 성공. 신규 AWS 리소스/고정 비용 변화 없음.
@@ -87,7 +88,7 @@
 | Data/Dashboard VPC | SQS DLQ `kjw-aegis-data-notifier-dlq` | 1 | active |
 | Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 | active |
 | Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료. 2026-05-27 UI/data shape 정합성 수정 후 pytest 25 passed |
-| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-3b8439f` push 확인 |
+| Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-3c20ec3` push 확인 |
 | Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 1 running task | active, desired/running 1, target healthy |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 | active |
@@ -99,7 +100,7 @@
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- 1번 Data/Dashboard VPC Backend는 active. ECS desired/running 1, ECR image `sha-3b8439f`, `/healthz` 200 확인
+- 1번 Data/Dashboard VPC Backend는 active. ECS desired/running 1, ECR image `sha-3c20ec3`, `/healthz` 200 확인
 - Lambda report-generator / Bedrock 일간 보고서는 팀원/후속 작업으로 현재 Step 8 범위가 아님
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산

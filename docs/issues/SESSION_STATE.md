@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-28
 수정 이력:
+  - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `a8fb0de`, web `fde09fe`, docs `3c20ec3`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-3c20ec3` push 확인, Terraform apply로 ECS task definition revision 15 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, post-apply plan No changes.
   - 2026-05-28  Multi-resolution history storage 아키텍처 문서화 완료. ADR 0025 신규 작성, troubleshooting #42 추가, data_storage_pipeline/api_spec/runbook 업데이트. 근본 해결(팀원 구현 예정) 까지 현행 임시방편(max_items=500 cap, window=1h) 유지.
   - 2026-05-28  history 쿼리 무한 페이징 cascade 504 수정 배포 완료. 원인: 테이블 116k 아이템, useFleetRecentChanges window=24h × 3공장 동시 무한 페이지 쿼리 → semaphore(10) 포화 → cascade 504. 수정: backend _get_history_sync ScanIndexForward=False + Limit=300/page + max_items=500 cap(최신 500건 역순 후 ascending 반환); routers ?limit 파라미터 추가; frontend 24h→1h. ECR sha-e17dbbf, CloudFront invalidation, ECS revision 12. /readyz dynamodb:ok redis:ok.
   - 2026-05-28  504 DynamoDB timeout 완전 수정 배포 완료. 원인 1: scan_latest 모드 전체 테이블 스캔(~100+ API 호출) timeout. 원인 2: 콜드 스타트 시 asyncio semaphore 포화 → 캐스케이드 504. 수정: scan_latest→batch_get(config.py+ecs.tf) + 기동 시 DDB warmup(@app.on_event startup) + IAM BatchGetItem 추가(ecs.tf). ECR image sha-dc17ea2, ECS task def revision 11, desired/running 1 stable. /healthz 200, /readyz dynamodb:ok redis:ok, /factories 401(정상). 기동 후 504 없음 확인.
