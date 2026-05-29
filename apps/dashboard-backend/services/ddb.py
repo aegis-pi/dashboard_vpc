@@ -277,6 +277,10 @@ def _extract_graph_5m(item: dict) -> dict:
     risk_mean = risk_score.get("mean")
     risk_min = risk_score.get("min")
 
+    ai_fire = ai_by_type.get("fire_score") or {}
+    ai_fall = ai_by_type.get("fall_score") or {}
+    ai_bend = ai_by_type.get("bend_score") or {}
+
     return {
         "timestamp": bucket_start or sk.removeprefix(GRAPH_5M_PREFIX),
         "bucket_start": bucket_start,
@@ -290,10 +294,13 @@ def _extract_graph_5m(item: dict) -> dict:
         "temperature_celsius_avg": temp.get("mean"),
         "humidity_percent_avg": humidity.get("mean"),
         "pressure_hpa_avg": pressure.get("mean"),
-        # AI — max per bucket to preserve spike visibility
-        "fire_score": (ai_by_type.get("fire_score") or {}).get("max"),
-        "fall_score": (ai_by_type.get("fall_score") or {}).get("max"),
-        "bend_score": (ai_by_type.get("bend_score") or {}).get("max"),
+        # AI — mean for line chart, max for spike markers (≥0.8)
+        "fire_score": ai_fire.get("mean"),
+        "fall_score": ai_fall.get("mean"),
+        "bend_score": ai_bend.get("mean"),
+        "fire_score_max": ai_fire.get("max"),
+        "fall_score_max": ai_fall.get("max"),
+        "bend_score_max": ai_bend.get("max"),
         "ai_max_score": ai.get("max_score"),
         # infra aggregates (no per-node breakdown in GRAPH#5M)
         "cpu_usage_percent_mean": cpu.get("mean"),

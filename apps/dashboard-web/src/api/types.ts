@@ -186,6 +186,10 @@ export interface HistoryItem {
   fire_score?: number | null
   fall_score?: number | null
   bend_score?: number | null
+  // GRAPH#5M AI max per bucket (for spike dot markers in bucketed charts)
+  fire_score_max?: number | null
+  fall_score_max?: number | null
+  bend_score_max?: number | null
   // infra fields (raw snapshots — per-node)
   node_summary?: { ready?: number; total?: number; not_ready?: number }
   nodes?: NodeStatus[]

@@ -215,8 +215,78 @@ export function SensorChart({ items, field, label, unit }: {
 }
 
 // ─── AI score chart ───────────────────────────────────────────────────
+// window=1h  → LineChart (raw snapshots, instant values)
+// window=6h/12h/24h → ComposedChart: mean lines + spike dot markers (max ≥ 0.8)
 export function AIScoreChart({ items }: { items: HistoryItem[] }) {
   const sampledItems = subsampleData(items)
+  const isBucket = items.length > 0 && items[0]?.is_bucket === true
+
+  if (isBucket) {
+    const data = sampledItems
+      .map((it) => {
+        const fireMax = (it.fire_score_max as number | null | undefined) ?? null
+        const fallMax = (it.fall_score_max as number | null | undefined) ?? null
+        const bendMax = (it.bend_score_max as number | null | undefined) ?? null
+        return {
+          ts: fmtTime(extractTimestamp(it)),
+          fire: it.fire_score ?? null,
+          fall: it.fall_score ?? null,
+          bend: it.bend_score ?? null,
+          fire_spike: fireMax != null && fireMax >= 0.8 ? fireMax : null,
+          fall_spike: fallMax != null && fallMax >= 0.8 ? fallMax : null,
+          bend_spike: bendMax != null && bendMax >= 0.8 ? bendMax : null,
+        }
+      })
+      .filter((d) => d.fire != null || d.fall != null || d.bend != null)
+
+    if (data.length === 0) {
+      return <EmptyChart message="AI Score 데이터 없음" />
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fireSpikeDot = (props: any): React.ReactElement => {
+      if ((props.payload?.fire_spike as number | null) == null) return <g />
+      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--crit)" opacity={0.9} />
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fallSpikeDot = (props: any): React.ReactElement => {
+      if ((props.payload?.fall_spike as number | null) == null) return <g />
+      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--warn)" opacity={0.9} />
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bendSpikeDot = (props: any): React.ReactElement => {
+      if ((props.payload?.bend_spike as number | null) == null) return <g />
+      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--accent)" opacity={0.9} />
+    }
+
+    return (
+      <div className="chart-wrap">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
+            <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+            <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
+            <Tooltip
+              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+            <ReferenceLine y={0.8} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
+            <ReferenceLine y={0.3} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
+            {/* Mean lines */}
+            <Line type="monotone" dataKey="fire" name="화재(평균)" stroke="var(--crit)" strokeWidth={1.6} dot={false} activeDot={{ r: 4 }} />
+            <Line type="monotone" dataKey="fall" name="넘어짐(평균)" stroke="var(--warn)" strokeWidth={1.6} dot={false} activeDot={{ r: 4 }} />
+            <Line type="monotone" dataKey="bend" name="굽힘(평균)" stroke="var(--accent)" strokeWidth={1.6} dot={false} activeDot={{ r: 4 }} />
+            {/* Spike markers: 5분 최대값 ≥ 0.8 */}
+            <Line type="monotone" dataKey="fire_spike" stroke="none" strokeWidth={0} dot={fireSpikeDot} activeDot={false} legendType="none" isAnimationActive={false} />
+            <Line type="monotone" dataKey="fall_spike" stroke="none" strokeWidth={0} dot={fallSpikeDot} activeDot={false} legendType="none" isAnimationActive={false} />
+            <Line type="monotone" dataKey="bend_spike" stroke="none" strokeWidth={0} dot={bendSpikeDot} activeDot={false} legendType="none" isAnimationActive={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
+
+  // window=1h: raw LineChart
   const data = sampledItems
     .map((it) => ({
       ts: fmtTime(extractTimestamp(it)),

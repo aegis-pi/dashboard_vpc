@@ -500,7 +500,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
     ? '온도 · 습도 · 기압 5분 평균'
     : '온도 · 습도 · 기압'
   const aiMetricLabel = isBucketedWindow
-    ? 'fire / fall / bend · 5분 최대값'
+    ? 'fire / fall / bend · 선=5분 평균, 점=최대 ≥0.8'
     : 'fire / fall / bend · 0 ~ 1'
 
   return (
@@ -586,7 +586,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
           {loading
             ? <LoadingChart />
             : isEmpty ? <EmptyNote /> : <AIScoreChart items={history} />}
-          {!loading && !isEmpty && <AIScoreThresholdLegend />}
+          {!loading && !isEmpty && <AIScoreThresholdLegend bucketed={isBucketedWindow} />}
         </div>
       </div>
     </>
@@ -717,7 +717,7 @@ function RiskThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
   )
 }
 
-function AIScoreThresholdLegend() {
+function AIScoreThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
   return (
     <div style={{
       display: 'flex', gap: 14, marginTop: 10,
@@ -739,6 +739,12 @@ function AIScoreThresholdLegend() {
           {t.label}
         </span>
       ))}
+      {bucketed && (
+        <>
+          <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
+          <span style={{ color: 'var(--ink-3)' }}>선=5분 평균, 점=5분 최대 ≥0.8</span>
+        </>
+      )}
     </div>
   )
 }

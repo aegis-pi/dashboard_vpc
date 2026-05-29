@@ -148,8 +148,15 @@ def test_graph_5m_items_have_infra_aggregate(client, ddb_mock):
 
 def test_graph_5m_items_have_ai_scores(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=6h").json()
+    # fire_score = mean (line), fire_score_max = max (spike marker)
+    means = [round(i["fire_score"], 4) for i in items if i.get("fire_score") is not None]
+    assert means == [0.1, 0.05]
+    maxes = [round(i["fire_score_max"], 4) for i in items if i.get("fire_score_max") is not None]
+    assert maxes == [0.5, 0.2]
     for item in items:
-        assert item.get("fire_score") is not None
+        assert "fire_score_max" in item
+        assert "fall_score_max" in item
+        assert "bend_score_max" in item
 
 
 def test_window_1h_not_contaminated_by_graph_5m(client, ddb_mock):
