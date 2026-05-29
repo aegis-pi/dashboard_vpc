@@ -4,7 +4,7 @@ import { RefreshCw, AlertTriangle } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { LevelBadge, PipelineBadge, StaleBadge } from '../components/Badge'
 import { relTime, riskColor } from '../utils/format'
-import { Sparkline } from '../components/Sparkline'
+
 import { useFactories } from '../hooks/useFactories'
 import { useFactoryHistory } from '../hooks/useFactoryHistory'
 import { useFleetRecentChanges, type RecentChange } from '../hooks/useFleetRecentChanges'
@@ -270,6 +270,130 @@ function StatDivider() {
   )
 }
 
+// ─── 1h 안전 점수 추이 차트 (우측 패널) ────────────────────────────
+function HistoryChartPanel({ data, color }: { data: number[]; color: string }) {
+  const W = 196, H = 128
+  const padL = 30, padR = 12, padT = 10, padB = 34
+  const cW = W - padL - padR
+  const cH = H - padT - padB
+
+  const hasData = data.length >= 2
+  const xOf = (i: number) => padL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
+  const yOf = (v: number) => padT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
+
+  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
+  const lastV = data.length > 0 ? data[data.length - 1]! : null
+  const lastX = data.length > 0 ? xOf(data.length - 1) : 0
+  const lastY = lastV != null ? yOf(lastV) : 0
+
+  const areaPath = hasData
+    ? `M ${xOf(0).toFixed(1)} ${yOf(0).toFixed(1)} L ${xOf(0).toFixed(1)} ${yOf(data[0]!).toFixed(1)} ${
+        data.map((v, i) => `L ${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join(' ')
+      } L ${xOf(data.length - 1).toFixed(1)} ${yOf(0).toFixed(1)} Z`
+    : ''
+
+  return (
+    <div style={{
+      borderLeft: '1px solid var(--line-2)',
+      background: 'var(--surface-2)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '14px 12px',
+      flexShrink: 0,
+      width: W + 24,
+    }}>
+      <div style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '.08em', marginBottom: 8, fontWeight: 500 }}>
+        안전 점수 추이
+      </div>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+        {/* Y축 */}
+        <line x1={padL} y1={padT} x2={padL} y2={padT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+        {/* X축 */}
+        <line x1={padL} y1={padT + cH} x2={padL + cW} y2={padT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+
+        {/* 기준선: 50(주의), 85(안전) */}
+        {[50, 85].map((v) => (
+          <g key={v}>
+            <line
+              x1={padL} x2={padL + cW}
+              y1={yOf(v)} y2={yOf(v)}
+              stroke="var(--line-2)" strokeWidth={0.7} strokeDasharray="3,3"
+            />
+            <text x={padL + cW + 3} y={yOf(v) + 3} fontSize={7} fill="var(--ink-5)" textAnchor="start">
+              {v}
+            </text>
+          </g>
+        ))}
+
+        {/* Y축 레이블 (회전) */}
+        <text
+          x={9}
+          y={padT + cH / 2}
+          textAnchor="middle"
+          fontSize={8.5}
+          fill="var(--ink-4)"
+          transform={`rotate(-90, 9, ${padT + cH / 2})`}
+        >안전 점수</text>
+
+        {/* Y축 눈금 */}
+        {([0, 50, 100] as const).map((v) => (
+          <text key={v} x={padL - 3} y={yOf(v) + 3} textAnchor="end" fontSize={7.5} fill="var(--ink-4)" fontFamily="monospace">
+            {v}
+          </text>
+        ))}
+
+        {/* 면적 채우기 */}
+        {hasData && <path d={areaPath} fill={color} opacity={0.1} />}
+
+        {/* 꺾은선 */}
+        {hasData && (
+          <polyline
+            points={pts}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
+
+        {/* 마지막 점 + 값 */}
+        {hasData && lastV != null && (
+          <>
+            <circle cx={lastX} cy={lastY} r={2.5} fill={color} />
+            <text x={lastX} y={lastY - 5} textAnchor="middle" fontSize={8} fill={color} fontFamily="monospace" fontWeight="600">
+              {lastV}
+            </text>
+          </>
+        )}
+
+        {/* X축 양끝 시간 */}
+        <text x={padL} y={padT + cH + 11} textAnchor="middle" fontSize={7} fill="var(--ink-5)">1h 전</text>
+        <text x={padL + cW} y={padT + cH + 11} textAnchor="middle" fontSize={7} fill="var(--ink-5)">현재</text>
+
+        {/* X축 레이블 */}
+        <text x={padL + cW / 2} y={H - 2} textAnchor="middle" fontSize={8.5} fill="var(--ink-4)">
+          시간 (지난 1시간)
+        </text>
+
+        {/* 데이터 없음 */}
+        {!hasData && (
+          <text x={W / 2} y={padT + cH / 2 + 4} textAnchor="middle" fontSize={9} fill="var(--ink-5)">
+            데이터 없음
+          </text>
+        )}
+      </svg>
+      {data.length > 0 && (
+        <div style={{ fontSize: 8, color: 'var(--ink-5)', marginTop: 4 }}>
+          {data.length}개 포인트
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Factory card ─────────────────────────────────────────────────────
 function FactoryCard({
   f, onClick,
@@ -286,7 +410,7 @@ function FactoryCard({
       className="card"
       onClick={onClick}
       style={{
-        cursor: 'pointer', display: 'flex', flexDirection: 'column',
+        cursor: 'pointer', display: 'flex', flexDirection: 'row',
         position: 'relative', overflow: 'hidden',
         transition: 'border-color .12s, box-shadow .15s',
       }}
@@ -302,27 +426,28 @@ function FactoryCard({
       {/* Left stripe */}
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} />
 
-      <div style={{ padding: '16px 18px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            {f.envType && (
-              <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', letterSpacing: '.06em' }}>
-                {f.envType}
+      {/* 좌측 콘텐츠 */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{ padding: '16px 18px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              {f.envType && (
+                <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', letterSpacing: '.06em' }}>
+                  {f.envType}
+                </span>
+              )}
+              <span style={{
+                fontSize: 15, fontWeight: 600, color: 'var(--ink)',
+                marginTop: f.envType ? 2 : 0,
+              }}>
+                {f.factory_id}
               </span>
-            )}
-            <span style={{
-              fontSize: 15, fontWeight: 600, color: 'var(--ink)',
-              marginTop: f.envType ? 2 : 0,
-            }}>
-              {f.factory_id}
-            </span>
+            </div>
+            <LevelBadge level={f.riskLevel} />
           </div>
-          <LevelBadge level={f.riskLevel} />
-        </div>
 
-        {/* Score + sparkline */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 14, alignItems: 'end' }}>
+          {/* Score */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span className="tnum" style={{
               fontFamily: SERIF,
@@ -334,86 +459,91 @@ function FactoryCard({
             }}>{f.riskScore ?? '—'}</span>
             <span className="micro" style={{ marginTop: 6, whiteSpace: 'nowrap' }}>/100 · 안전 점수</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingBottom: 6 }}>
-            <Sparkline data={sparkData} color={color} width={120} height={32} strokeWidth={1.4} />
-            <span className="mono" style={{ fontSize: 9.5, color: 'var(--ink-4)', letterSpacing: '.06em', textAlign: 'right' }}>
-              지난 1h · {sparkData.length}pt
+
+          {/* Meta strip */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            gap: 8, flexWrap: 'wrap',
+            paddingTop: 6, borderTop: '1px solid var(--line-2)',
+          }}>
+            <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+              {f.nodeReady != null && f.nodeTotal != null
+                ? <>node <span style={{ color: 'var(--ink)' }} className="tnum">{f.nodeReady}/{f.nodeTotal}</span> Ready</>
+                : '노드 미수신'}
             </span>
+            <PipelineBadge status={f.pipeline} />
           </div>
         </div>
 
-        {/* Meta strip */}
+        {/* Top causes */}
+        <div style={{ padding: '10px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="eyebrow" style={{ marginBottom: 2 }}>top_causes</div>
+          {causes.length === 0
+            ? <div className="micro">미계산</div>
+            : causes.slice(0, 3).map((c, i) => {
+                const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
+                const contribution = typeof c === 'string' ? null : c.contribution
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    fontSize: 12, color: 'var(--ink-2)',
+                  }}>
+                    {contribution != null && (
+                      <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--crit)', width: 30, textAlign: 'right', flexShrink: 0 }}>
+                        −{contribution}
+                      </span>
+                    )}
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {name}
+                    </span>
+                  </div>
+                )
+              })}
+        </div>
+
+        {/* Footer */}
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          gap: 8, flexWrap: 'wrap',
-          paddingTop: 6, borderTop: '1px solid var(--line-2)',
+          marginTop: 'auto', padding: '10px 18px', borderTop: '1px solid var(--line-2)',
+          background: 'var(--surface-2)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11.5,
         }}>
-          <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-            {f.nodeReady != null && f.nodeTotal != null
-              ? <>node <span style={{ color: 'var(--ink)' }} className="tnum">{f.nodeReady}/{f.nodeTotal}</span> Ready</>
-              : '노드 미수신'}
+          <span className="mono" style={{ color: 'var(--ink-3)' }}>
+            updated <span style={{ color: 'var(--ink-2)' }}>{relTime(f.updated_at)}</span>
           </span>
-          <PipelineBadge status={f.pipeline} />
+          <StaleBadge
+            lastFactoryStateAt={f.last_factory_state_at}
+            lastInfraStateAt={f.last_infra_state_at}
+          />
         </div>
       </div>
 
-      {/* Top causes */}
-      <div style={{ padding: '10px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div className="eyebrow" style={{ marginBottom: 2 }}>top_causes</div>
-        {causes.length === 0
-          ? <div className="micro">미계산</div>
-          : causes.slice(0, 3).map((c, i) => {
-              const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
-              const contribution = typeof c === 'string' ? null : c.contribution
-              return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  fontSize: 12, color: 'var(--ink-2)',
-                }}>
-                  {contribution != null && (
-                    <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--crit)', width: 30, textAlign: 'right', flexShrink: 0 }}>
-                      −{contribution}
-                    </span>
-                  )}
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {name}
-                  </span>
-                </div>
-              )
-            })}
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        marginTop: 'auto', padding: '10px 18px', borderTop: '1px solid var(--line-2)',
-        background: 'var(--surface-2)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11.5,
-      }}>
-        <span className="mono" style={{ color: 'var(--ink-3)' }}>
-          updated <span style={{ color: 'var(--ink-2)' }}>{relTime(f.updated_at)}</span>
-        </span>
-        <StaleBadge
-          lastFactoryStateAt={f.last_factory_state_at}
-          lastInfraStateAt={f.last_infra_state_at}
-        />
-      </div>
+      {/* 우측: 1h 안전 점수 추이 차트 */}
+      <HistoryChartPanel data={sparkData} color={color} />
     </div>
   )
 }
 
 // ─── Recent row (risk_level transition) ──────────────────────────────────
+const LEVEL_RANK: Record<string, number> = { safe: 0, warning: 1, danger: 2 }
+
 function RecentRow({ e }: { e: RecentChange }) {
   const toColor = riskColor(e.to)
   const fromColor = riskColor(e.from)
   const levelKr = (l: string) =>
     l === 'safe' ? '안전' : l === 'warning' ? '주의' : l === 'danger' ? '위험' : l
   const rel = relTime(new Date(e.ts).toISOString())
+  const isWorsening = (LEVEL_RANK[e.to] ?? 0) > (LEVEL_RANK[e.from] ?? 0)
+  const causes = isWorsening && e.top_cause_names?.length ? e.top_cause_names : []
 
   return (
-    <div className="list-row" style={{ padding: '12px 16px', alignItems: 'center' }}>
-      <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: toColor }} />
+    <div className="list-row" style={{ padding: '12px 16px', alignItems: 'flex-start', gap: 10 }}>
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+        background: toColor, marginTop: 4,
+      }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Main row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink)', fontWeight: 500 }}>
             {e.factory_id}
           </span>
@@ -422,44 +552,133 @@ function RecentRow({ e }: { e: RecentChange }) {
             <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>→</span>
             <span style={{ color: toColor, fontWeight: 500 }}>{levelKr(e.to)}</span>
           </span>
+          {e.score != null && (
+            <span className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              score <span style={{ color: 'var(--ink-2)' }}>{e.score}</span>
+            </span>
+          )}
         </div>
-        {e.score != null && (
-          <div className="micro" style={{ marginTop: 2 }}>
-            risk_score <span className="mono tnum" style={{ color: 'var(--ink-2)' }}>{e.score}</span>
+        {/* Top causes (악화 전환 시만 표시) */}
+        {causes.length > 0 && (
+          <div style={{
+            marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: '3px 6px',
+          }}>
+            {causes.slice(0, 4).map((c, i) => (
+              <span key={i} style={{
+                fontSize: 10.5, color: 'var(--ink-3)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--line-2)',
+                borderRadius: 4, padding: '1px 6px',
+                fontFamily: 'monospace',
+              }}>
+                {c}
+              </span>
+            ))}
           </div>
         )}
       </div>
-      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>{rel}</span>
+      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+        {rel}
+      </span>
     </div>
   )
 }
 
 // ─── Recent changes section ────────────────────────────────────────────
 function RecentSection({
-  events, loading,
-}: { events: RecentChange[]; loading: boolean }) {
+  events, loading, refreshing, factoryIds,
+}: {
+  events: RecentChange[]
+  loading: boolean
+  refreshing: boolean
+  factoryIds: string[]
+}) {
+  const [selectedFactory, setSelectedFactory] = useState<string | null>(null)
+
+  // 메인 페이지에서는 악화 전환만 표시 (안전→주의, 안전→위험, 주의→위험)
+  const worsening = events.filter(
+    (e) => (LEVEL_RANK[e.to] ?? 0) > (LEVEL_RANK[e.from] ?? 0),
+  )
+  const filtered = selectedFactory
+    ? worsening.filter((e) => e.factory_id === selectedFactory)
+    : worsening
+
   return (
     <div className="card">
-      <div className="card-hd">
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+      {/* Header */}
+      <div className="card-hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <h2 className="h2" style={{ whiteSpace: 'nowrap' }}>최근 상태 변화</h2>
           <span className="micro" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            HISTORY#STATE · risk_level 변화 {events.length}건
+            악화 전환 · {filtered.length}건
           </span>
+          {refreshing && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 10.5, color: 'var(--ink-4)',
+            }}>
+              <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+              갱신 중
+            </span>
+          )}
         </div>
+
+        {/* Factory filter pills */}
+        {factoryIds.length > 0 && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <FilterPill
+              label="전체"
+              active={selectedFactory === null}
+              onClick={() => setSelectedFactory(null)}
+            />
+            {factoryIds.map((id) => (
+              <FilterPill
+                key={id}
+                label={id}
+                active={selectedFactory === id}
+                onClick={() => setSelectedFactory((prev) => prev === id ? null : id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Body */}
       {loading ? (
         <div className="empty-state"><div className="spinner" /></div>
-      ) : events.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 12.5 }}>
-          최근 24시간 내 변화가 없습니다.
+          {selectedFactory
+            ? `${selectedFactory} — 지난 1시간 내 악화 전환이 없습니다.`
+            : '지난 1시간 내 악화 전환이 없습니다.'}
         </div>
       ) : (
         <div>
-          {events.map((e, i) => <RecentRow key={i} e={e} />)}
+          {filtered.map((e, i) => <RecentRow key={i} e={e} />)}
         </div>
       )}
     </div>
+  )
+}
+
+function FilterPill({
+  label, active, onClick,
+}: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        height: 24, padding: '0 9px', borderRadius: 6, border: '1px solid',
+        cursor: 'pointer', fontSize: 11.5, fontFamily: 'monospace',
+        transition: 'background .1s, color .1s, border-color .1s',
+        background: active ? 'var(--ink)' : 'var(--surface)',
+        color: active ? 'var(--surface)' : 'var(--ink-2)',
+        borderColor: active ? 'var(--ink)' : 'var(--line-2)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -483,21 +702,27 @@ export function FleetPage() {
   const {
     events: recentChanges,
     loading: recentLoading,
+    refreshing: recentRefreshing,
     refresh: refreshRecentChanges,
   } = useFleetRecentChanges(factoryIds)
 
-  const handleRefresh = useCallback(() => {
+  // Auto-interval only refreshes factory cards (fast data).
+  // Recent changes has its own 60s internal cadence via useFleetRecentChanges.
+  const handleAutoRefresh = useCallback(() => {
+    void refresh()
+  }, [refresh])
+
+  // Manual refresh button refreshes both immediately.
+  const handleManualRefresh = useCallback(() => {
     void refresh()
     void refreshRecentChanges()
   }, [refresh, refreshRecentChanges])
 
   useEffect(() => {
     if (refreshInterval <= 0) return
-    const id = window.setInterval(() => {
-      handleRefresh()
-    }, refreshInterval)
+    const id = window.setInterval(() => { handleAutoRefresh() }, refreshInterval)
     return () => window.clearInterval(id)
-  }, [handleRefresh, refreshInterval])
+  }, [handleAutoRefresh, refreshInterval])
 
   if (error instanceof AuthError) {
     return (
@@ -516,7 +741,7 @@ export function FleetPage() {
     <Shell
       factories={sidebarFactories}
       crumbs={[{ label: 'Aegis-π' }, { label: 'Fleet Overview' }]}
-      onRefresh={handleRefresh}
+      onRefresh={handleManualRefresh}
       refreshInterval={refreshInterval}
       onIntervalChange={setRefreshInterval}
     >
@@ -545,7 +770,7 @@ export function FleetPage() {
             <span style={{ fontWeight: 600 }}>데이터 로드 실패</span>
           </div>
           <p className="sub" style={{ marginTop: 8 }}>{error.message}</p>
-          <button className="btn" style={{ marginTop: 14 }} onClick={handleRefresh}>
+          <button className="btn" style={{ marginTop: 14 }} onClick={handleManualRefresh}>
             <RefreshCw size={13} />다시 시도
           </button>
         </div>
@@ -579,7 +804,12 @@ export function FleetPage() {
           </div>
 
           {/* Recent risk_level changes */}
-          <RecentSection events={recentChanges} loading={recentLoading} />
+          <RecentSection
+            events={recentChanges}
+            loading={recentLoading}
+            refreshing={recentRefreshing}
+            factoryIds={factoryIds}
+          />
         </>
       )}
     </Shell>
