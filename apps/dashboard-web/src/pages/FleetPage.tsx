@@ -273,32 +273,97 @@ function StatDivider() {
   )
 }
 
-// ─── 카드 우상단용 소형 스파크라인 ────────────────────────────────────
-function CardSparkline({ data, color }: { data: number[]; color: string }) {
-  const W = 112, H = 38
-  if (data.length < 2) {
-    return (
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-        <text x={W / 2} y={H / 2 + 3} textAnchor="middle" fontSize={9} fill="var(--ink-5)">—</text>
-      </svg>
-    )
-  }
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-  const xOf = (i: number) => (i / (data.length - 1)) * W
-  const yOf = (v: number) => H - 3 - ((v - min) / range) * (H - 6)
+// ─── 카드용 가로 1h 차트 (축 레이블 포함) ────────────────────────────
+function WideHistoryChart({ data, color }: { data: number[]; color: string }) {
+  // viewBox 좌표계: 300×82  /  실제 렌더: width="100%"로 카드 폭에 맞춤
+  const VW = 300, VH = 82
+  const pL = 26, pR = 8, pT = 10, pB = 28
+  const cW = VW - pL - pR   // 266
+  const cH = VH - pT - pB   // 44
+
+  const hasData = data.length >= 2
+  const xOf = (i: number) => pL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
+  // y 스케일은 항상 0–100 고정
+  const yOf = (v: number) => pT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
+
   const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
-  const areaD =
-    `M 0,${H} L ${data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')} L ${W},${H} Z`
-  const lastX = xOf(data.length - 1)
-  const lastY = yOf(data[data.length - 1]!)
+  const areaD = hasData
+    ? `M ${xOf(0).toFixed(1)},${yOf(0).toFixed(1)} L ${
+        data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')
+      } L ${xOf(data.length - 1).toFixed(1)},${yOf(0).toFixed(1)} Z`
+    : ''
+  const lastV = hasData ? data[data.length - 1]! : null
+  const lastX = hasData ? xOf(data.length - 1) : 0
+  const lastY = lastV != null ? yOf(lastV) : 0
+
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-      <path d={areaD} fill={color} opacity={0.12} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.4}
-        strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={lastX} cy={lastY} r={2.5} fill={color} />
+    <svg
+      width="100%" viewBox={`0 0 ${VW} ${VH}`}
+      preserveAspectRatio="none"
+      style={{ display: 'block', overflow: 'visible' }}
+    >
+      {/* 축 */}
+      <line x1={pL} y1={pT} x2={pL} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+      <line x1={pL} y1={pT + cH} x2={pL + cW} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+
+      {/* 기준선 50·85 */}
+      {[50, 85].map((v) => (
+        <g key={v}>
+          <line
+            x1={pL} x2={pL + cW} y1={yOf(v)} y2={yOf(v)}
+            stroke="var(--line-2)" strokeWidth={0.7} strokeDasharray="3,3"
+          />
+          <text x={pL + cW + 3} y={yOf(v) + 3} fontSize={6} fill="var(--ink-5)" textAnchor="start">
+            {v}
+          </text>
+        </g>
+      ))}
+
+      {/* Y축 레이블 */}
+      <text
+        x={8} y={pT + cH / 2} textAnchor="middle" fontSize={7} fill="var(--ink-4)"
+        transform={`rotate(-90, 8, ${pT + cH / 2})`}
+      >안전 점수</text>
+
+      {/* Y축 눈금 */}
+      {[0, 50, 100].map((v) => (
+        <text key={v} x={pL - 3} y={yOf(v) + 2.5} textAnchor="end" fontSize={6.5} fill="var(--ink-4)" fontFamily="monospace">
+          {v}
+        </text>
+      ))}
+
+      {/* 면적 + 꺾은선 */}
+      {hasData && <path d={areaD} fill={color} opacity={0.1} />}
+      {hasData && (
+        <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5}
+          strokeLinejoin="round" strokeLinecap="round" />
+      )}
+
+      {/* 마지막 점 + 현재값 */}
+      {hasData && lastV != null && (
+        <>
+          <circle cx={lastX} cy={lastY} r={2.5} fill={color} />
+          <text x={lastX} y={lastY - 5} textAnchor="middle" fontSize={7} fill={color} fontFamily="monospace" fontWeight="600">
+            {lastV}
+          </text>
+        </>
+      )}
+
+      {/* X축 양끝 */}
+      <text x={pL} y={pT + cH + 10} textAnchor="middle" fontSize={6.5} fill="var(--ink-5)">1h 전</text>
+      <text x={pL + cW} y={pT + cH + 10} textAnchor="middle" fontSize={6.5} fill="var(--ink-5)">현재</text>
+
+      {/* X축 레이블 */}
+      <text x={pL + cW / 2} y={VH - 2} textAnchor="middle" fontSize={7} fill="var(--ink-4)">
+        시간 (지난 1시간)
+      </text>
+
+      {/* 데이터 없음 */}
+      {!hasData && (
+        <text x={VW / 2} y={pT + cH / 2 + 3} textAnchor="middle" fontSize={8} fill="var(--ink-5)">
+          데이터 없음
+        </text>
+      )}
     </svg>
   )
 }
@@ -335,46 +400,33 @@ function FactoryCard({
       {/* Left stripe */}
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} />
 
-      <div style={{ padding: '16px 18px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Header: factory name (left) | badge + mini chart (right) */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ padding: '14px 18px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Header: factory name | LevelBadge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             {f.envType && (
               <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', letterSpacing: '.06em' }}>
                 {f.envType}
               </span>
             )}
-            <span style={{
-              fontSize: 15, fontWeight: 600, color: 'var(--ink)',
-              marginTop: f.envType ? 2 : 0,
-            }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)', marginTop: f.envType ? 2 : 0 }}>
               {f.factory_id}
             </span>
           </div>
-
-          {/* 우상단: badge + 1h 미니 차트 */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-            <LevelBadge level={f.riskLevel} />
-            <div>
-              <CardSparkline data={sparkData} color={color} />
-              <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', textAlign: 'right', marginTop: 2 }}>
-                지난 1h · {sparkData.length}pt
-              </div>
-            </div>
-          </div>
+          <LevelBadge level={f.riskLevel} />
         </div>
 
         {/* Score */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span className="tnum" style={{
             fontFamily: SERIF,
-            fontSize: 68, lineHeight: 0.78,
+            fontSize: 64, lineHeight: 0.82,
             color, letterSpacing: '-0.02em', fontWeight: 400,
             display: 'inline-block',
             transform: 'scaleY(0.84) scaleX(1.08)',
             transformOrigin: 'left bottom',
           }}>{f.riskScore ?? '—'}</span>
-          <span className="micro" style={{ marginTop: 6, whiteSpace: 'nowrap' }}>/100 · 안전 점수</span>
+          <span className="micro">/100 · 안전 점수</span>
         </div>
 
         {/* Meta strip */}
@@ -392,8 +444,16 @@ function FactoryCard({
         </div>
       </div>
 
+      {/* 가로 1h 차트 */}
+      <div style={{ padding: '10px 14px 4px' }}>
+        <WideHistoryChart data={sparkData} color={color} />
+        <div className="mono" style={{ fontSize: 9, color: 'var(--ink-5)', textAlign: 'right', marginTop: 2 }}>
+          {sparkData.length}pt
+        </div>
+      </div>
+
       {/* Top causes */}
-      <div style={{ padding: '10px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ padding: '8px 18px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div className="eyebrow" style={{ marginBottom: 2 }}>top_causes</div>
         {causes.length === 0
           ? <div className="micro">미계산</div>
@@ -401,10 +461,7 @@ function FactoryCard({
               const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
               const contribution = typeof c === 'string' ? null : c.contribution
               return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  fontSize: 12, color: 'var(--ink-2)',
-                }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--ink-2)' }}>
                   {contribution != null && (
                     <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--crit)', width: 30, textAlign: 'right', flexShrink: 0 }}>
                       −{contribution}
