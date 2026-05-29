@@ -537,8 +537,8 @@ input { font-family: inherit; }
 }
 .factory-hero-pi {
   position: absolute;
-  right: 18px;
-  bottom: -58px;
+  right: clamp(365px, 32vw, 430px);
+  bottom: -62px;
   z-index: 0;
   font-family: var(--font-serif);
   font-size: 220px;
@@ -694,6 +694,10 @@ input { font-family: inherit; }
     grid-template-columns: 1fr;
     gap: 20px;
   }
+  .factory-hero-pi {
+    right: auto;
+    left: clamp(18px, 8vw, 96px);
+  }
   .factory-hero-status {
     grid-template-columns: auto auto minmax(260px, 1fr);
     min-width: 0;
@@ -711,6 +715,12 @@ input { font-family: inherit; }
   .factory-card-grid { grid-template-columns: 1fr; }
   .factory-hero {
     padding: 18px 18px 18px 22px;
+  }
+  .factory-hero-pi {
+    left: auto;
+    right: 14px;
+    bottom: -64px;
+    font-size: 190px;
   }
   .factory-hero-title {
     font-size: 36px;
