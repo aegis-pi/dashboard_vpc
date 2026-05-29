@@ -179,6 +179,7 @@ export interface HistoryItem {
   is_bucket?: boolean
   risk_score_avg?: number | null
   risk_score_min?: number | null
+  risk_score_max?: number | null
   // factory_state fields
   temperature_celsius_avg?: number | null
   humidity_percent_avg?: number | null

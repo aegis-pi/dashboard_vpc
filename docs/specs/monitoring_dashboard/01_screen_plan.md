@@ -1,13 +1,32 @@
 # Monitoring Dashboard 화면 계획
 
 상태: source of truth
-기준일: 2026-04-28
+기준일: 2026-05-29
+수정 이력:
+  - 2026-05-29  Risk Twin Web Environment History 그래프 기준 추가.
 
 ## 목적
 
 현재 `factory-a` Grafana 화면 구성을 정리한다.
 
 ## 화면 구성
+
+## Risk Twin Web - Factory Environment History
+
+안전 점수 추이:
+
+```text
+6h:  5분 bucket, 72 points
+12h: 10분 재집계 bucket, 72 points
+24h: 20분 재집계 bucket, 72 points
+```
+
+렌더링:
+- `risk_score_avg`: 굵은 실선
+- `risk_score_max`: 얇은 점선
+- `risk_score_avg` ~ `risk_score_max`: 연한 음영
+- threshold 85/50: 수평 점선
+- tooltip: 시간 구간, 평균값, 최대값, 샘플 수
 
 ### 1. 환경 센서 영역
 

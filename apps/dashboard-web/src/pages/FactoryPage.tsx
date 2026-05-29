@@ -497,7 +497,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
     ? `GRAPH#5M · ${bucketMinutes ?? 5}분 집계 버킷`
     : 'HISTORY#STATE · 원시 스냅샷'
   const riskMetricLabel = isBucketedWindow
-    ? 'risk_score 평균선 + 버킷 최저점 마커'
+    ? 'risk_score 평균선 + 최대선 + 변동 음영'
     : 'risk_score · 100이 가장 안전'
   const sensorMetricLabel = isBucketedWindow
     ? `온도 · 습도 · 기압 · ${bucketMinutes ?? 5}분 평균+최대`
@@ -721,7 +721,7 @@ function RiskThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
       {bucketed && (
         <>
           <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-          <span style={{ color: 'var(--ink-3)' }}>선=집계 평균, 점=집계 최저점</span>
+          <span style={{ color: 'var(--ink-3)' }}>굵은 선=평균, 점선=최대, 음영=평균~최대</span>
         </>
       )}
     </div>

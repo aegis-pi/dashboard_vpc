@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-29
 수정 이력:
+  - 2026-05-29  안전 점수 그래프용 `risk_score_max` 추출/응답 기준 추가.
   - 2026-05-29  ADR 0025 구현 완료 반영. GRAPH#5M 계층 추가, 데이터 흐름 갱신, Dashboard 조회 기준 window 분기 현행화.
   - 2026-05-28  HISTORY 섹션에 TTL 48h 스케일 이슈와 Multi-resolution 전환 계획(ADR 0025) 추가.
 
@@ -77,7 +78,7 @@ Dashboard API/Web
 | `S3 processed_agg` | GraphAggregator5m이 생성한 GRAPH#5M 보조 JSON | 장기 재처리, 검증 | 장기 보존 |
 | `DynamoDB LATEST` | 공장별 현재 상태 1건 | 대시보드 상단 카드, 현재 노드 상태 | 계속 overwrite |
 | `DynamoDB HISTORY#STATE` | 최근 1h 그래프용 raw snapshot buffer | window=1h 그래프 | TTL 2h (현재 48h 유지 중) |
-| `DynamoDB GRAPH#5M` | 5분 avg/min 집계 버킷 | window=6h/12h/24h 그래프 | TTL 48h |
+| `DynamoDB GRAPH#5M` | 5분 avg/min/max 집계 버킷 | window=6h/12h/24h 그래프 | TTL 48h |
 
 DynamoDB는 원본의 source of truth가 아니다. 원본 정본은 `S3 raw`이고, 처리 결과 이력 정본은 `S3 processed`다. DynamoDB는 Dashboard가 빠르게 읽기 위한 hot store다.
 
@@ -492,6 +493,7 @@ Dashboard 추출 필드 (backend `_extract_graph_5m` 기준):
 | --- | --- | --- |
 | `risk_score` / `risk_score_avg` | `risk.score.mean` | Risk Score 평균 라인 |
 | `risk_score_min` | `risk.score.min` | 경고/위험 마커 기준 (`≤84`: 주의, `≤49`: 위험) |
+| `risk_score_max` | `risk.score.max` | Risk Score 최대 라인과 평균~최대 음영 |
 | `temperature_celsius_avg` | `sensor.temperature_celsius.mean` | 온도 그래프 |
 | `humidity_percent_avg` | `sensor.humidity_percent.mean` | 습도 그래프 |
 | `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | 기압 그래프 |
@@ -568,7 +570,7 @@ infra_state
 | 현재 pipeline 상태 | `DynamoDB LATEST.pipeline_status` | normal/warning/critical |
 | 24h header sparkline | `DynamoDB GRAPH#5M` | window=24h, risk_score (mean) |
 | 최근 그래프 window=1h | `DynamoDB HISTORY#STATE` | raw snapshot, max_items=500 cap |
-| 최근 그래프 window=6h/12h/24h | `DynamoDB GRAPH#5M` | 5분 avg/min 집계, 최대 288 items |
+| 최근 그래프 window=6h/12h/24h | `DynamoDB GRAPH#5M` | 5분 avg/min/max 집계, 최대 288 items |
 | 장기 이력/감사 | `S3 processed`, `S3 raw` | 장기 조회, 재처리, 리포트 |
 
 Dashboard API:
@@ -580,7 +582,7 @@ GET /factories/{factory_id}/history?window=1h
 
 GET /factories/{factory_id}/history?window=6h|12h|24h
   -> DynamoDB GRAPH#5M query (ScanIndexForward=True, 최대 288 items)
-  -> 응답: timestamp, is_bucket=true, risk_score_avg, risk_score_min,
+  -> 응답: timestamp, is_bucket=true, risk_score_avg, risk_score_min, risk_score_max,
            temperature_celsius_avg, fire_score, cpu_usage_percent_mean, ...
   -> 해당 공장에 GRAPH#5M 데이터 없으면 []
 ```

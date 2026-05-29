@@ -256,7 +256,7 @@ def _extract_graph_5m(item: dict) -> dict:
 
     Follows the field mapping defined in example_data.md / ADR 0025:
       sensor.*   → temperature_celsius_avg / humidity_percent_avg / pressure_hpa_avg
-      risk.score → risk_score (mean) / risk_score_avg / risk_score_min
+      risk.score → risk_score (mean) / risk_score_avg / risk_score_min / risk_score_max
       ai_detection.by_type.*.max → fire_score / fall_score / bend_score
       infra.*    → cpu_usage_percent_mean / memory_usage_percent_mean / disk_usage_percent_last
     """
@@ -280,6 +280,7 @@ def _extract_graph_5m(item: dict) -> dict:
 
     risk_mean = risk_score.get("mean")
     risk_min = risk_score.get("min")
+    risk_max = risk_score.get("max")
 
     ai_fire = ai_by_type.get("fire_score") or {}
     ai_fall = ai_by_type.get("fall_score") or {}
@@ -296,6 +297,7 @@ def _extract_graph_5m(item: dict) -> dict:
         "risk_score": risk_mean,
         "risk_score_avg": risk_mean,
         "risk_score_min": risk_min,
+        "risk_score_max": risk_max,
         # sensor avg
         "temperature_celsius_avg": temp.get("mean"),
         "humidity_percent_avg": humidity.get("mean"),
@@ -345,6 +347,7 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
     - avg fields: weighted average by sample_count
     - max fields: max(max)
     - risk_score_min: min(min)  — worst dip in the window
+    - risk_score_max: max(max)
     - sample_count: sum
     - disk_usage_percent_last: last bucket's value
     """
@@ -380,6 +383,7 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
         "risk_score": risk_avg,
         "risk_score_avg": risk_avg,
         "risk_score_min": _fmin("risk_score_min"),
+        "risk_score_max": _fmax("risk_score_max"),
         # sensor avg (weighted)
         "temperature_celsius_avg": _wavg("temperature_celsius_avg"),
         "humidity_percent_avg": _wavg("humidity_percent_avg"),

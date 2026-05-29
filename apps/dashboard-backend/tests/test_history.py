@@ -121,15 +121,18 @@ def test_graph_5m_returns_bucket_items(client, ddb_mock):
         assert item.get("is_bucket") is True
 
 
-def test_graph_5m_items_have_risk_avg_and_min(client, ddb_mock):
+def test_graph_5m_items_have_risk_avg_min_and_max(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=6h").json()
     for item in items:
         assert "risk_score_avg" in item
         assert "risk_score_min" in item
+        assert "risk_score_max" in item
     avgs = {round(i["risk_score_avg"]) for i in items}
     assert avgs == {30, 70}
     mins = {round(i["risk_score_min"]) for i in items}
     assert mins == {25, 60}
+    maxes = {round(i["risk_score_max"]) for i in items}
+    assert maxes == {35, 80}
 
 
 def test_graph_5m_items_have_sensor_fields(client, ddb_mock):
@@ -200,6 +203,8 @@ def test_graph_12h_weighted_avg_correct(client, ddb_mock):
 
 def test_graph_12h_max_and_sample_count_correct(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=12h").json()
+    # risk max: max(35.0, 80.0) = 80.0
+    assert items[0]["risk_score_max"] == 80.0
     # temp max: max(26.0, 28.0) = 28.0
     assert items[0]["temperature_celsius_max"] == 28.0
     # sample_count = 97 + 97 = 194

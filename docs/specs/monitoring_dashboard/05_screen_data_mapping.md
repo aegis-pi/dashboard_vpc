@@ -1,7 +1,9 @@
 # Risk Twin Web Screen Data Mapping
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-05-29
+수정 이력:
+  - 2026-05-29  Environment History 안전 점수 그래프를 avg/max/threshold/tooltip 기준으로 갱신.
 
 ## 목적
 
@@ -14,7 +16,8 @@
 | 이름 | 저장소 | 용도 |
 | --- | --- | --- |
 | `DynamoDB LATEST` | `AEGIS-DynamoDB-FactoryStatus` | 공장별 현재 상태, 카드, 현재 요약 |
-| `DynamoDB HISTORY#STATE` | `AEGIS-DynamoDB-FactoryStatus` | Safety/Risk, 환경, AI score, 노드 CPU/memory/disk/Ready 그래프 |
+| `DynamoDB HISTORY#STATE` | `AEGIS-DynamoDB-FactoryStatus` | 1h Safety/Risk, 환경, AI score, 노드 CPU/memory/disk/Ready 그래프 |
+| `DynamoDB GRAPH#5M` | `AEGIS-DynamoDB-FactoryStatus` | 6h/12h/24h 집계 그래프 |
 | `S3 processed` | `processed/*` | 상세 이력, 리포트, 장기 조회 |
 | `S3 raw` | `raw/*` | 원본 확인, 감사, 재처리 |
 
@@ -365,15 +368,15 @@ Risk Score, 센서 값, AI score의 최근 추세를 보여준다.
 ### API
 
 ```text
-GET /factories/{factory_id}/risk-history?window=1h
-GET /factories/{factory_id}/factory-history?window=1h
+GET /factories/{factory_id}/history?window=1h|6h|12h|24h
 ```
 
 지원 window:
 
 ```text
 1h
-2h
+6h
+12h
 24h
 ```
 
@@ -385,7 +388,7 @@ MVP 기본 window:
 
 ### Backend 조회
 
-Risk:
+1h:
 
 ```text
 Query
@@ -393,12 +396,20 @@ pk = FACTORY#{factory_id}
 sk BETWEEN HISTORY#STATE#{from} AND HISTORY#STATE#{to}
 ```
 
-Factory:
+6h/12h/24h:
 
 ```text
 Query
 pk = FACTORY#{factory_id}
-sk BETWEEN HISTORY#STATE#{from} AND HISTORY#STATE#{to}
+sk BETWEEN GRAPH#5M#{from} AND GRAPH#5M#{to}
+```
+
+표시 단위:
+
+```text
+6h:  5분 bucket 그대로 사용, 최대 72 points
+12h: 5분 bucket 2개를 10분 단위로 재집계, 최대 72 points
+24h: 5분 bucket 4개를 20분 단위로 재집계, 최대 72 points
 ```
 
 ### HISTORY#STATE 필드
@@ -410,6 +421,18 @@ sk BETWEEN HISTORY#STATE#{from} AND HISTORY#STATE#{to}
 | Risk Level | `risk_level` | Y | threshold background 또는 point color |
 | Top causes | `top_cause_names[]` | N | tooltip |
 | bucket | `bucket_seconds` | Y | sampling note |
+
+### GRAPH#5M Risk 필드 (6h/12h/24h)
+
+| 화면 요소 | 필드 경로 | 필수 | 렌더링 |
+| --- | --- | --- | --- |
+| x축 | `bucket_start` 또는 `timestamp` | Y | chart timestamp |
+| 시간 구간 | `bucket_start` + `bucket_end` | Y | tooltip |
+| 평균 안전 점수 | `risk_score_avg` | Y | 굵은 실선 |
+| 최대 안전 점수 | `risk_score_max` | Y | 얇은 점선 |
+| 변동 폭 | `risk_score_avg` ~ `risk_score_max` | Y | 연한 음영 |
+| 샘플 수 | `sample_count` | Y | tooltip |
+| 임계값 | 85, 50 | Y | 수평 점선 |
 
 ### HISTORY#STATE 필드
 
@@ -464,11 +487,15 @@ sk BETWEEN HISTORY#STATE#{from} AND HISTORY#STATE#{to}
 Risk chart:
 
 ```text
-x = timestamp
-y = risk_score
+x = timestamp 또는 bucket_start
+1h y = risk_score
+6h/12h/24h avg line = risk_score_avg
+6h/12h/24h max line = risk_score_max
+6h/12h/24h band = risk_score_avg ~ risk_score_max
 safe range: 100~85
 warning range: 84~50
 danger range: 49~0
+tooltip: 시간 구간, 평균값, 최대값, 샘플 수
 ```
 
 AI chart:

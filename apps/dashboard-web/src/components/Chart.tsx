@@ -40,88 +40,76 @@ function fmtTime(ts?: string): string {
 
 // ─── Risk score chart ─────────────────────────────────────────────────
 // window=1h  → LineChart (raw snapshots)
-// window=6h/12h/24h → ComposedChart with Area (avg) + threshold markers (min)
+// window=6h/12h/24h → ComposedChart: avg solid + max dashed + avg-to-max band
 export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
   const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
 
   if (isBucket) {
     const data = sampledItems
-      .map((it) => {
-        const score = it.risk_score_avg ?? null
-        const scoreMin = it.risk_score_min ?? null
-        return {
-          ts: fmtTime(it.timestamp),
-          score,
-          score_min: scoreMin,
-          warn_min: scoreMin != null && scoreMin <= 84 && scoreMin > 49 ? scoreMin : null,
-          danger_min: scoreMin != null && scoreMin <= 49 ? scoreMin : null,
-        }
-      })
-      .filter((d) => d.score != null)
+      .map((it) => ({
+        ts: fmtTimeShort(it.bucket_start || it.timestamp),
+        avg: it.risk_score_avg ?? null,
+        max: it.risk_score_max ?? null,
+        sample_count: it.sample_count ?? null,
+        bucket_minutes: it.bucket_minutes ?? null,
+        bucket_start: it.bucket_start,
+        bucket_end: it.bucket_end,
+      }))
+      .filter((d) => d.avg != null || d.max != null)
 
     if (data.length === 0) {
       return <EmptyChart message="선택한 시간 범위에 Risk 데이터가 없습니다" />
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const warnDot = (props: any): React.ReactElement => {
-      if ((props.payload?.warn_min as number | null) == null) return <g />
-      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--warn)" opacity={0.85} />
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dangerDot = (props: any): React.ReactElement => {
-      if ((props.payload?.danger_min as number | null) == null) return <g />
-      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--crit)" opacity={0.85} />
     }
 
     return (
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <Area
+              type="monotone"
+              dataKey="max"
+              fill="var(--accent)"
+              fillOpacity={0.12}
+              stroke="none"
+              isAnimationActive={false}
+            />
+            <Area
+              type="monotone"
+              dataKey="avg"
+              fill="var(--surface)"
+              fillOpacity={0.96}
+              stroke="none"
+              isAnimationActive={false}
+            />
             <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
             <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
             <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
-            <Tooltip
-              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-              labelStyle={{ color: 'var(--ink-3)' }}
-            />
+            <Tooltip content={(props) => (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <RiskBandTooltip {...props as any} />
+            )} />
             <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
             <ReferenceLine y={50} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
-            <Area
+            <Line
               type="monotone"
-              dataKey="score"
-              name="Risk Score (평균)"
+              dataKey="avg"
+              name="안전 점수 평균"
               stroke="var(--accent)"
-              fill="var(--accent)"
-              fillOpacity={0.1}
-              strokeWidth={1.8}
+              strokeWidth={2.2}
               dot={false}
               activeDot={{ r: 4 }}
             />
-            {/* Warning markers: 50 < risk_score_min ≤ 84 */}
             <Line
               type="monotone"
-              dataKey="warn_min"
-              name="Risk Score 최저(주의)"
-              stroke="none"
-              strokeWidth={0}
-              dot={warnDot}
+              dataKey="max"
+              name="안전 점수 최대"
+              stroke="var(--accent)"
+              strokeWidth={1}
+              strokeDasharray="4 2"
+              strokeOpacity={0.65}
+              dot={false}
               activeDot={false}
-              legendType="none"
-              isAnimationActive={false}
-            />
-            {/* Danger markers: risk_score_min ≤ 49 */}
-            <Line
-              type="monotone"
-              dataKey="danger_min"
-              name="Risk Score 최저(위험)"
-              stroke="none"
-              strokeWidth={0}
-              dot={dangerDot}
-              activeDot={false}
-              legendType="none"
-              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -189,6 +177,53 @@ function fmtTimeShort(ts?: string): string {
   } catch {
     return ts.substring(11, 16)
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[]; label?: string }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload as Record<string, unknown> | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const avg = (payload.find((p: any) => p.dataKey === 'avg')?.value as number | undefined) ?? null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const max = (payload.find((p: any) => p.dataKey === 'max')?.value as number | undefined) ?? null
+
+  const timeStr = (d?.bucket_start && d?.bucket_end)
+    ? `${fmtTimeShort(d.bucket_start as string)} ~ ${fmtTimeShort(d.bucket_end as string)}`
+    : (d?.ts as string | undefined) ?? ''
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--line)',
+      borderRadius: 8, padding: '8px 12px', fontSize: 12,
+    }}>
+      <div style={{ color: 'var(--ink-3)', marginBottom: 6, fontSize: 11 }}>{timeStr}</div>
+      {avg != null && (
+        <div style={{ color: 'var(--ink-2)' }}>
+          평균&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+            {avg.toFixed(2)}
+          </span>
+        </div>
+      )}
+      {max != null && (
+        <div style={{ color: 'var(--ink-2)' }}>
+          최대&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+            {max.toFixed(2)}
+          </span>
+        </div>
+      )}
+      {(d?.sample_count as number | null) != null && (
+        <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 4 }}>
+          샘플 {d!.sample_count as number}개
+        </div>
+      )}
+      {(d?.bucket_minutes as number | null) != null && (
+        <div style={{ color: 'var(--ink-5)', fontSize: 10 }}>
+          {d!.bucket_minutes as number}분 집계
+        </div>
+      )}
+    </div>
+  )
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

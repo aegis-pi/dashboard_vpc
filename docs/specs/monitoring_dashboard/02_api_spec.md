@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-05-29
 수정 이력:
+  - 2026-05-29  안전 점수 그래프용 `risk_score_max` 응답 필드 추가.
   - 2026-05-29  ADR 0025 구현 완료 반영. history endpoint window 분기 현행화. GRAPH#5M 응답 필드 명세 추가.
   - 2026-05-28  history endpoint에 ADR 0025 window 분기 계획 추가. 현행 max_items=500 cap 임시방편 명시.
   - 2026-05-26  Step 6 구현 결과 반영. history endpoint 3개 분리 → 1개 통합(/history?window=). reports endpoint path 구조 갱신. WebSocket JWT 전달 방식 ?token= 파라미터로 확정. skeleton 항목 명시.
@@ -85,7 +86,7 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/factories` | Cognito JWT | 공장 목록 + latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) | 구현 완료 |
 | GET | `/factories/{factory_id}` | Cognito JWT | 단일 공장 latest 전체 | DDB GetItem | 구현 완료 |
 | GET | `/factories/{factory_id}/history?window=1h` | Cognito JWT | 시계열 (risk/factory_state/infra_state 통합) | DDB Query (`sk BETWEEN HISTORY#STATE#`, max_items=500 cap) | 구현 완료 |
-| GET | `/factories/{factory_id}/history?window=6h\|12h\|24h` | Cognito JWT | 5분 avg/min 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 최대 288 items) | **구현 완료** (ADR 0025) |
+| GET | `/factories/{factory_id}/history?window=6h\|12h\|24h` | Cognito JWT | 5분 avg/min/max 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 최대 288 items) | **구현 완료** (ADR 0025) |
 | GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — LLM report-generator 후속 작업 이후 | skeleton |
 | GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — LLM report-generator 후속 작업 이후 | skeleton |
 
@@ -116,6 +117,7 @@ Authorization: Bearer <Cognito Access Token>
 | `is_bucket` | 고정 `true` | GRAPH#5M 아이템 구분 플래그 |
 | `risk_score` / `risk_score_avg` | `risk.score.mean` | 5분 평균 |
 | `risk_score_min` | `risk.score.min` | 5분 최솟값. 경고/위험 마커 기준 |
+| `risk_score_max` | `risk.score.max` | 5분 최댓값. 평균~최대 음영/최대 점선 기준 |
 | `temperature_celsius_avg` | `sensor.temperature_celsius.mean` | 5분 평균 |
 | `humidity_percent_avg` | `sensor.humidity_percent.mean` | |
 | `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | |
@@ -126,11 +128,11 @@ Authorization: Bearer <Cognito Access Token>
 
 Risk Score 방향: **100 = 최안전, 0 = 최위험**
 
-| 구간 | level | Frontend 마커 |
+| 구간 | level | Frontend 표시 |
 | --- | --- | --- |
-| 85 ~ 100 | 안전 | — |
-| 50 ~ 84 | 주의 | warning scatter (risk_score_min ≤ 84) |
-| 0 ~ 49 | 위험 | danger scatter (risk_score_min ≤ 49) |
+| 85 ~ 100 | 안전 | threshold line y=85 |
+| 50 ~ 84 | 주의 | threshold line y=50/85 |
+| 0 ~ 49 | 위험 | threshold line y=50 |
 
 공장에 GRAPH#5M 데이터가 없으면 빈 배열 `[]` 반환. factory-a는 Edge Agent 비활성 구간에 따라 데이터 없을 수 있음.
 

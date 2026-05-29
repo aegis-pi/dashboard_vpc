@@ -19,7 +19,7 @@
 | 계층 | sk prefix / 구조 | TTL | 역할 |
 | --- | --- | --- | --- |
 | history_raw | 기존 `HISTORY#STATE#*` (변경 없음) | **2h** (기존 48h → 단축) | 1h 실시간 정밀 차트 전용 (쿼리 window 1h의 2배 버퍼) |
-| history_bucket | 기존 테이블 내 `GRAPH#5M#*` prefix (`example_data.md` 기준) | **48h** | 5분 단위 avg/min 집계. 6h/12h/24h 그래프 |
+| history_bucket | 기존 테이블 내 `GRAPH#5M#*` prefix (`example_data.md` 기준) | **48h** | 5분 단위 avg/min/max 집계. 6h/12h/24h 그래프 |
 
 history_bucket 아이템 구조 예시 (`example_data.md` 기준 `GRAPH#5M#` prefix 사용):
 
@@ -32,6 +32,7 @@ history_bucket 아이템 구조 예시 (`example_data.md` 기준 `GRAPH#5M#` pre
   "bucket_end": "2026-05-28T10:04:59.999Z",
   "risk_score_avg": 42.3,
   "risk_score_min": 28.5,
+  "risk_score_max": 66.0,
   "temperature_avg": 36.8,
   "temperature_max": 39.2,
   "sample_count": 100,
@@ -72,10 +73,11 @@ window=24h  → GRAPH#5M# query   (history_bucket, 288 items/공장)
 ### Dashboard Frontend ComposedChart
 
 - 기존 LineChart → Recharts ComposedChart로 교체
-- 평균 추이: 시안색 Area 그래프 (`risk_score_avg`)
-- 경고 마커: `risk_score_min <= 84` (주의 이하 구간 진입)인 버킷 위치에 붉은 Scatter Overlay 표시
-  - `risk_score_min <= 49` → 위험 (danger 색상)
-  - `50 <= risk_score_min <= 84` → 주의 (warning 색상)
+- 평균 추이: 굵은 실선 (`risk_score_avg`)
+- 최대 추이: 얇은 점선 (`risk_score_max`)
+- 변동 폭: 평균~최대 사이 연한 음영
+- 임계값: 안전/주의 기준 85, 주의/위험 기준 50 수평 점선
+- Tooltip: 시간 구간, 평균값, 최대값, 샘플 수 표시
 
 ## 변경 이유
 
@@ -110,8 +112,8 @@ asyncio semaphore(한도 10) 포화 → cascade 504 Gateway Timeout 발생.
   - `window=1h` → `HISTORY#STATE#` + `_extract()` + max_items=500 cap 유지
   - else → `GRAPH#5M#` + `_extract_graph_5m()`
 - Dashboard Backend `tests/`: GRAPH#5M 테스트 8개 추가 — **52 passed**
-- Dashboard Frontend `api/types.ts`: `HistoryItem`에 `is_bucket`, `risk_score_avg`, `risk_score_min`, infra aggregate 필드 추가 — **2026-05-29 완료**
-- Dashboard Frontend `components/Chart.tsx`: `RiskScoreChart` ComposedChart + Area(avg) + Scatter 마커, `NodeResourceChart` aggregate fallback — **2026-05-29 완료**
+- Dashboard Frontend `api/types.ts`: `HistoryItem`에 `is_bucket`, `risk_score_avg`, `risk_score_min`, `risk_score_max`, infra aggregate 필드 추가 — **2026-05-29 완료**
+- Dashboard Frontend `components/Chart.tsx`: `RiskScoreChart` ComposedChart + 평균/최대선 + 평균~최대 음영, `NodeResourceChart` aggregate fallback — **2026-05-29 완료**
 
 ## 업데이트 필요한 문서
 
