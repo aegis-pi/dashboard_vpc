@@ -25,7 +25,13 @@ async def list_factories(
         infra = i.get("infra_state") or {}
         fs = i.get("factory_state") or {}
         ps = i.get("pipeline_status") or {}
+        nodes = infra.get("nodes") or []
+        workloads = infra.get("workloads") or []
         ns = infra.get("node_summary") or {}
+        node_ready = infra.get("nodes_ready") if infra.get("nodes_ready") is not None else ns.get("ready")
+        node_total = infra.get("nodes_total") if infra.get("nodes_total") is not None else (ns.get("total") or (len(nodes) or None))
+        workload_ready = infra.get("pods_ready")
+        workload_total = len(workloads) or None
         result.append(
             {
                 "factory_id": factory_id,
@@ -38,8 +44,10 @@ async def list_factories(
                 "display_status": (i.get("dashboard") or {}).get("display_status"),
                 "last_factory_state_at": fs.get("source_timestamp"),
                 "last_infra_state_at": infra.get("source_timestamp"),
-                "node_ready": ns.get("ready"),
-                "node_total": ns.get("total"),
+                "node_ready": node_ready,
+                "node_total": node_total,
+                "workload_ready": workload_ready,
+                "workload_total": workload_total,
             }
         )
     return result
