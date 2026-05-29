@@ -9,7 +9,7 @@ import { useFactories } from '../hooks/useFactories'
 import { useFactoryHistory } from '../hooks/useFactoryHistory'
 import { useFleetRecentChanges, type RecentChange } from '../hooks/useFleetRecentChanges'
 import { AuthError } from '../api/client'
-import type { FactorySummary } from '../api/types'
+import type { FactorySummary, HistoryItem } from '../api/types'
 
 const SERIF = '"Instrument Serif", ui-serif, Georgia, serif'
 
@@ -18,6 +18,8 @@ const BANDS = [
   { from: 50, to: 85, color: 'var(--warn)', label: '주의' },
   { from: 85, to: 100, color: 'var(--safe)', label: '안전' },
 ]
+
+const TREND_WINDOW_MS = 10 * 60 * 1000
 
 // ─── Normalize factory to consistent shape ────────────────────────────
 function normalizeFactory(f: FactorySummary) {
@@ -29,6 +31,15 @@ function normalizeFactory(f: FactorySummary) {
   const pipeline = f.pipeline_status ?? 'normal'
   const envType = f.environment_type
   return { ...f, riskLevel, riskScore, topCauses, nodeReady, nodeTotal, pipeline, envType }
+}
+
+function recentHistoryItems(items: HistoryItem[], windowMs = TREND_WINDOW_MS): HistoryItem[] {
+  const cutoff = Date.now() - windowMs
+  return items.filter((item) => {
+    if (!item.timestamp) return false
+    const ts = new Date(item.timestamp).getTime()
+    return Number.isFinite(ts) && ts >= cutoff
+  })
 }
 
 // ─── Label anti-collision (identical to frontend reference) ──────────
@@ -348,8 +359,8 @@ function FactoryCard({
 }: { f: ReturnType<typeof normalizeFactory>; onClick: () => void }) {
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
-  const { data: history10m } = useFactoryHistory(f.factory_id, '10m')
-  const sparkData = history10m
+  const { data: history1h } = useFactoryHistory(f.factory_id, '1h')
+  const sparkData = recentHistoryItems(history1h)
     .map((h) => h.risk_score)
     .filter((v): v is number => v != null)
   const score = f.riskScore ?? null

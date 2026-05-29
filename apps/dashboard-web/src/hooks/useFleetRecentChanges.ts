@@ -49,7 +49,8 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     }
 
     try {
-      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '10m')))
+      // Backend serves raw HISTORY#STATE for 1h; derive the 10m view client-side.
+      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '1h')))
       if (!mounted.current || requestSeq.current !== seq) return
 
       const all: RecentChange[] = []
