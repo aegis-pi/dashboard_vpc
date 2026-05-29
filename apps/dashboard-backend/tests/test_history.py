@@ -159,6 +159,60 @@ def test_graph_5m_items_have_ai_scores(client, ddb_mock):
         assert "bend_score_max" in item
 
 
+def test_graph_5m_items_have_sensor_max_fields(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=6h").json()
+    for item in items:
+        assert "temperature_celsius_max" in item
+        assert "humidity_percent_max" in item
+        assert "pressure_hpa_max" in item
+    maxes = [round(i["temperature_celsius_max"], 1) for i in items]
+    assert maxes == [26.0, 28.0]
+
+
+def test_graph_5m_items_have_sample_count(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=6h").json()
+    for item in items:
+        assert item.get("sample_count") is not None
+    counts = {i["sample_count"] for i in items}
+    assert counts == {97}
+
+
+def test_graph_6h_has_bucket_minutes_5(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=6h").json()
+    for item in items:
+        assert item.get("bucket_minutes") == 5
+
+
+def test_graph_12h_reaggregated_to_10min_buckets(client, ddb_mock):
+    # 2 GRAPH#5M items (45-min and 30-min ago) are merged into 1 bucket
+    items = client.get("/factories/factory-a/history?window=12h").json()
+    assert len(items) == 1
+    assert items[0]["is_bucket"] is True
+    assert items[0]["bucket_minutes"] == 10
+
+
+def test_graph_12h_weighted_avg_correct(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=12h").json()
+    # Item 1: risk_avg=30.0, sample=97; Item 2: risk_avg=70.0, sample=97
+    # weighted avg = (30*97 + 70*97) / 194 = 50.0
+    assert round(items[0]["risk_score_avg"]) == 50
+
+
+def test_graph_12h_max_and_sample_count_correct(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=12h").json()
+    # temp max: max(26.0, 28.0) = 28.0
+    assert items[0]["temperature_celsius_max"] == 28.0
+    # sample_count = 97 + 97 = 194
+    assert items[0]["sample_count"] == 194
+
+
+def test_graph_24h_reaggregated_to_20min_buckets(client, ddb_mock):
+    # 2 GRAPH#5M items → 1 merged bucket at 20-min resolution
+    items = client.get("/factories/factory-a/history?window=24h").json()
+    assert len(items) == 1
+    assert items[0]["bucket_minutes"] == 20
+
+
 def test_window_1h_not_contaminated_by_graph_5m(client, ddb_mock):
     """window=1h must return HISTORY#STATE items only — no GRAPH#5M buckets."""
     items = client.get("/factories/factory-a/history?window=1h").json()

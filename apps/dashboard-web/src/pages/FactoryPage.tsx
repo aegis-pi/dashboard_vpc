@@ -5,7 +5,7 @@ import { Shell } from '../components/Layout'
 import { LevelBadge, PipelineBadge, StaleBadge } from '../components/Badge'
 import { relTime, riskColor } from '../utils/format'
 import { extractSensor, extractAI } from '../utils/normalize'
-import { RiskScoreChart, AIScoreChart, NodeResourceChart } from '../components/Chart'
+import { RiskScoreChart, AIScoreChart, NodeResourceChart, SensorChart } from '../components/Chart'
 import { ConnStatus } from '../components/ConnStatus'
 import { CompactTrendChart } from '../components/RiskTrendChart'
 import { recentRiskScores } from '../utils/trend'
@@ -490,17 +490,20 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
 
   const isEmpty = history.length === 0
   const isBucketedWindow = win !== '1h'
+  const bucketMinutes = isBucketedWindow && history.length > 0
+    ? history[0]?.bucket_minutes ?? null
+    : null
   const sourceLabel = isBucketedWindow
-    ? 'GRAPH#5M · 5분 집계 버킷'
+    ? `GRAPH#5M · ${bucketMinutes ?? 5}분 집계 버킷`
     : 'HISTORY#STATE · 원시 스냅샷'
   const riskMetricLabel = isBucketedWindow
     ? 'risk_score 평균선 + 버킷 최저점 마커'
     : 'risk_score · 100이 가장 안전'
   const sensorMetricLabel = isBucketedWindow
-    ? '온도 · 습도 · 기압 5분 평균'
+    ? `온도 · 습도 · 기압 · ${bucketMinutes ?? 5}분 평균+최대`
     : '온도 · 습도 · 기압'
   const aiMetricLabel = isBucketedWindow
-    ? 'fire / fall / bend · 선=5분 평균, 점=최대 ≥0.8'
+    ? `fire / fall / bend · 선=${bucketMinutes ?? 5}분 평균, 점=최대 ≥0.8`
     : 'fire / fall / bend · 0 ~ 1'
 
   return (
@@ -558,7 +561,15 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
         <div className="card-bd">
           {loading
             ? <LoadingChart />
-            : isEmpty ? <EmptyNote /> : (
+            : isEmpty ? <EmptyNote /> : isBucketedWindow ? (
+              // 6h/12h/24h: full ComposedChart with avg+max band per sensor
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SensorChart items={history} field="temperature_celsius_avg" label="온도" unit="°C" />
+                <SensorChart items={history} field="humidity_percent_avg" label="습도" unit="%" />
+                <SensorChart items={history} field="pressure_hpa_avg" label="기압" unit="hPa" />
+              </div>
+            ) : (
+              // 1h: compact mini panels (avg sparkline only)
               <div className="grid row3">
                 <SensorPanel
                   label="온도" unit="°C" color="oklch(0.65 0.18 30)"
@@ -710,7 +721,7 @@ function RiskThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
       {bucketed && (
         <>
           <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-          <span style={{ color: 'var(--ink-3)' }}>선=5분 평균, 점=5분 최저점</span>
+          <span style={{ color: 'var(--ink-3)' }}>선=집계 평균, 점=집계 최저점</span>
         </>
       )}
     </div>
@@ -742,7 +753,7 @@ function AIScoreThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
       {bucketed && (
         <>
           <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-          <span style={{ color: 'var(--ink-3)' }}>선=5분 평균, 점=5분 최대 ≥0.8</span>
+          <span style={{ color: 'var(--ink-3)' }}>선=집계 평균, 점=집계 최대 ≥0.8</span>
         </>
       )}
     </div>

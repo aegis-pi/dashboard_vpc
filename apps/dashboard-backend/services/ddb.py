@@ -229,8 +229,10 @@ async def get_factory_history(
 ) -> list[dict]:
     """Return history items for chart consumption.
 
-    window=1h             → HISTORY#STATE# raw snapshots + _extract()
-    window=6h / 12h / 24h → GRAPH#5M# 5-minute aggregates + _extract_graph_5m()
+    window=1h  → HISTORY#STATE# raw snapshots (72 pts max)
+    window=6h  → GRAPH#5M# 5-min buckets (up to 72 pts)
+    window=12h → GRAPH#5M# re-aggregated to 10-min buckets (2×5min, up to 72 pts)
+    window=24h → GRAPH#5M# re-aggregated to 20-min buckets (4×5min, up to 72 pts)
     """
     table_name = get_settings().ddb_table_status
     since = _since_iso(window)
@@ -242,7 +244,9 @@ async def get_factory_history(
 
     since_sk = f"{GRAPH_5M_PREFIX}{since}"
     raw = await _run_ddb(_get_graph_5m_sync, table_name, factory_id, since_sk)
-    return [_extract_graph_5m(i) for i in raw]
+    extracted = [_extract_graph_5m(i) for i in raw]
+    n = _bucket_size_for_window(window)
+    return _reaggregate_extracted(extracted, n) if n > 1 else extracted
 
 
 # ─── Private utilities ────────────────────────────────────────────────────────
@@ -285,15 +289,21 @@ def _extract_graph_5m(item: dict) -> dict:
         "timestamp": bucket_start or sk.removeprefix(GRAPH_5M_PREFIX),
         "bucket_start": bucket_start,
         "bucket_end": item.get("bucket_end"),
+        "bucket_minutes": 5,
         "is_bucket": True,
+        "sample_count": quality.get("source_count") or risk_score.get("count"),
         # risk
         "risk_score": risk_mean,
         "risk_score_avg": risk_mean,
         "risk_score_min": risk_min,
-        # sensor
+        # sensor avg
         "temperature_celsius_avg": temp.get("mean"),
         "humidity_percent_avg": humidity.get("mean"),
         "pressure_hpa_avg": pressure.get("mean"),
+        # sensor max (for avg-to-max band in charts)
+        "temperature_celsius_max": temp.get("max"),
+        "humidity_percent_max": humidity.get("max"),
+        "pressure_hpa_max": pressure.get("max"),
         # AI — mean for line chart, max for spike markers (≥0.8)
         "fire_score": ai_fire.get("mean"),
         "fall_score": ai_fall.get("mean"),
@@ -307,6 +317,90 @@ def _extract_graph_5m(item: dict) -> dict:
         "memory_usage_percent_mean": memory.get("mean"),
         "disk_usage_percent_last": disk.get("last"),
         "quality": quality if quality else None,
+    }
+
+
+def _bucket_size_for_window(window: str) -> int:
+    """Number of 5-min GRAPH#5M items to merge per output bucket.
+
+    6h  → 1 (no merge, 72 pts at 5-min)
+    12h → 2 (10-min buckets, 72 pts)
+    24h → 4 (20-min buckets, 72 pts)
+    """
+    return {"12h": 2, "24h": 4}.get(window, 1)
+
+
+def _reaggregate_extracted(items: list[dict], n: int) -> list[dict]:
+    """Group consecutive extracted GRAPH#5M items into n-wide merged buckets."""
+    return [
+        _merge_extracted_group(items[i : i + n], n)
+        for i in range(0, len(items), n)
+        if items[i : i + n]
+    ]
+
+
+def _merge_extracted_group(group: list[dict], n: int) -> dict:
+    """Merge a group of extracted GRAPH#5M items into one bucket.
+
+    - avg fields: weighted average by sample_count
+    - max fields: max(max)
+    - risk_score_min: min(min)  — worst dip in the window
+    - sample_count: sum
+    - disk_usage_percent_last: last bucket's value
+    """
+    first, last = group[0], group[-1]
+
+    def _wavg(field: str) -> float | None:
+        total = sum(g.get("sample_count") or 0 for g in group)
+        if not total:
+            return None
+        return sum((g.get(field) or 0) * (g.get("sample_count") or 0) for g in group) / total
+
+    def _fmax(field: str) -> float | None:
+        vals = [g[field] for g in group if g.get(field) is not None]
+        return max(vals) if vals else None
+
+    def _fmin(field: str) -> float | None:
+        vals = [g[field] for g in group if g.get(field) is not None]
+        return min(vals) if vals else None
+
+    def _fsum(field: str) -> int | None:
+        vals = [g[field] for g in group if g.get(field) is not None]
+        return sum(vals) if vals else None
+
+    risk_avg = _wavg("risk_score_avg")
+    return {
+        "timestamp": first.get("timestamp"),
+        "bucket_start": first.get("bucket_start"),
+        "bucket_end": last.get("bucket_end"),
+        "bucket_minutes": 5 * n,
+        "is_bucket": True,
+        "sample_count": _fsum("sample_count"),
+        # risk
+        "risk_score": risk_avg,
+        "risk_score_avg": risk_avg,
+        "risk_score_min": _fmin("risk_score_min"),
+        # sensor avg (weighted)
+        "temperature_celsius_avg": _wavg("temperature_celsius_avg"),
+        "humidity_percent_avg": _wavg("humidity_percent_avg"),
+        "pressure_hpa_avg": _wavg("pressure_hpa_avg"),
+        # sensor max
+        "temperature_celsius_max": _fmax("temperature_celsius_max"),
+        "humidity_percent_max": _fmax("humidity_percent_max"),
+        "pressure_hpa_max": _fmax("pressure_hpa_max"),
+        # AI scores
+        "fire_score": _wavg("fire_score"),
+        "fall_score": _wavg("fall_score"),
+        "bend_score": _wavg("bend_score"),
+        "fire_score_max": _fmax("fire_score_max"),
+        "fall_score_max": _fmax("fall_score_max"),
+        "bend_score_max": _fmax("bend_score_max"),
+        "ai_max_score": _fmax("ai_max_score"),
+        # infra
+        "cpu_usage_percent_mean": _wavg("cpu_usage_percent_mean"),
+        "memory_usage_percent_mean": _wavg("memory_usage_percent_mean"),
+        "disk_usage_percent_last": last.get("disk_usage_percent_last"),
+        "quality": None,
     }
 
 

@@ -170,23 +170,152 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
 }
 
 // ─── Sensor chart (temp / humidity / pressure) ────────────────────────
+// window=1h  → simple LineChart (avg only)
+// window=6h/12h/24h → ComposedChart: avg solid + max dashed + avg-to-max band
+
+type SensorAvgField = 'temperature_celsius_avg' | 'humidity_percent_avg' | 'pressure_hpa_avg'
+type SensorMaxField = 'temperature_celsius_max' | 'humidity_percent_max' | 'pressure_hpa_max'
+
+const SENSOR_MAX_FIELD: Record<SensorAvgField, SensorMaxField> = {
+  temperature_celsius_avg: 'temperature_celsius_max',
+  humidity_percent_avg: 'humidity_percent_max',
+  pressure_hpa_avg: 'pressure_hpa_max',
+}
+
+function fmtTimeShort(ts?: string): string {
+  if (!ts) return ''
+  try {
+    return new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ts.substring(11, 16)
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SensorBandTooltip({ active, payload, unit }: { active?: boolean; payload?: any[]; label?: string; unit: string }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload as Record<string, unknown> | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const avg = (payload.find((p: any) => p.dataKey === 'avg')?.value as number | undefined) ?? null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const max = (payload.find((p: any) => p.dataKey === 'max')?.value as number | undefined) ?? null
+
+  const timeStr = (d?.bucket_start && d?.bucket_end)
+    ? `${fmtTimeShort(d.bucket_start as string)} ~ ${fmtTimeShort(d.bucket_end as string)}`
+    : (d?.ts as string | undefined) ?? ''
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--line)',
+      borderRadius: 8, padding: '8px 12px', fontSize: 12,
+    }}>
+      <div style={{ color: 'var(--ink-3)', marginBottom: 6, fontSize: 11 }}>{timeStr}</div>
+      {avg != null && (
+        <div style={{ color: 'var(--ink-2)' }}>
+          평균&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+            {avg.toFixed(2)}
+          </span>&nbsp;<span style={{ color: 'var(--ink-4)' }}>{unit}</span>
+        </div>
+      )}
+      {max != null && (
+        <div style={{ color: 'var(--ink-2)' }}>
+          최대&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+            {max.toFixed(2)}
+          </span>&nbsp;<span style={{ color: 'var(--ink-4)' }}>{unit}</span>
+        </div>
+      )}
+      {(d?.sample_count as number | null) != null && (
+        <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 4 }}>
+          샘플 {d!.sample_count as number}개
+        </div>
+      )}
+      {(d?.bucket_minutes as number | null) != null && (
+        <div style={{ color: 'var(--ink-5)', fontSize: 10 }}>
+          {d!.bucket_minutes as number}분 집계
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SensorChart({ items, field, label, unit }: {
   items: HistoryItem[]
-  field: 'temperature_celsius_avg' | 'humidity_percent_avg' | 'pressure_hpa_avg'
+  field: SensorAvgField
   label: string
   unit: string
 }) {
   const sampledItems = subsampleData(items)
-  const data = sampledItems
-    .map((it) => {
-      const val = it[field] as number | null | undefined
-      return { ts: fmtTime(extractTimestamp(it)), value: val ?? null }
-    })
-    .filter((d) => d.value != null)
+  const isBucket = items.length > 0 && items[0]?.is_bucket === true
+  const maxField = SENSOR_MAX_FIELD[field]
+  const bucketMinutes = isBucket ? (items[0]?.bucket_minutes ?? 5) : null
+  const is24h = bucketMinutes === 20
 
-  if (data.length === 0) {
-    return <EmptyChart message={`${label} 데이터 없음`} />
+  if (isBucket) {
+    const data = sampledItems
+      .map((it) => ({
+        ts: fmtTimeShort(it.bucket_start || it.timestamp),
+        avg: (it[field] as number | null | undefined) ?? null,
+        max: (it[maxField] as number | null | undefined) ?? null,
+        sample_count: it.sample_count ?? null,
+        bucket_minutes: it.bucket_minutes ?? null,
+        bucket_start: it.bucket_start,
+        bucket_end: it.bucket_end,
+      }))
+      .filter((d) => d.avg != null || d.max != null)
+
+    if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
+
+    const fillOpacity = is24h ? 0.08 : 0.15
+
+    return (
+      <div className="chart-wrap">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            {/* max area fills 0→max; avg area paints over 0→avg (reveals only avg-to-max band) */}
+            <Area
+              type="monotone" dataKey="max"
+              fill="var(--accent)" fillOpacity={fillOpacity}
+              stroke="none" isAnimationActive={false}
+            />
+            <Area
+              type="monotone" dataKey="avg"
+              fill="var(--surface)" fillOpacity={0.95}
+              stroke="none" isAnimationActive={false}
+            />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
+            <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+            <YAxis tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
+            <Tooltip content={(props) => (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <SensorBandTooltip {...props as any} unit={unit} />
+            )} />
+            {/* avg: solid bold line */}
+            <Line
+              type="monotone" dataKey="avg" name={`${label} 평균`}
+              stroke="var(--accent)" strokeWidth={2}
+              dot={false} activeDot={{ r: 4 }}
+            />
+            {/* max: thin dashed line */}
+            <Line
+              type="monotone" dataKey="max" name={`${label} 최대`}
+              stroke="var(--accent)" strokeWidth={1} strokeDasharray="4 2"
+              dot={false} activeDot={false} strokeOpacity={0.65}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    )
   }
+
+  // window=1h: raw LineChart (avg only, no max available)
+  const data = sampledItems
+    .map((it) => ({
+      ts: fmtTime(extractTimestamp(it)),
+      avg: (it[field] as number | null | undefined) ?? null,
+    }))
+    .filter((d) => d.avg != null)
+
+  if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
 
   return (
     <div className="chart-wrap">
@@ -197,16 +326,12 @@ export function SensorChart({ items, field, label, unit }: {
           <YAxis tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
           <Tooltip
             contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-            formatter={(v: number) => [`${v} ${unit}`, label]}
+            formatter={(v: number) => [`${v.toFixed(2)} ${unit}`, label]}
           />
           <Line
-            type="monotone"
-            dataKey="value"
-            name={label}
-            stroke="var(--accent)"
-            strokeWidth={1.8}
-            dot={false}
-            activeDot={{ r: 4 }}
+            type="monotone" dataKey="avg" name={label}
+            stroke="var(--accent)" strokeWidth={1.8}
+            dot={false} activeDot={{ r: 4 }}
           />
         </LineChart>
       </ResponsiveContainer>
