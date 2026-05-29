@@ -7,6 +7,8 @@ export interface FactoryViewModel {
   top_causes: Array<{ name: string; value?: number | null; contribution?: number | null }>
   node_ready: number | undefined
   node_total: number | undefined
+  workload_ready: number | undefined
+  workload_total: number | undefined
   pipeline: string | undefined
   env_type: string | undefined
   updated_at: string | undefined
@@ -20,13 +22,17 @@ export function adaptFactorySummary(f: FactorySummary): FactoryViewModel {
     if (typeof c === 'string') return { name: c }
     return { name: c.name ?? c.field ?? '?', value: c.value, contribution: c.contribution }
   })
+  const infra = f.infra_state
+  const workloads: unknown[] = infra?.workloads ?? []
   return {
     factory_id: f.factory_id,
     risk_level: f.risk_level ?? f.risk?.level,
     risk_score: f.risk_score ?? f.risk?.score,
     top_causes,
-    node_ready: f.node_ready ?? f.infra_state?.node_summary?.ready,
-    node_total: f.node_total ?? f.infra_state?.node_summary?.total,
+    node_ready: f.node_ready ?? infra?.nodes_ready ?? infra?.node_summary?.ready,
+    node_total: f.node_total ?? infra?.nodes_total ?? infra?.node_summary?.total,
+    workload_ready: f.workload_ready ?? infra?.pods_ready,
+    workload_total: f.workload_total ?? (workloads.length || undefined),
     pipeline: (f.pipeline_status as string | undefined) ?? 'normal',
     env_type: f.environment_type,
     updated_at: f.updated_at,

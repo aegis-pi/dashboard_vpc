@@ -103,10 +103,36 @@ function resolveNodeSummary(infra: FactoryDetail['infra_state']): { ready: numbe
     const ready = infra.node_summary.ready ?? 0
     return { ready, total, not_ready: infra.node_summary.not_ready ?? (total - ready) }
   }
+  if (infra.nodes_total != null) {
+    const total = infra.nodes_total
+    const ready = infra.nodes_ready ?? 0
+    return { ready, total, not_ready: total - ready }
+  }
   if (infra.nodes && infra.nodes.length > 0) {
     const total = infra.nodes.length
-    const ready = infra.nodes.filter((n) => n.ready === true).length
+    const ready = infra.nodes.filter((n) => n.ready === true || n.status === 'Ready').length
     return { ready, total, not_ready: total - ready }
+  }
+  return null
+}
+
+function resolveWorkloadSummary(
+  infra: FactoryDetail['infra_state'],
+): { running: number; total: number; unhealthy?: number } | null {
+  if (!infra) return null
+  if (infra.workload_summary?.total != null) {
+    return {
+      running: infra.workload_summary.running ?? 0,
+      total: infra.workload_summary.total,
+      unhealthy: infra.workload_summary.unhealthy,
+    }
+  }
+  const workloads = infra.workloads ?? []
+  if (workloads.length > 0) {
+    return {
+      running: infra.pods_ready ?? workloads.filter((w) => (w.containers_ready ?? 0) > 0).length,
+      total: workloads.length,
+    }
   }
   return null
 }
@@ -141,7 +167,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
   const ai     = extractAI(data.factory_state)
   const infra  = data.infra_state
   const ns     = resolveNodeSummary(infra)
-  const ws     = infra?.workload_summary
+  const ws     = resolveWorkloadSummary(infra)
   const devices = resolveDevices(infra)
   const causes = risk?.top_causes ?? []
 
@@ -789,7 +815,7 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
 
   const nodes: NodeStatus[]         = data.infra_state?.nodes ?? []
   const workloads: WorkloadStatus[] = data.infra_state?.workloads ?? []
-  const ws  = data.infra_state?.workload_summary
+  const ws  = resolveWorkloadSummary(data.infra_state)
   const ps  = data.pipeline_status
   const hb  = data.infra_state?.heartbeat
   const devices = resolveDevices(data.infra_state)

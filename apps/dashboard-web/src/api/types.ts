@@ -21,6 +21,8 @@ export interface FactorySummary {
   top_causes?: (TopCause | string)[]
   node_ready?: number
   node_total?: number
+  workload_ready?: number
+  workload_total?: number
   pipeline_status?: PipelineStatus
   updated_at?: string
   last_factory_state_at?: string
@@ -33,6 +35,10 @@ export interface FactorySummary {
   }
   infra_state?: {
     node_summary?: { ready?: number; total?: number; not_ready?: number }
+    nodes_ready?: number
+    nodes_total?: number
+    pods_ready?: number
+    workloads?: WorkloadStatus[]
   }
   pipeline_status_obj?: { status?: PipelineStatus }
 }
@@ -103,6 +109,8 @@ export interface FactoryDetail {
   }
   infra_state?: {
     node_summary?: { ready?: number; total?: number; not_ready?: number }
+    nodes_ready?: number
+    nodes_total?: number
     nodes?: NodeStatus[]
     workload_summary?: {
       total?: number
@@ -110,6 +118,7 @@ export interface FactoryDetail {
       unhealthy?: number
       restart_count_total?: number
     }
+    pods_ready?: number
     workloads?: WorkloadStatus[]
     // nested device format: { bme280: { available, last_seen_at }, ... }
     devices?: {
@@ -142,6 +151,7 @@ export interface NodeStatus {
   node_id: string
   role?: string | null
   ready?: boolean
+  status?: string
   cpu_usage_percent?: number | null
   memory_usage_percent?: number | null
   disk_usage_percent?: number | null
@@ -153,6 +163,7 @@ export interface WorkloadStatus {
   namespace?: string | null
   status?: string
   ready?: boolean | null
+  containers_ready?: number | null
   node_id?: string
   restart_count?: number
 }
