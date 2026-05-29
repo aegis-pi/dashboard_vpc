@@ -320,6 +320,82 @@ def ddb_mock():
                 "factory_id": "factory-a",
                 "risk": {"score": 99.0, "level": "danger"},
             },
+            # GRAPH#5M item 1 (45 min ago) — danger range (risk_score_min=25.0)
+            {
+                "pk": "FACTORY#factory-a",
+                "sk": f"GRAPH#5M#{ts_45}",
+                "factory_id": "factory-a",
+                "bucket_start": ts_45,
+                "bucket_end": _now_minus(40),
+                "item_type": "GRAPH#5M",
+                "schema_version": "graph-5m-v0.1.0",
+                "bucket_minutes": 5,
+                "sensor": {
+                    "temperature_celsius": {"mean": 25.0, "min": 24.0, "max": 26.0, "count": 97},
+                    "humidity_percent": {"mean": 50.0, "min": 48.0, "max": 52.0, "count": 97},
+                    "pressure_hpa": {"mean": 1008.0, "min": 1007.0, "max": 1009.0, "count": 97},
+                },
+                "risk": {
+                    "score": {"mean": 30.0, "min": 25.0, "max": 35.0, "count": 97},
+                },
+                "ai_detection": {
+                    "threshold": 0.7,
+                    "max_score": 0.5,
+                    "above_threshold_count": 0,
+                    "by_type": {
+                        "fire_score": {"max": 0.5, "min": 0.0, "mean": 0.1, "count": 97,
+                                       "threshold": 0.7, "above_threshold_count": 0},
+                        "fall_score": {"max": 0.2, "min": 0.0, "mean": 0.05, "count": 97,
+                                       "threshold": 0.7, "above_threshold_count": 0},
+                        "bend_score": {"max": 0.1, "min": 0.0, "mean": 0.02, "count": 97,
+                                       "threshold": 0.7, "above_threshold_count": 0},
+                    },
+                },
+                "infra": {
+                    "cpu_usage_percent": {"mean": 40.0, "max": 60.0, "min": 20.0, "count": 97},
+                    "memory_usage_percent": {"mean": 55.0, "max": 65.0, "min": 45.0, "count": 97},
+                    "disk_usage_percent": {"last": 70.0, "mean": 70.0, "max": 71.0, "min": 69.0, "count": 97},
+                },
+                "quality": {"source_count": 97, "expected_count": 100, "is_empty": False, "is_partial": False},
+            },
+            # GRAPH#5M item 2 (30 min ago) — warning range (risk_score_min=60.0)
+            {
+                "pk": "FACTORY#factory-a",
+                "sk": f"GRAPH#5M#{ts_30}",
+                "factory_id": "factory-a",
+                "bucket_start": ts_30,
+                "bucket_end": _now_minus(25),
+                "item_type": "GRAPH#5M",
+                "schema_version": "graph-5m-v0.1.0",
+                "bucket_minutes": 5,
+                "sensor": {
+                    "temperature_celsius": {"mean": 27.0, "min": 26.0, "max": 28.0, "count": 97},
+                    "humidity_percent": {"mean": 52.0, "min": 50.0, "max": 54.0, "count": 97},
+                    "pressure_hpa": {"mean": 1009.0, "min": 1008.0, "max": 1010.0, "count": 97},
+                },
+                "risk": {
+                    "score": {"mean": 70.0, "min": 60.0, "max": 80.0, "count": 97},
+                },
+                "ai_detection": {
+                    "threshold": 0.7,
+                    "max_score": 0.2,
+                    "above_threshold_count": 0,
+                    "by_type": {
+                        "fire_score": {"max": 0.2, "min": 0.0, "mean": 0.05, "count": 97,
+                                       "threshold": 0.7, "above_threshold_count": 0},
+                        "fall_score": {"max": 0.1, "min": 0.0, "mean": 0.02, "count": 97,
+                                       "threshold": 0.7, "above_threshold_count": 0},
+                        "bend_score": {"max": 0.15, "min": 0.0, "mean": 0.03, "count": 97,
+                                       "threshold": 0.7, "above_threshold_count": 0},
+                    },
+                },
+                "infra": {
+                    "cpu_usage_percent": {"mean": 45.0, "max": 55.0, "min": 35.0, "count": 97},
+                    "memory_usage_percent": {"mean": 58.0, "max": 68.0, "min": 48.0, "count": 97},
+                    "disk_usage_percent": {"last": 71.0, "mean": 71.0, "max": 72.0, "min": 70.0, "count": 97},
+                },
+                "quality": {"source_count": 97, "expected_count": 100, "is_empty": False, "is_partial": False},
+            },
         ]
 
         for item in items:

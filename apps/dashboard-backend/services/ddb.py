@@ -1,12 +1,14 @@
 """DynamoDB access layer for AEGIS-DynamoDB-FactoryStatus.
 
-Key contract (ADR 0022):
-  table  : AEGIS-DynamoDB-FactoryStatus
-  LATEST : pk=FACTORY#{factory_id}  sk=LATEST
-  HISTORY: pk=FACTORY#{factory_id}  sk=HISTORY#STATE#{iso_timestamp}
+Key contract (ADR 0022 / ADR 0025):
+  table       : AEGIS-DynamoDB-FactoryStatus
+  LATEST      : pk=FACTORY#{factory_id}  sk=LATEST
+  HISTORY_RAW : pk=FACTORY#{factory_id}  sk=HISTORY#STATE#{iso_timestamp}  TTL 2h
+  GRAPH_5M    : pk=FACTORY#{factory_id}  sk=GRAPH#5M#{bucket_start_iso}    TTL 48h
 
-Only the HISTORY#STATE# prefix is queried.  No other HISTORY-sub-type prefix
-exists in the data contract; querying them is explicitly forbidden.
+window=1h   → HISTORY#STATE# query (raw snapshots, ~2,760 items/factory at 3s interval)
+window=6h/12h/24h → GRAPH#5M# query (5-minute aggregates, max 72/144/288 items/factory)
+Only these two prefixes are queried.  No other HISTORY# or GRAPH# prefix is allowed.
 """
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -22,6 +24,7 @@ from config import get_settings
 
 LATEST_SK = "LATEST"
 HISTORY_STATE_PREFIX = "HISTORY#STATE#"
+GRAPH_5M_PREFIX = "GRAPH#5M#"
 MAX_BATCH_GET_KEYS = 100
 _ddb_semaphore: asyncio.Semaphore | None = None
 _ddb_semaphore_limit: int | None = None
@@ -151,6 +154,26 @@ def _list_factories_by_scan_sync(table_name: str, limit: int) -> list[dict]:
     )
 
 
+def _get_graph_5m_sync(table_name: str, factory_id: str, since_sk: str) -> list[dict]:
+    """Query GRAPH#5M items ascending for a factory (max 288 items for 24h window)."""
+    table = _ddb().Table(table_name)
+    kwargs: dict = dict(
+        KeyConditionExpression=(
+            Key("pk").eq(f"FACTORY#{factory_id}")
+            & Key("sk").between(since_sk, f"{GRAPH_5M_PREFIX}~")
+        ),
+        ScanIndexForward=True,
+    )
+    items: list = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return [_from_ddb(i) for i in items]
+
+
 def _get_history_sync(
     table_name: str, factory_id: str, since_sk: str, max_items: int = 500
 ) -> list[dict]:
@@ -204,15 +227,81 @@ async def list_factories() -> list[dict]:
 async def get_factory_history(
     factory_id: str, window: str = "1h", max_items: int = 500
 ) -> list[dict]:
-    """Query HISTORY#STATE items and extract risk/factory_state/infra_state."""
-    since = _since_iso(window)
-    since_sk = f"{HISTORY_STATE_PREFIX}{since}"
+    """Return history items for chart consumption.
+
+    window=1h             → HISTORY#STATE# raw snapshots + _extract()
+    window=6h / 12h / 24h → GRAPH#5M# 5-minute aggregates + _extract_graph_5m()
+    """
     table_name = get_settings().ddb_table_status
-    raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items)
-    return [_extract(i) for i in raw]
+    since = _since_iso(window)
+
+    if window == "1h":
+        since_sk = f"{HISTORY_STATE_PREFIX}{since}"
+        raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items)
+        return [_extract(i) for i in raw]
+
+    since_sk = f"{GRAPH_5M_PREFIX}{since}"
+    raw = await _run_ddb(_get_graph_5m_sync, table_name, factory_id, since_sk)
+    return [_extract_graph_5m(i) for i in raw]
 
 
 # ─── Private utilities ────────────────────────────────────────────────────────
+
+def _extract_graph_5m(item: dict) -> dict:
+    """Extract aggregated metrics from a GRAPH#5M bucket item for frontend charts.
+
+    Follows the field mapping defined in example_data.md / ADR 0025:
+      sensor.*   → temperature_celsius_avg / humidity_percent_avg / pressure_hpa_avg
+      risk.score → risk_score (mean) / risk_score_avg / risk_score_min
+      ai_detection.by_type.*.max → fire_score / fall_score / bend_score
+      infra.*    → cpu_usage_percent_mean / memory_usage_percent_mean / disk_usage_percent_last
+    """
+    bucket_start = item.get("bucket_start", "")
+    sk = item.get("sk", "")
+
+    sensor = item.get("sensor") or {}
+    risk = item.get("risk") or {}
+    ai = item.get("ai_detection") or {}
+    infra = item.get("infra") or {}
+    quality = item.get("quality") or {}
+
+    temp = sensor.get("temperature_celsius") or {}
+    humidity = sensor.get("humidity_percent") or {}
+    pressure = sensor.get("pressure_hpa") or {}
+    risk_score = risk.get("score") or {}
+    ai_by_type = ai.get("by_type") or {}
+    cpu = infra.get("cpu_usage_percent") or {}
+    memory = infra.get("memory_usage_percent") or {}
+    disk = infra.get("disk_usage_percent") or {}
+
+    risk_mean = risk_score.get("mean")
+    risk_min = risk_score.get("min")
+
+    return {
+        "timestamp": bucket_start or sk.removeprefix(GRAPH_5M_PREFIX),
+        "bucket_start": bucket_start,
+        "bucket_end": item.get("bucket_end"),
+        "is_bucket": True,
+        # risk
+        "risk_score": risk_mean,
+        "risk_score_avg": risk_mean,
+        "risk_score_min": risk_min,
+        # sensor
+        "temperature_celsius_avg": temp.get("mean"),
+        "humidity_percent_avg": humidity.get("mean"),
+        "pressure_hpa_avg": pressure.get("mean"),
+        # AI — max per bucket to preserve spike visibility
+        "fire_score": (ai_by_type.get("fire_score") or {}).get("max"),
+        "fall_score": (ai_by_type.get("fall_score") or {}).get("max"),
+        "bend_score": (ai_by_type.get("bend_score") or {}).get("max"),
+        "ai_max_score": ai.get("max_score"),
+        # infra aggregates (no per-node breakdown in GRAPH#5M)
+        "cpu_usage_percent_mean": cpu.get("mean"),
+        "memory_usage_percent_mean": memory.get("mean"),
+        "disk_usage_percent_last": disk.get("last"),
+        "quality": quality if quality else None,
+    }
+
 
 def _parse_window(window: str) -> timedelta:
     if window.endswith("h"):
