@@ -40,7 +40,7 @@ function fmtTime(ts?: string): string {
 
 // ─── Risk score chart ─────────────────────────────────────────────────
 // window=1h  → LineChart (raw snapshots)
-// window=6h/12h/24h → ComposedChart with Area (avg) + Scatter markers (min)
+// window=6h/12h/24h → ComposedChart with Area (avg) + threshold markers (min)
 export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
   const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
@@ -53,9 +53,9 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
         return {
           ts: fmtTime(it.timestamp),
           score,
-          // warn_y / danger_y placed at avg height for visual alignment
-          warn_y: scoreMin != null && scoreMin <= 84 && scoreMin > 49 ? score : null,
-          danger_y: scoreMin != null && scoreMin <= 49 ? score : null,
+          score_min: scoreMin,
+          warn_min: scoreMin != null && scoreMin <= 84 && scoreMin > 49 ? scoreMin : null,
+          danger_min: scoreMin != null && scoreMin <= 49 ? scoreMin : null,
         }
       })
       .filter((d) => d.score != null)
@@ -66,12 +66,12 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const warnDot = (props: any): React.ReactElement => {
-      if ((props.payload?.warn_y as number | null) == null) return <g />
+      if ((props.payload?.warn_min as number | null) == null) return <g />
       return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--warn)" opacity={0.85} />
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dangerDot = (props: any): React.ReactElement => {
-      if ((props.payload?.danger_y as number | null) == null) return <g />
+      if ((props.payload?.danger_min as number | null) == null) return <g />
       return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--crit)" opacity={0.85} />
     }
 
@@ -102,7 +102,8 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
             {/* Warning markers: 50 < risk_score_min ≤ 84 */}
             <Line
               type="monotone"
-              dataKey="warn_y"
+              dataKey="warn_min"
+              name="Risk Score 최저(주의)"
               stroke="none"
               strokeWidth={0}
               dot={warnDot}
@@ -113,7 +114,8 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
             {/* Danger markers: risk_score_min ≤ 49 */}
             <Line
               type="monotone"
-              dataKey="danger_y"
+              dataKey="danger_min"
+              name="Risk Score 최저(위험)"
               stroke="none"
               strokeWidth={0}
               dot={dangerDot}

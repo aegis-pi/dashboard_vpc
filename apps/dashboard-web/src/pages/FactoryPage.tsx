@@ -489,6 +489,19 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
   }, [refreshSignalKey, refresh])
 
   const isEmpty = history.length === 0
+  const isBucketedWindow = win !== '1h'
+  const sourceLabel = isBucketedWindow
+    ? 'GRAPH#5M · 5분 집계 버킷'
+    : 'HISTORY#STATE · 원시 스냅샷'
+  const riskMetricLabel = isBucketedWindow
+    ? 'risk_score 평균선 + 버킷 최저점 마커'
+    : 'risk_score · 100이 가장 안전'
+  const sensorMetricLabel = isBucketedWindow
+    ? '온도 · 습도 · 기압 5분 평균'
+    : '온도 · 습도 · 기압'
+  const aiMetricLabel = isBucketedWindow
+    ? 'fire / fall / bend · 5분 최대값'
+    : 'fire / fall / bend · 0 ~ 1'
 
   return (
     <>
@@ -506,6 +519,8 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
           <span className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
             {history.length} pts
           </span>
+          <span style={{ color: 'var(--ink-5)' }}>·</span>
+          <span className="micro">{sourceLabel}</span>
         </div>
         <div className="seg">
           {HISTORY_WINDOWS.map((w) => (
@@ -521,14 +536,14 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
         <div className="card-hd">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <h2 className="h2">안전 점수 추이</h2>
-            <span className="micro">HISTORY#STATE · risk_score · 100이 가장 안전</span>
+            <span className="micro">{sourceLabel} · {riskMetricLabel}</span>
           </div>
         </div>
         <div className="card-bd">
           {loading
             ? <LoadingChart />
             : isEmpty ? <EmptyNote /> : <RiskScoreChart items={history} />}
-          {!loading && !isEmpty && <RiskThresholdLegend />}
+          {!loading && !isEmpty && <RiskThresholdLegend bucketed={isBucketedWindow} />}
         </div>
       </div>
 
@@ -537,7 +552,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
         <div className="card-hd">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <h2 className="h2">환경 센서</h2>
-            <span className="micro">HISTORY#STATE · 온도 · 습도 · 기압</span>
+            <span className="micro">{sourceLabel} · {sensorMetricLabel}</span>
           </div>
         </div>
         <div className="card-bd">
@@ -564,7 +579,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
         <div className="card-hd">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <h2 className="h2">AI 탐지 점수</h2>
-            <span className="micro">HISTORY#STATE · fire / fall / bend · 0 ~ 1</span>
+            <span className="micro">{sourceLabel} · {aiMetricLabel}</span>
           </div>
         </div>
         <div className="card-bd">
@@ -670,7 +685,7 @@ function MiniSparkline({ data, color, height = 60 }: { data: (number | null)[]; 
   )
 }
 
-function RiskThresholdLegend() {
+function RiskThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
   return (
     <div style={{
       display: 'flex', gap: 14, marginTop: 10,
@@ -692,6 +707,12 @@ function RiskThresholdLegend() {
           {t.label}
         </span>
       ))}
+      {bucketed && (
+        <>
+          <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
+          <span style={{ color: 'var(--ink-3)' }}>선=5분 평균, 점=5분 최저점</span>
+        </>
+      )}
     </div>
   )
 }
