@@ -44,6 +44,7 @@ function FactoryHeader({
   return (
     <div className="factory-hero" style={{ background: tintBg }}>
       <div className="factory-hero-accent" style={{ background: color }} />
+      <div className="factory-hero-pi" style={{ color }}>π</div>
 
       <div className="factory-hero-copy">
         <div className="factory-hero-badges">
@@ -57,26 +58,25 @@ function FactoryHeader({
           <PipelineBadge status={f.pipeline_status?.status} />
           <StaleBadge lastFactoryStateAt={f.last_factory_state_at} lastInfraStateAt={f.last_infra_state_at} />
         </div>
-        <div className="factory-hero-identity">
-          <h1 className="factory-hero-title">{f.factory_id}</h1>
-          <div className="factory-hero-score-block">
-            <span className="eyebrow">safety score</span>
-            <div className="factory-hero-score-row">
-              <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? '—'}</span>
-              <span className="mono tnum factory-hero-score-unit">/100</span>
-            </div>
-          </div>
-        </div>
+        <h1 className="factory-hero-title">{f.factory_id}</h1>
         <p className="factory-hero-summary">
           {f.dashboard?.summary ?? '미수신'}
         </p>
       </div>
 
       <div className="factory-hero-status">
+        <div className="factory-hero-score-block">
+          <span className="eyebrow">safety score</span>
+          <div className="factory-hero-score-row">
+            <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? '—'}</span>
+            {riskScore != null && <span className="mono tnum factory-hero-score-unit">/100</span>}
+          </div>
+        </div>
+        <div className="factory-hero-divider" />
         <div className="factory-hero-trend">
           <div className="factory-trend-head">
-            <span className="eyebrow">10m trend</span>
-            <span className="mono tnum">{trendData.length}pt</span>
+            <span className="eyebrow">10M TREND</span>
+            <span className="mono tnum">{trendData.length} pt</span>
           </div>
           <div className="factory-hero-trend-chart">
             <CompactTrendChart data={trendData} color={color} />
@@ -84,7 +84,7 @@ function FactoryHeader({
           <div className="factory-hero-meta">
             <span className="mono">
               node <span className="tnum" style={{ color: 'var(--ink)' }}>
-                {ns ? `${ns.ready}/${ns.total}` : '—'}
+                {ns ? `${ns.ready}/${ns.total}` : '미수신'}
               </span>
             </span>
             <span className="mono">{relTime(f.updated_at)}</span>

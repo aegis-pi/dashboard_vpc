@@ -517,14 +517,14 @@ input { font-family: inherit; }
 .factory-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(360px, 460px);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
   align-items: stretch;
   min-height: 196px;
   margin-bottom: 18px;
-  padding: 18px 24px 18px 28px;
+  padding: 19px 26px 19px 29px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 12px;
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
@@ -533,7 +533,19 @@ input { font-family: inherit; }
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 3px;
+}
+.factory-hero-pi {
+  position: absolute;
+  right: 18px;
+  bottom: -58px;
+  z-index: 0;
+  font-family: var(--font-serif);
+  font-size: 220px;
+  line-height: 1;
+  opacity: .045;
+  pointer-events: none;
+  user-select: none;
 }
 .factory-hero-copy {
   min-width: 0;
@@ -558,44 +570,46 @@ input { font-family: inherit; }
   font-weight: 600;
 }
 .factory-hero-dot { color: var(--ink-5); }
-.factory-hero-identity {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 11px;
-  min-width: 0;
-}
 .factory-hero-title {
-  font-family: var(--font-sans);
-  font-size: 34px;
-  line-height: 1;
-  font-weight: 650;
+  font-family: var(--font-serif);
+  font-size: 42px;
+  line-height: .9;
+  font-weight: 400;
   color: var(--ink);
   letter-spacing: 0;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transform: scaleY(.76) scaleX(1.08);
+  transform-origin: left center;
 }
 .factory-hero-summary {
   margin: 0;
-  max-width: 680px;
+  max-width: 560px;
   font-size: 12.5px;
   color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .factory-hero-status {
   position: relative;
   z-index: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(260px, 300px);
+  gap: 18px;
   align-items: stretch;
-  padding-left: 24px;
+  min-width: 476px;
+  padding-left: 28px;
   border-left: 1px solid var(--line-2);
 }
 .factory-hero-score-block {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
-  min-width: 132px;
+  min-width: 128px;
 }
 .factory-hero-score-row {
   display: flex;
@@ -604,11 +618,11 @@ input { font-family: inherit; }
 }
 .factory-hero-score {
   font-family: var(--font-serif);
-  font-size: 64px;
+  font-size: 72px;
   line-height: .78;
   font-weight: 400;
   display: inline-block;
-  transform: scaleY(.86) scaleX(1.04);
+  transform: scaleY(.84);
   transform-origin: left bottom;
 }
 .factory-hero-score-unit {
@@ -617,16 +631,19 @@ input { font-family: inherit; }
   letter-spacing: .04em;
   font-weight: 500;
 }
+.factory-hero-divider {
+  width: 1px;
+  min-height: 124px;
+  align-self: center;
+  background: var(--line-2);
+}
 .factory-hero-trend {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
   min-width: 0;
-  padding: 10px 10px 7px;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  padding: 2px 0 0;
   min-height: 130px;
 }
 .factory-hero-meta {
@@ -637,6 +654,7 @@ input { font-family: inherit; }
 }
 .factory-hero-trend-chart {
   min-height: 86px;
+  margin-inline: -2px;
 }
 .factory-hero-meta {
   font-size: 11px;
@@ -677,6 +695,8 @@ input { font-family: inherit; }
     gap: 20px;
   }
   .factory-hero-status {
+    grid-template-columns: auto auto minmax(260px, 1fr);
+    min-width: 0;
     padding-left: 0;
     padding-top: 18px;
     border-left: 0;
@@ -693,12 +713,18 @@ input { font-family: inherit; }
     padding: 18px 18px 18px 22px;
   }
   .factory-hero-title {
-    font-size: 30px;
+    font-size: 36px;
+    white-space: normal;
+  }
+  .factory-hero-summary {
     white-space: normal;
   }
   .factory-hero-status {
-    display: block;
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
+  .factory-hero-divider { display: none; }
+  .factory-hero-score-block { min-width: 0; }
   .factory-card-score-row {
     align-items: flex-start;
     flex-direction: column;

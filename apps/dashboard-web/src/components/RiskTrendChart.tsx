@@ -4,12 +4,13 @@ export function CompactTrendChart({ data, color }: { data: number[]; color: stri
   const cW = VW - pL - pR
   const cH = VH - pT - pB
 
-  const hasData = data.length >= 2
-  const xOf = (i: number) => pL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
+  const hasData = data.length >= 1
+  const hasLine = data.length >= 2
+  const xOf = (i: number) => pL + (data.length < 2 ? cW : (i / (data.length - 1)) * cW)
   const yOf = (v: number) => pT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
 
   const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
-  const areaD = hasData
+  const areaD = hasLine
     ? `M ${xOf(0).toFixed(1)},${pT + cH} L ${
         data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')
       } L ${xOf(data.length - 1).toFixed(1)},${pT + cH} Z`
@@ -41,8 +42,8 @@ export function CompactTrendChart({ data, color }: { data: number[]; color: stri
       <text x={7} y={pT + cH / 2} textAnchor="middle" fontSize={7.5} fill="var(--ink-4)" transform={`rotate(-90, 7, ${pT + cH / 2})`}>
         안전 점수
       </text>
-      {hasData && <path d={areaD} fill={color} opacity={0.1} />}
-      {hasData && (
+      {hasLine && <path d={areaD} fill={color} opacity={0.1} />}
+      {hasLine && (
         <polyline points={pts} fill="none" stroke={color} strokeWidth={1.8}
           strokeLinejoin="round" strokeLinecap="round" />
       )}
