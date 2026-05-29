@@ -517,10 +517,10 @@ input { font-family: inherit; }
 .factory-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 440px);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 500px);
   gap: 24px;
   align-items: stretch;
-  min-height: 136px;
+  min-height: 184px;
   margin-bottom: 18px;
   padding: 18px 24px 18px 28px;
   border: 1px solid var(--line);
@@ -580,7 +580,7 @@ input { font-family: inherit; }
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: auto minmax(190px, 1fr);
+  grid-template-columns: auto minmax(240px, 1fr);
   gap: 18px;
   align-items: center;
   padding-left: 24px;
@@ -612,27 +612,25 @@ input { font-family: inherit; }
   letter-spacing: .04em;
   font-weight: 500;
 }
-.factory-hero-spark {
+.factory-hero-trend {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
+  padding: 10px 10px 7px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  min-height: 130px;
 }
-.factory-hero-spark-head,
 .factory-hero-meta {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
 }
-.factory-hero-spark-head .mono {
-  font-size: 10.5px;
-  color: var(--ink-4);
-}
-.factory-hero-sparkline {
-  min-height: 36px;
-  display: flex;
-  align-items: center;
+.factory-hero-trend-chart {
+  min-height: 86px;
 }
 .factory-hero-meta {
   font-size: 11px;

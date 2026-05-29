@@ -103,9 +103,9 @@ variable "shared_data_bucket_name" {
 # ---------------------------------------------------------------------------
 
 variable "ecs_backend_desired_count" {
-  description = "Desired number of running ECS backend tasks. Set to 0 before first ECR image push to avoid failed deployments."
+  description = "Desired number of running ECS backend tasks."
   type        = number
-  default     = 0
+  default     = 1
 }
 
 variable "backend_container_image" {

@@ -7,7 +7,8 @@ import { relTime, riskColor } from '../utils/format'
 import { extractSensor, extractAI } from '../utils/normalize'
 import { RiskScoreChart, AIScoreChart, NodeResourceChart } from '../components/Chart'
 import { ConnStatus } from '../components/ConnStatus'
-import { Sparkline } from '../components/Sparkline'
+import { CompactTrendChart } from '../components/RiskTrendChart'
+import { recentRiskScores } from '../utils/trend'
 import { useFactory } from '../hooks/useFactory'
 import { useFactories } from '../hooks/useFactories'
 import { useFactoryHistory, type HistoryWindow } from '../hooks/useFactoryHistory'
@@ -25,8 +26,8 @@ const TABS: { id: TabId; label: string }[] = [
 
 // ─── Factory hero header ──────────────────────────────────────────────
 function FactoryHeader({
-  f, sparkData,
-}: { f: FactoryDetail; sparkData: number[] }) {
+  f, trendData,
+}: { f: FactoryDetail; trendData: number[] }) {
   const riskLevel = f.risk?.level
   const riskScore = f.risk?.score
   const ns = resolveNodeSummary(f.infra_state)
@@ -73,13 +74,13 @@ function FactoryHeader({
           </div>
         </div>
 
-        <div className="factory-hero-spark">
-          <div className="factory-hero-spark-head">
-            <span className="eyebrow">last 24h</span>
-            <span className="mono tnum">{sparkData.length}pt</span>
+        <div className="factory-hero-trend">
+          <div className="factory-trend-head">
+            <span className="eyebrow">10m trend</span>
+            <span className="mono tnum">{trendData.length}pt</span>
           </div>
-          <div className="factory-hero-sparkline">
-            <Sparkline data={sparkData} width={190} height={42} color={color} strokeWidth={1.6} />
+          <div className="factory-hero-trend-chart">
+            <CompactTrendChart data={trendData} color={color} />
           </div>
           <div className="factory-hero-meta">
             <span className="mono">
@@ -118,20 +119,26 @@ function resolveNodeSummary(infra: FactoryDetail['infra_state']): { ready: numbe
 
 function resolveWorkloadSummary(
   infra: FactoryDetail['infra_state'],
-): { running: number; total: number; unhealthy?: number } | null {
+): { running: number; total: number; not_running: number } | null {
   if (!infra) return null
   if (infra.workload_summary?.total != null) {
+    const total = infra.workload_summary.total
+    const running = infra.workload_summary.running ?? 0
+    const notRunning = infra.workload_summary.unhealthy ?? Math.max(total - running, 0)
     return {
-      running: infra.workload_summary.running ?? 0,
-      total: infra.workload_summary.total,
-      unhealthy: infra.workload_summary.unhealthy,
+      running,
+      total,
+      not_running: notRunning,
     }
   }
   const workloads = infra.workloads ?? []
   if (workloads.length > 0) {
+    const total = workloads.length
+    const running = infra.pods_ready ?? workloads.filter((w) => (w.containers_ready ?? 0) > 0).length
     return {
-      running: infra.pods_ready ?? workloads.filter((w) => (w.containers_ready ?? 0) > 0).length,
-      total: workloads.length,
+      running,
+      total,
+      not_running: Math.max(total - running, 0),
     }
   }
   return null
@@ -273,13 +280,13 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
               <SummaryLine
                 label="Workload Running"
                 value={ws ? `${ws.running} / ${ws.total}` : '미수신'}
-                tone={ws ? (ws.unhealthy ?? 0) > 0 ? 'warn' : 'safe' : 'unk'}
-                sub={ws ? (ws.unhealthy ?? 0) > 0 ? `${ws.unhealthy} unhealthy` : 'all running' : undefined}
+                tone={ws ? ws.not_running > 0 ? 'warn' : 'safe' : 'unk'}
+                sub={ws ? ws.not_running > 0 ? `${ws.not_running} NotRunning` : 'all running' : undefined}
               />
             </div>
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              paddingTop: 4, borderTop: '1px solid var(--line-2)',
+              paddingTop: 10, borderTop: '1px solid var(--line-2)',
             }}>
               <span className="eyebrow">devices</span>
             </div>
@@ -948,9 +955,9 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
                 <span className="micro">{ws.running}/{ws.total} Running</span>
               )}
             </div>
-            {ws && (ws.unhealthy ?? 0) > 0 && (
+            {ws && ws.not_running > 0 && (
               <span className="pill warn" style={{ padding: '3px 6px', fontSize: 10.5 }}>
-                <span className="dot" />unhealthy · {ws.unhealthy}
+                <span className="dot" />NotRunning · {ws.not_running}
               </span>
             )}
           </div>
@@ -1297,18 +1304,16 @@ export function FactoryPage() {
   const { status: wsStatus, lastMessage } = useWebSocket(factoryId)
   const { data: fleetData, refresh: refreshFleet } = useFactories()
 
-  // 24h history for the header sparkline
-  const { data: history24h, refresh: refreshHistory24h } = useFactoryHistory(factoryId, '24h')
-  const sparkData = history24h
-    .map((h) => h.risk_score)
-    .filter((v): v is number => v != null)
+  // 1h history is enough to derive the header's 10m trend.
+  const { data: history1h, refresh: refreshHistory1h } = useFactoryHistory(factoryId, '1h')
+  const trendData = recentRiskScores(history1h)
 
   const refreshPageData = useCallback(() => {
     void refresh()
-    void refreshHistory24h()
+    void refreshHistory1h()
     void refreshFleet()
     setRefreshSignalKey((k) => k + 1)
-  }, [refresh, refreshHistory24h, refreshFleet])
+  }, [refresh, refreshHistory1h, refreshFleet])
 
   useEffect(() => {
     if (refreshInterval <= 0) return
@@ -1376,7 +1381,7 @@ export function FactoryPage() {
 
       {data && (
         <>
-          <FactoryHeader f={data} sparkData={sparkData} />
+          <FactoryHeader f={data} trendData={trendData} />
 
           <div className="factory-tabs-panel">
             <div className="tabs factory-tabs">

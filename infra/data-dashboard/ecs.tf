@@ -344,6 +344,10 @@ resource "aws_ecs_service" "backend" {
     Step = "7"
   })
 
+  lifecycle {
+    ignore_changes = [desired_count, task_definition]
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.ecs_task_execution_managed,
     aws_iam_role_policy.ecs_task_execution_secrets,

@@ -242,25 +242,6 @@ output "redis_auth_secret_name" {
 }
 
 # ---------------------------------------------------------------------------
-# Lambda data processor (Step 4)
-# ---------------------------------------------------------------------------
-
-output "lambda_data_processor_name" {
-  description = "Lambda function name for data processor."
-  value       = aws_lambda_function.data_processor.function_name
-}
-
-output "iot_rule_factory_state_processor" {
-  description = "IoT Rule name for factory_state → Lambda data processor."
-  value       = aws_iot_topic_rule.factory_state_processor.name
-}
-
-output "iot_rule_infra_state_processor" {
-  description = "IoT Rule name for infra_state → Lambda data processor."
-  value       = aws_iot_topic_rule.infra_state_processor.name
-}
-
-# ---------------------------------------------------------------------------
 # Lambda notifier (Step 5)
 # ---------------------------------------------------------------------------
 

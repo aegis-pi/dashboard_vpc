@@ -4,12 +4,14 @@ import { RefreshCw, AlertTriangle } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { LevelBadge, PipelineBadge, StaleBadge } from '../components/Badge'
 import { relTime, riskColor } from '../utils/format'
+import { CompactTrendChart } from '../components/RiskTrendChart'
+import { recentRiskScores } from '../utils/trend'
 
 import { useFactories } from '../hooks/useFactories'
 import { useFactoryHistory } from '../hooks/useFactoryHistory'
 import { useFleetRecentChanges, type RecentChange } from '../hooks/useFleetRecentChanges'
 import { AuthError } from '../api/client'
-import type { FactorySummary, HistoryItem } from '../api/types'
+import type { FactorySummary } from '../api/types'
 
 const SERIF = '"Instrument Serif", ui-serif, Georgia, serif'
 
@@ -18,8 +20,6 @@ const BANDS = [
   { from: 50, to: 85, color: 'var(--warn)', label: '주의' },
   { from: 85, to: 100, color: 'var(--safe)', label: '안전' },
 ]
-
-const TREND_WINDOW_MS = 10 * 60 * 1000
 
 // ─── Normalize factory to consistent shape ────────────────────────────
 function normalizeFactory(f: FactorySummary) {
@@ -31,15 +31,6 @@ function normalizeFactory(f: FactorySummary) {
   const pipeline = f.pipeline_status ?? 'normal'
   const envType = f.environment_type
   return { ...f, riskLevel, riskScore, topCauses, nodeReady, nodeTotal, pipeline, envType }
-}
-
-function recentHistoryItems(items: HistoryItem[], windowMs = TREND_WINDOW_MS): HistoryItem[] {
-  const cutoff = Date.now() - windowMs
-  return items.filter((item) => {
-    if (!item.timestamp) return false
-    const ts = new Date(item.timestamp).getTime()
-    return Number.isFinite(ts) && ts >= cutoff
-  })
 }
 
 // ─── Label anti-collision (identical to frontend reference) ──────────
@@ -284,75 +275,6 @@ function StatDivider() {
   )
 }
 
-// ─── Compact 10m trend for factory card ──────────────────────────────
-function CompactTrendChart({ data, color }: { data: number[]; color: string }) {
-  const VW = 260, VH = 86
-  const pL = 26, pR = 12, pT = 12, pB = 20
-  const cW = VW - pL - pR
-  const cH = VH - pT - pB
-
-  const hasData = data.length >= 2
-  const xOf = (i: number) => pL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
-  const yOf = (v: number) => pT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
-
-  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
-  const areaD = hasData
-    ? `M ${xOf(0).toFixed(1)},${pT + cH} L ${
-        data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')
-      } L ${xOf(data.length - 1).toFixed(1)},${pT + cH} Z`
-    : ''
-  const lastV = hasData ? data[data.length - 1]! : null
-  const lastX = hasData ? xOf(data.length - 1) : 0
-  const lastY = lastV != null ? yOf(lastV) : 0
-
-  return (
-    <svg
-      width="100%" viewBox={`0 0 ${VW} ${VH}`}
-      preserveAspectRatio="none"
-      style={{ display: 'block' }}
-    >
-      {[50, 85].map((v) => (
-        <line
-          key={v}
-          x1={pL} x2={pL + cW} y1={yOf(v)} y2={yOf(v)}
-          stroke="var(--line-2)" strokeWidth={0.8} strokeDasharray="3,3"
-        />
-      ))}
-      <line x1={pL} x2={pL} y1={pT} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
-      <line x1={pL} x2={pL + cW} y1={pT + cH} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
-      {[0, 50, 100].map((v) => (
-        <text key={v} x={pL - 4} y={yOf(v) + 2.5} textAnchor="end" fontSize={7} fill="var(--ink-4)" fontFamily="monospace">
-          {v}
-        </text>
-      ))}
-      <text x={7} y={pT + cH / 2} textAnchor="middle" fontSize={7.5} fill="var(--ink-4)" transform={`rotate(-90, 7, ${pT + cH / 2})`}>
-        안전 점수
-      </text>
-      {hasData && <path d={areaD} fill={color} opacity={0.1} />}
-      {hasData && (
-        <polyline points={pts} fill="none" stroke={color} strokeWidth={1.8}
-          strokeLinejoin="round" strokeLinecap="round" />
-      )}
-      {hasData && lastV != null && (
-        <>
-          <circle cx={lastX} cy={lastY} r={3} fill={color} />
-          <text x={Math.min(lastX, VW - 17)} y={Math.max(8, lastY - 6)} textAnchor="middle" fontSize={8} fill={color} fontFamily="monospace" fontWeight="600">
-            {lastV}
-          </text>
-        </>
-      )}
-      <text x={pL} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">10m 전</text>
-      <text x={pL + cW} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">현재</text>
-      <text x={pL + cW / 2} y={VH - 3} textAnchor="middle" fontSize={8} fill="var(--ink-4)">시간</text>
-      {!hasData && (
-        <text x={VW / 2} y={pT + cH / 2 + 3} textAnchor="middle" fontSize={9} fill="var(--ink-5)">
-          데이터 없음
-        </text>
-      )}
-    </svg>
-  )
-}
-
 // ─── Factory card ─────────────────────────────────────────────────────
 function FactoryCard({
   f, onClick,
@@ -360,9 +282,7 @@ function FactoryCard({
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
   const { data: history1h } = useFactoryHistory(f.factory_id, '1h')
-  const sparkData = recentHistoryItems(history1h)
-    .map((h) => h.risk_score)
-    .filter((v): v is number => v != null)
+  const sparkData = recentRiskScores(history1h)
   const score = f.riskScore ?? null
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
 
