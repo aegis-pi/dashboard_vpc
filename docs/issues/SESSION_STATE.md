@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-05-29
 수정 이력:
+  - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `5d39c82`, web `e0d3fce`, frontend-reference `c555519`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-c555519` push 확인, Terraform apply로 ECS task definition revision 17 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, dashboard web HTTP 200, post-apply plan No changes.
   - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `aea41eb`, web `e0041cd`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-e0041cd` push 확인, Terraform apply로 ECS task definition revision 16 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, dashboard web HTTP 200, post-apply plan No changes.
   - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `a8fb0de`, web `fde09fe`, docs `3c20ec3`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-3c20ec3` push 확인, Terraform apply로 ECS task definition revision 15 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, post-apply plan No changes.
   - 2026-05-28  Multi-resolution history storage 아키텍처 문서화 완료. ADR 0025 신규 작성, troubleshooting #42 추가, data_storage_pipeline/api_spec/runbook 업데이트. 근본 해결(팀원 구현 예정) 까지 현행 임시방편(max_items=500 cap, window=1h) 유지.
@@ -1090,11 +1091,12 @@ AWS 비용 기준은 `docs/ops/15_aws_cost_baseline.md`에 반영했고, AWS 리
 ## 최근 커밋
 
 ```text
+c555519 frontend-reference: compact factory hero
+e0d3fce web: render infra workload summaries
+5d39c82 backend: expose infra summary counts
 7176b6a refactor(frontend): consolidate prototype under frontend
 97dab97 docs(architecture): add dashboard diagram assets
 01a7609 docs(changes): align websocket ADR with factory status table
-14e853a feat(dashboard-backend): add FastAPI service skeleton
-63cbc9b docs(data-dashboard): document lifecycle workflow
 ```
 
 현재 세션 정리 내용:
