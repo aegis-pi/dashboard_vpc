@@ -537,7 +537,7 @@ input { font-family: inherit; }
 }
 .factory-hero-pi {
   position: absolute;
-  right: clamp(365px, 32vw, 430px);
+  left: -54px;
   bottom: -62px;
   z-index: 0;
   font-family: var(--font-serif);
@@ -601,10 +601,11 @@ input { font-family: inherit; }
   gap: 18px;
   align-items: stretch;
   min-width: 476px;
-  padding-left: 28px;
-  border-left: 1px solid var(--line-2);
+  padding-left: 18px;
 }
 .factory-hero-score-block {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -638,6 +639,8 @@ input { font-family: inherit; }
   background: var(--line-2);
 }
 .factory-hero-trend {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -695,15 +698,13 @@ input { font-family: inherit; }
     gap: 20px;
   }
   .factory-hero-pi {
-    right: auto;
-    left: clamp(18px, 8vw, 96px);
+    left: -22px;
   }
   .factory-hero-status {
     grid-template-columns: auto auto minmax(260px, 1fr);
     min-width: 0;
-    padding-left: 0;
+    padding-left: 18px;
     padding-top: 18px;
-    border-left: 0;
     border-top: 1px solid var(--line-2);
   }
 }

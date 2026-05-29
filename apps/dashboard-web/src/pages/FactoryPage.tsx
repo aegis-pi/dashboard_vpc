@@ -44,7 +44,6 @@ function FactoryHeader({
   return (
     <div className="factory-hero" style={{ background: tintBg }}>
       <div className="factory-hero-accent" style={{ background: color }} />
-      <div className="factory-hero-pi" style={{ color }}>π</div>
 
       <div className="factory-hero-copy">
         <div className="factory-hero-badges">
@@ -65,6 +64,7 @@ function FactoryHeader({
       </div>
 
       <div className="factory-hero-status">
+        <div className="factory-hero-pi" style={{ color }}>π</div>
         <div className="factory-hero-score-block">
           <span className="eyebrow">safety score</span>
           <div className="factory-hero-score-row">
