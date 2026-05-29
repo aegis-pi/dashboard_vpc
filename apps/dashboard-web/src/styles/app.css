@@ -517,10 +517,10 @@ input { font-family: inherit; }
 .factory-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 500px);
+  grid-template-columns: minmax(260px, 1fr) minmax(360px, 460px);
   gap: 24px;
   align-items: stretch;
-  min-height: 184px;
+  min-height: 196px;
   margin-bottom: 18px;
   padding: 18px 24px 18px 28px;
   border: 1px solid var(--line);
@@ -541,8 +541,8 @@ input { font-family: inherit; }
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
+  gap: 14px;
 }
 .factory-hero-badges {
   display: flex;
@@ -558,6 +558,13 @@ input { font-family: inherit; }
   font-weight: 600;
 }
 .factory-hero-dot { color: var(--ink-5); }
+.factory-hero-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  min-width: 0;
+}
 .factory-hero-title {
   font-family: var(--font-sans);
   font-size: 34px;
@@ -571,7 +578,7 @@ input { font-family: inherit; }
   text-overflow: ellipsis;
 }
 .factory-hero-summary {
-  margin: 7px 0 0;
+  margin: 0;
   max-width: 680px;
   font-size: 12.5px;
   color: var(--ink-3);
@@ -579,10 +586,8 @@ input { font-family: inherit; }
 .factory-hero-status {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: auto minmax(240px, 1fr);
-  gap: 18px;
-  align-items: center;
+  display: flex;
+  align-items: stretch;
   padding-left: 24px;
   border-left: 1px solid var(--line-2);
 }
@@ -590,7 +595,7 @@ input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 104px;
+  min-width: 132px;
 }
 .factory-hero-score-row {
   display: flex;
@@ -616,6 +621,7 @@ input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
   min-width: 0;
   padding: 10px 10px 7px;
   border: 1px solid var(--line-2);
@@ -691,8 +697,7 @@ input { font-family: inherit; }
     white-space: normal;
   }
   .factory-hero-status {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    display: block;
   }
   .factory-card-score-row {
     align-items: flex-start;

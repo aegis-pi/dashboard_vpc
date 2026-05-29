@@ -57,23 +57,22 @@ function FactoryHeader({
           <PipelineBadge status={f.pipeline_status?.status} />
           <StaleBadge lastFactoryStateAt={f.last_factory_state_at} lastInfraStateAt={f.last_infra_state_at} />
         </div>
-        <div>
+        <div className="factory-hero-identity">
           <h1 className="factory-hero-title">{f.factory_id}</h1>
-          <p className="factory-hero-summary">
-            {f.dashboard?.summary ?? '미수신'}
-          </p>
+          <div className="factory-hero-score-block">
+            <span className="eyebrow">safety score</span>
+            <div className="factory-hero-score-row">
+              <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? '—'}</span>
+              <span className="mono tnum factory-hero-score-unit">/100</span>
+            </div>
+          </div>
         </div>
+        <p className="factory-hero-summary">
+          {f.dashboard?.summary ?? '미수신'}
+        </p>
       </div>
 
       <div className="factory-hero-status">
-        <div className="factory-hero-score-block">
-          <span className="eyebrow">safety score</span>
-          <div className="factory-hero-score-row">
-            <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? '—'}</span>
-            <span className="mono tnum factory-hero-score-unit">/100</span>
-          </div>
-        </div>
-
         <div className="factory-hero-trend">
           <div className="factory-trend-head">
             <span className="eyebrow">10m trend</span>
@@ -1306,7 +1305,11 @@ export function FactoryPage() {
 
   // 1h history is enough to derive the header's 10m trend.
   const { data: history1h, refresh: refreshHistory1h } = useFactoryHistory(factoryId, '1h')
-  const trendData = recentRiskScores(history1h)
+  const [trendData, setTrendData] = useState<number[]>([])
+
+  useEffect(() => {
+    setTrendData(recentRiskScores(history1h))
+  }, [history1h])
 
   const refreshPageData = useCallback(() => {
     void refresh()

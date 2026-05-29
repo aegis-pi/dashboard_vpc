@@ -277,14 +277,23 @@ function StatDivider() {
 
 // ─── Factory card ─────────────────────────────────────────────────────
 function FactoryCard({
-  f, onClick,
-}: { f: ReturnType<typeof normalizeFactory>; onClick: () => void }) {
+  f, onClick, refreshSignalKey,
+}: { f: ReturnType<typeof normalizeFactory>; onClick: () => void; refreshSignalKey: number }) {
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
-  const { data: history1h } = useFactoryHistory(f.factory_id, '1h')
-  const sparkData = recentRiskScores(history1h)
+  const { data: history1h, refresh: refreshHistory1h } = useFactoryHistory(f.factory_id, '1h')
+  const [sparkData, setSparkData] = useState<number[]>([])
   const score = f.riskScore ?? null
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
+
+  useEffect(() => {
+    setSparkData(recentRiskScores(history1h))
+  }, [history1h])
+
+  useEffect(() => {
+    if (refreshSignalKey === 0) return
+    void refreshHistory1h()
+  }, [refreshHistory1h, refreshSignalKey])
 
   return (
     <div
@@ -542,6 +551,7 @@ function FilterPill({
 export function FleetPage() {
   const navigate = useNavigate()
   const [refreshInterval, setRefreshInterval] = useState(0)
+  const [refreshSignalKey, setRefreshSignalKey] = useState(0)
   const { data, loading, error, refresh } = useFactories()
   const hasFleetData = data !== null
 
@@ -566,12 +576,14 @@ export function FleetPage() {
   // Recent changes has its own 60s internal cadence via useFleetRecentChanges.
   const handleAutoRefresh = useCallback(() => {
     void refresh()
+    setRefreshSignalKey((k) => k + 1)
   }, [refresh])
 
   // Manual refresh button refreshes both immediately.
   const handleManualRefresh = useCallback(() => {
     void refresh()
     void refreshRecentChanges()
+    setRefreshSignalKey((k) => k + 1)
   }, [refresh, refreshRecentChanges])
 
   useEffect(() => {
@@ -652,6 +664,7 @@ export function FleetPage() {
                   <FactoryCard
                     key={f.factory_id}
                     f={f}
+                    refreshSignalKey={refreshSignalKey}
                     onClick={() => navigate(`/factory/${f.factory_id}`)}
                   />
                 ))}
