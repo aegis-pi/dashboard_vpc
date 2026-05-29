@@ -537,13 +537,14 @@ input { font-family: inherit; }
 }
 .factory-hero-pi {
   position: absolute;
-  left: -54px;
-  bottom: -62px;
+  right: -10px;
+  bottom: -60px;
   z-index: 0;
   font-family: var(--font-serif);
   font-size: 220px;
   line-height: 1;
   opacity: .045;
+  transform-origin: bottom right;
   pointer-events: none;
   user-select: none;
 }
@@ -698,7 +699,8 @@ input { font-family: inherit; }
     gap: 20px;
   }
   .factory-hero-pi {
-    left: -22px;
+    right: -10px;
+    bottom: -60px;
   }
   .factory-hero-status {
     grid-template-columns: auto auto minmax(260px, 1fr);
@@ -718,8 +720,7 @@ input { font-family: inherit; }
     padding: 18px 18px 18px 22px;
   }
   .factory-hero-pi {
-    left: auto;
-    right: 14px;
+    right: -10px;
     bottom: -64px;
     font-size: 190px;
   }
