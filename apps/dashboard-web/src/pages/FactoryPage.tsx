@@ -1351,13 +1351,14 @@ export function FactoryPage() {
 
   // Use all factories for the sidebar. If fleet data hasn't loaded yet (direct
   // URL access, no cache), show the current factory so the section stays visible.
-  const sidebarFactories = fleetData?.factories
+  const sidebarFactories = (fleetData?.factories
     ? fleetData.factories.map((f) => ({
         factory_id: f.factory_id,
         risk_level: f.risk_level ?? f.risk?.level,
         risk_score: f.risk_score ?? f.risk?.score,
       }))
     : [{ factory_id: factoryId, risk_level: data?.risk?.level, risk_score: data?.risk?.score }]
+  ).sort((a, b) => a.factory_id.localeCompare(b.factory_id))
 
   return (
     <Shell

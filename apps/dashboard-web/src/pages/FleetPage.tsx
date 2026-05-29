@@ -76,7 +76,10 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
   const safe    = factories.filter((f) => f.riskLevel === 'safe').length
   const total   = factories.length
 
-  const dotXs    = factories.map((f) => Math.max(2, Math.min(98, f.riskScore ?? 50)))
+  // 점수 오름차순 정렬 — computeLabelPositions이 오름차순 입력을 가정하므로
+  const byScore = [...factories].sort((a, b) => (a.riskScore ?? 50) - (b.riskScore ?? 50))
+
+  const dotXs    = byScore.map((f) => Math.max(2, Math.min(98, f.riskScore ?? 50)))
   // Vertical stack index for tied dots so identical scores stay visible
   const dotStack = dotXs.map((x, i) => {
     let s = 0
@@ -160,7 +163,7 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
             <svg width="100%" height={areaH}
               viewBox={`0 0 100 ${areaH}`} preserveAspectRatio="none"
               style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-              {factories.map((f, i) => {
+              {byScore.map((f, i) => {
                 const x1 = dotXs[i]!
                 const x2 = labelXs[i]!
                 const y1 = 4 + (dotStack[i] ?? 0) * 18
@@ -178,7 +181,7 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
             </svg>
 
             {/* Score dots — anchored to band edge; tied dots stack downward */}
-            {factories.map((f, i) => {
+            {byScore.map((f, i) => {
               const color = riskColor(f.riskLevel)
               return (
                 <div key={`dot-${f.factory_id}`} style={{
@@ -195,7 +198,7 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
             })}
 
             {/* Score + factory_id labels at bottom */}
-            {factories.map((f, i) => {
+            {byScore.map((f, i) => {
               const color = riskColor(f.riskLevel)
               return (
                 <div key={`lbl-${f.factory_id}`} style={{
@@ -270,127 +273,33 @@ function StatDivider() {
   )
 }
 
-// ─── 1h 안전 점수 추이 차트 (우측 패널) ────────────────────────────
-function HistoryChartPanel({ data, color }: { data: number[]; color: string }) {
-  const W = 196, H = 128
-  const padL = 30, padR = 12, padT = 10, padB = 34
-  const cW = W - padL - padR
-  const cH = H - padT - padB
-
-  const hasData = data.length >= 2
-  const xOf = (i: number) => padL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
-  const yOf = (v: number) => padT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
-
-  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
-  const lastV = data.length > 0 ? data[data.length - 1]! : null
-  const lastX = data.length > 0 ? xOf(data.length - 1) : 0
-  const lastY = lastV != null ? yOf(lastV) : 0
-
-  const areaPath = hasData
-    ? `M ${xOf(0).toFixed(1)} ${yOf(0).toFixed(1)} L ${xOf(0).toFixed(1)} ${yOf(data[0]!).toFixed(1)} ${
-        data.map((v, i) => `L ${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join(' ')
-      } L ${xOf(data.length - 1).toFixed(1)} ${yOf(0).toFixed(1)} Z`
-    : ''
-
-  return (
-    <div style={{
-      borderLeft: '1px solid var(--line-2)',
-      background: 'var(--surface-2)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '14px 12px',
-      flexShrink: 0,
-      width: W + 24,
-    }}>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '.08em', marginBottom: 8, fontWeight: 500 }}>
-        안전 점수 추이
-      </div>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
-        {/* Y축 */}
-        <line x1={padL} y1={padT} x2={padL} y2={padT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
-        {/* X축 */}
-        <line x1={padL} y1={padT + cH} x2={padL + cW} y2={padT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
-
-        {/* 기준선: 50(주의), 85(안전) */}
-        {[50, 85].map((v) => (
-          <g key={v}>
-            <line
-              x1={padL} x2={padL + cW}
-              y1={yOf(v)} y2={yOf(v)}
-              stroke="var(--line-2)" strokeWidth={0.7} strokeDasharray="3,3"
-            />
-            <text x={padL + cW + 3} y={yOf(v) + 3} fontSize={7} fill="var(--ink-5)" textAnchor="start">
-              {v}
-            </text>
-          </g>
-        ))}
-
-        {/* Y축 레이블 (회전) */}
-        <text
-          x={9}
-          y={padT + cH / 2}
-          textAnchor="middle"
-          fontSize={8.5}
-          fill="var(--ink-4)"
-          transform={`rotate(-90, 9, ${padT + cH / 2})`}
-        >안전 점수</text>
-
-        {/* Y축 눈금 */}
-        {([0, 50, 100] as const).map((v) => (
-          <text key={v} x={padL - 3} y={yOf(v) + 3} textAnchor="end" fontSize={7.5} fill="var(--ink-4)" fontFamily="monospace">
-            {v}
-          </text>
-        ))}
-
-        {/* 면적 채우기 */}
-        {hasData && <path d={areaPath} fill={color} opacity={0.1} />}
-
-        {/* 꺾은선 */}
-        {hasData && (
-          <polyline
-            points={pts}
-            fill="none"
-            stroke={color}
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        )}
-
-        {/* 마지막 점 + 값 */}
-        {hasData && lastV != null && (
-          <>
-            <circle cx={lastX} cy={lastY} r={2.5} fill={color} />
-            <text x={lastX} y={lastY - 5} textAnchor="middle" fontSize={8} fill={color} fontFamily="monospace" fontWeight="600">
-              {lastV}
-            </text>
-          </>
-        )}
-
-        {/* X축 양끝 시간 */}
-        <text x={padL} y={padT + cH + 11} textAnchor="middle" fontSize={7} fill="var(--ink-5)">1h 전</text>
-        <text x={padL + cW} y={padT + cH + 11} textAnchor="middle" fontSize={7} fill="var(--ink-5)">현재</text>
-
-        {/* X축 레이블 */}
-        <text x={padL + cW / 2} y={H - 2} textAnchor="middle" fontSize={8.5} fill="var(--ink-4)">
-          시간 (지난 1시간)
-        </text>
-
-        {/* 데이터 없음 */}
-        {!hasData && (
-          <text x={W / 2} y={padT + cH / 2 + 4} textAnchor="middle" fontSize={9} fill="var(--ink-5)">
-            데이터 없음
-          </text>
-        )}
+// ─── 카드 우상단용 소형 스파크라인 ────────────────────────────────────
+function CardSparkline({ data, color }: { data: number[]; color: string }) {
+  const W = 112, H = 38
+  if (data.length < 2) {
+    return (
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+        <text x={W / 2} y={H / 2 + 3} textAnchor="middle" fontSize={9} fill="var(--ink-5)">—</text>
       </svg>
-      {data.length > 0 && (
-        <div style={{ fontSize: 8, color: 'var(--ink-5)', marginTop: 4 }}>
-          {data.length}개 포인트
-        </div>
-      )}
-    </div>
+    )
+  }
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const xOf = (i: number) => (i / (data.length - 1)) * W
+  const yOf = (v: number) => H - 3 - ((v - min) / range) * (H - 6)
+  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
+  const areaD =
+    `M 0,${H} L ${data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')} L ${W},${H} Z`
+  const lastX = xOf(data.length - 1)
+  const lastY = yOf(data[data.length - 1]!)
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+      <path d={areaD} fill={color} opacity={0.12} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.4}
+        strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={lastX} cy={lastY} r={2.5} fill={color} />
+    </svg>
   )
 }
 
@@ -410,7 +319,7 @@ function FactoryCard({
       className="card"
       onClick={onClick}
       style={{
-        cursor: 'pointer', display: 'flex', flexDirection: 'row',
+        cursor: 'pointer', display: 'flex', flexDirection: 'column',
         position: 'relative', overflow: 'hidden',
         transition: 'border-color .12s, box-shadow .15s',
       }}
@@ -426,99 +335,103 @@ function FactoryCard({
       {/* Left stripe */}
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} />
 
-      {/* 좌측 콘텐츠 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ padding: '16px 18px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              {f.envType && (
-                <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', letterSpacing: '.06em' }}>
-                  {f.envType}
-                </span>
-              )}
-              <span style={{
-                fontSize: 15, fontWeight: 600, color: 'var(--ink)',
-                marginTop: f.envType ? 2 : 0,
-              }}>
-                {f.factory_id}
+      <div style={{ padding: '16px 18px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Header: factory name (left) | badge + mini chart (right) */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            {f.envType && (
+              <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', letterSpacing: '.06em' }}>
+                {f.envType}
               </span>
-            </div>
-            <LevelBadge level={f.riskLevel} />
-          </div>
-
-          {/* Score */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span className="tnum" style={{
-              fontFamily: SERIF,
-              fontSize: 68, lineHeight: 0.78,
-              color, letterSpacing: '-0.02em', fontWeight: 400,
-              display: 'inline-block',
-              transform: 'scaleY(0.84) scaleX(1.08)',
-              transformOrigin: 'left bottom',
-            }}>{f.riskScore ?? '—'}</span>
-            <span className="micro" style={{ marginTop: 6, whiteSpace: 'nowrap' }}>/100 · 안전 점수</span>
-          </div>
-
-          {/* Meta strip */}
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            gap: 8, flexWrap: 'wrap',
-            paddingTop: 6, borderTop: '1px solid var(--line-2)',
-          }}>
-            <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-              {f.nodeReady != null && f.nodeTotal != null
-                ? <>node <span style={{ color: 'var(--ink)' }} className="tnum">{f.nodeReady}/{f.nodeTotal}</span> Ready</>
-                : '노드 미수신'}
+            )}
+            <span style={{
+              fontSize: 15, fontWeight: 600, color: 'var(--ink)',
+              marginTop: f.envType ? 2 : 0,
+            }}>
+              {f.factory_id}
             </span>
-            <PipelineBadge status={f.pipeline} />
+          </div>
+
+          {/* 우상단: badge + 1h 미니 차트 */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+            <LevelBadge level={f.riskLevel} />
+            <div>
+              <CardSparkline data={sparkData} color={color} />
+              <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', textAlign: 'right', marginTop: 2 }}>
+                지난 1h · {sparkData.length}pt
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Top causes */}
-        <div style={{ padding: '10px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className="eyebrow" style={{ marginBottom: 2 }}>top_causes</div>
-          {causes.length === 0
-            ? <div className="micro">미계산</div>
-            : causes.slice(0, 3).map((c, i) => {
-                const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
-                const contribution = typeof c === 'string' ? null : c.contribution
-                return (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    fontSize: 12, color: 'var(--ink-2)',
-                  }}>
-                    {contribution != null && (
-                      <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--crit)', width: 30, textAlign: 'right', flexShrink: 0 }}>
-                        −{contribution}
-                      </span>
-                    )}
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {name}
-                    </span>
-                  </div>
-                )
-              })}
+        {/* Score */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span className="tnum" style={{
+            fontFamily: SERIF,
+            fontSize: 68, lineHeight: 0.78,
+            color, letterSpacing: '-0.02em', fontWeight: 400,
+            display: 'inline-block',
+            transform: 'scaleY(0.84) scaleX(1.08)',
+            transformOrigin: 'left bottom',
+          }}>{f.riskScore ?? '—'}</span>
+          <span className="micro" style={{ marginTop: 6, whiteSpace: 'nowrap' }}>/100 · 안전 점수</span>
         </div>
 
-        {/* Footer */}
+        {/* Meta strip */}
         <div style={{
-          marginTop: 'auto', padding: '10px 18px', borderTop: '1px solid var(--line-2)',
-          background: 'var(--surface-2)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11.5,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          gap: 8, flexWrap: 'wrap',
+          paddingTop: 6, borderTop: '1px solid var(--line-2)',
         }}>
-          <span className="mono" style={{ color: 'var(--ink-3)' }}>
-            updated <span style={{ color: 'var(--ink-2)' }}>{relTime(f.updated_at)}</span>
+          <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+            {f.nodeReady != null && f.nodeTotal != null
+              ? <>node <span style={{ color: 'var(--ink)' }} className="tnum">{f.nodeReady}/{f.nodeTotal}</span> Ready</>
+              : '노드 미수신'}
           </span>
-          <StaleBadge
-            lastFactoryStateAt={f.last_factory_state_at}
-            lastInfraStateAt={f.last_infra_state_at}
-          />
+          <PipelineBadge status={f.pipeline} />
         </div>
       </div>
 
-      {/* 우측: 1h 안전 점수 추이 차트 */}
-      <HistoryChartPanel data={sparkData} color={color} />
+      {/* Top causes */}
+      <div style={{ padding: '10px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="eyebrow" style={{ marginBottom: 2 }}>top_causes</div>
+        {causes.length === 0
+          ? <div className="micro">미계산</div>
+          : causes.slice(0, 3).map((c, i) => {
+              const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
+              const contribution = typeof c === 'string' ? null : c.contribution
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  fontSize: 12, color: 'var(--ink-2)',
+                }}>
+                  {contribution != null && (
+                    <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--crit)', width: 30, textAlign: 'right', flexShrink: 0 }}>
+                      −{contribution}
+                    </span>
+                  )}
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {name}
+                  </span>
+                </div>
+              )
+            })}
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        marginTop: 'auto', padding: '10px 18px', borderTop: '1px solid var(--line-2)',
+        background: 'var(--surface-2)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11.5,
+      }}>
+        <span className="mono" style={{ color: 'var(--ink-3)' }}>
+          updated <span style={{ color: 'var(--ink-2)' }}>{relTime(f.updated_at)}</span>
+        </span>
+        <StaleBadge
+          lastFactoryStateAt={f.last_factory_state_at}
+          lastInfraStateAt={f.last_infra_state_at}
+        />
+      </div>
     </div>
   )
 }
