@@ -348,8 +348,9 @@ def _extract(item: dict) -> dict:
     fs = item.get("factory_state") or {}
     infra = item.get("infra_state") or {}
 
+    # data-processor writes {"field": ...}; test fixtures use {"name": ...} — handle both.
     top_cause_names = [
-        (c.get("name") if isinstance(c, dict) else str(c))
+        (c.get("name") or c.get("field") if isinstance(c, dict) else str(c))
         for c in (risk.get("top_causes") or [])
     ]
 

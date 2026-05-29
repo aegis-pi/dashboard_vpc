@@ -157,3 +157,52 @@ def test_window_1h_not_contaminated_by_graph_5m(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=1h").json()
     for item in items:
         assert not item.get("is_bucket")
+
+
+# ── top_cause_names extraction ────────────────────────────────────────────────
+
+def test_top_cause_names_extracted_with_name_key():
+    """Fixtures / legacy data use {"name": ...} — must extract correctly."""
+    from services.ddb import _extract
+    item = {
+        "sk": "HISTORY#STATE#2026-01-01T00:00:00Z",
+        "risk": {
+            "score": 40.0,
+            "level": "danger",
+            "top_causes": [
+                {"name": "temperature", "value": 39.0, "contribution": 14.3},
+                {"name": "humidity", "value": 80.0, "contribution": 9.1},
+            ],
+        },
+    }
+    result = _extract(item)
+    assert result["top_cause_names"] == ["temperature", "humidity"]
+
+
+def test_top_cause_names_extracted_with_field_key():
+    """Real data-processor output uses {"field": ...} — must extract correctly."""
+    from services.ddb import _extract
+    item = {
+        "sk": "HISTORY#STATE#2026-01-01T00:00:00Z",
+        "risk": {
+            "score": 45.0,
+            "level": "warning",
+            "top_causes": [
+                {"field": "temperature", "value": 33.5, "contribution": 5.7},
+                {"field": "ai_event_rate", "value": 0.6, "contribution": 4.0},
+            ],
+        },
+    }
+    result = _extract(item)
+    assert result["top_cause_names"] == ["temperature", "ai_event_rate"]
+
+
+def test_top_cause_names_empty_when_no_causes():
+    """Items with empty top_causes list must yield empty top_cause_names."""
+    from services.ddb import _extract
+    item = {
+        "sk": "HISTORY#STATE#2026-01-01T00:00:00Z",
+        "risk": {"score": 90.0, "level": "safe", "top_causes": []},
+    }
+    result = _extract(item)
+    assert result["top_cause_names"] == []
