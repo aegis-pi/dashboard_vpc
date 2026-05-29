@@ -14,7 +14,9 @@ export interface RecentChange {
 
 const SELF_REFRESH_MS = 60_000
 
-// Fetches 1h HISTORY#STATE for each factory, derives risk_level transitions.
+const RECENT_WINDOW_MS = 10 * 60 * 1000
+
+// Fetches recent HISTORY#STATE for each factory, derives risk_level transitions.
 // Manages its own 60s refresh cycle — callers do not need to drive it.
 // Stale-while-revalidate: previous results stay visible during background refresh.
 export function useFleetRecentChanges(factoryIds: string[]) {
@@ -47,10 +49,11 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     }
 
     try {
-      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '1h')))
+      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '10m')))
       if (!mounted.current || requestSeq.current !== seq) return
 
       const all: RecentChange[] = []
+      const cutoff = Date.now() - RECENT_WINDOW_MS
       ids.forEach((factoryId, idx) => {
         const history = (results[idx] ?? []).map(normalizeHistoryItem)
         for (let i = 1; i < history.length; i++) {
@@ -58,6 +61,7 @@ export function useFleetRecentChanges(factoryIds: string[]) {
           const curr = history[i]!
           if (curr.risk_level && prev.risk_level && curr.risk_level !== prev.risk_level) {
             const ts = curr.timestamp ? new Date(curr.timestamp).getTime() : 0
+            if (ts < cutoff) continue
             all.push({
               factory_id: factoryId,
               from: prev.risk_level,

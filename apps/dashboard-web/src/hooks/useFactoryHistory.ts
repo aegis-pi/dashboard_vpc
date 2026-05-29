@@ -3,7 +3,7 @@ import { fetchFactoryHistory } from '../api/client'
 import { normalizeHistoryItem } from '../utils/normalize'
 import type { HistoryItem } from '../api/types'
 
-export type HistoryWindow = '1h' | '6h' | '12h' | '24h'
+export type HistoryWindow = '10m' | '1h' | '6h' | '12h' | '24h'
 
 export function useFactoryHistory(factoryId: string, window: HistoryWindow = '1h', enabled = true) {
   const [data, setData] = useState<HistoryItem[]>([])

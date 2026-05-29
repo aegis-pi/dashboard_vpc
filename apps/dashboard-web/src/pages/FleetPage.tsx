@@ -96,13 +96,13 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
     <div className="card" style={{ marginBottom: 18 }}>
       {/* Header: title + compact stats pill */}
       <div style={{
-        padding: '16px 22px 10px',
+        padding: '20px 24px 12px',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         gap: 20, flexWrap: 'wrap',
       }}>
         <div>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>Fleet Safety Pulse</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+          <div className="eyebrow" style={{ marginBottom: 8, fontSize: 11.5 }}>Fleet Safety Pulse</div>
+          <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>
             오른쪽에 가까울수록 안전. 점은 각 공장의 현재 안전 점수.
           </div>
         </div>
@@ -122,12 +122,12 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
       </div>
 
       {/* Track + anti-collision label area */}
-      <div style={{ padding: '4px 22px 18px' }}>
-        <div style={{ position: 'relative', padding: '6px 6px 0', maxWidth: 1080, margin: '0 auto' }}>
+      <div style={{ padding: '6px 24px 22px' }}>
+        <div style={{ position: 'relative', padding: '6px 4px 0', width: '100%' }}>
           {/* Band track */}
           <div style={{
             position: 'relative',
-            height: 'clamp(32px, 3.2vw, 42px)',
+            height: 'clamp(44px, 4vw, 56px)',
             borderRadius: 10, border: '1px solid var(--line-2)',
             overflow: 'hidden', background: 'var(--surface-2)',
           }}>
@@ -147,7 +147,7 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
                 pointerEvents: 'none',
               }}>
                 <span className="mono" style={{
-                  fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                  fontSize: 12.5, letterSpacing: '.14em', textTransform: 'uppercase',
                   color: b.color, fontWeight: 700, opacity: 0.95,
                 }}>{b.label}</span>
               </div>
@@ -190,7 +190,7 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
                   transform: 'translateX(-50%)', pointerEvents: 'none',
                 }}>
                   <div style={{
-                    width: 14, height: 14, borderRadius: '50%', background: color,
+                    width: 18, height: 18, borderRadius: '50%', background: color,
                     boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 18%, transparent), 0 0 0 1px var(--surface)`,
                   }} />
                 </div>
@@ -208,14 +208,14 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
                 }}>
                   <span className="tnum" style={{
                     fontFamily: SERIF,
-                    fontSize: 30, lineHeight: 0.85, color,
+                    fontSize: 38, lineHeight: 0.85, color,
                     letterSpacing: '-0.01em',
                     display: 'inline-block',
                     transform: 'scaleY(0.84) scaleX(1.06)',
                     transformOrigin: 'center bottom',
                   }}>{f.riskScore ?? '—'}</span>
                   <span className="mono" style={{
-                    fontSize: 10.5, color: 'var(--ink-2)',
+                    fontSize: 11.5, color: 'var(--ink-2)',
                     letterSpacing: '.03em', marginTop: 4, fontWeight: 500,
                     whiteSpace: 'nowrap',
                   }}>{f.factory_id}</span>
@@ -273,15 +273,15 @@ function StatDivider() {
   )
 }
 
-// ─── Compact 1h trend for factory card ───────────────────────────────
+// ─── Compact 10m trend for factory card ──────────────────────────────
 function CompactTrendChart({ data, color }: { data: number[]; color: string }) {
-  const VW = 240, VH = 70
-  const pX = 8, pT = 10, pB = 12
-  const cW = VW - pX * 2
+  const VW = 260, VH = 86
+  const pL = 26, pR = 12, pT = 12, pB = 20
+  const cW = VW - pL - pR
   const cH = VH - pT - pB
 
   const hasData = data.length >= 2
-  const xOf = (i: number) => pX + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
+  const xOf = (i: number) => pL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
   const yOf = (v: number) => pT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
 
   const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
@@ -303,10 +303,20 @@ function CompactTrendChart({ data, color }: { data: number[]; color: string }) {
       {[50, 85].map((v) => (
         <line
           key={v}
-          x1={pX} x2={pX + cW} y1={yOf(v)} y2={yOf(v)}
+          x1={pL} x2={pL + cW} y1={yOf(v)} y2={yOf(v)}
           stroke="var(--line-2)" strokeWidth={0.8} strokeDasharray="3,3"
         />
       ))}
+      <line x1={pL} x2={pL} y1={pT} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+      <line x1={pL} x2={pL + cW} y1={pT + cH} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+      {[0, 50, 100].map((v) => (
+        <text key={v} x={pL - 4} y={yOf(v) + 2.5} textAnchor="end" fontSize={7} fill="var(--ink-4)" fontFamily="monospace">
+          {v}
+        </text>
+      ))}
+      <text x={7} y={pT + cH / 2} textAnchor="middle" fontSize={7.5} fill="var(--ink-4)" transform={`rotate(-90, 7, ${pT + cH / 2})`}>
+        안전 점수
+      </text>
       {hasData && <path d={areaD} fill={color} opacity={0.1} />}
       {hasData && (
         <polyline points={pts} fill="none" stroke={color} strokeWidth={1.8}
@@ -320,6 +330,9 @@ function CompactTrendChart({ data, color }: { data: number[]; color: string }) {
           </text>
         </>
       )}
+      <text x={pL} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">10m 전</text>
+      <text x={pL + cW} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">현재</text>
+      <text x={pL + cW / 2} y={VH - 3} textAnchor="middle" fontSize={8} fill="var(--ink-4)">시간</text>
       {!hasData && (
         <text x={VW / 2} y={pT + cH / 2 + 3} textAnchor="middle" fontSize={9} fill="var(--ink-5)">
           데이터 없음
@@ -335,8 +348,8 @@ function FactoryCard({
 }: { f: ReturnType<typeof normalizeFactory>; onClick: () => void }) {
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
-  const { data: history1h } = useFactoryHistory(f.factory_id, '1h')
-  const sparkData = history1h
+  const { data: history10m } = useFactoryHistory(f.factory_id, '10m')
+  const sparkData = history10m
     .map((h) => h.risk_score)
     .filter((v): v is number => v != null)
   const score = f.riskScore ?? null
@@ -395,7 +408,7 @@ function FactoryCard({
 
         <div className="factory-card-trend">
           <div className="factory-trend-head">
-            <span className="eyebrow">1h trend</span>
+            <span className="eyebrow">10m trend</span>
             <span className="mono">{sparkData.length}pt</span>
           </div>
           <CompactTrendChart data={sparkData} color={color} />
@@ -522,7 +535,7 @@ function RecentSection({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <h2 className="h2" style={{ whiteSpace: 'nowrap' }}>최근 상태 변화</h2>
           <span className="micro" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            악화 전환 · {filtered.length}건
+            최근 10분 악화 전환 · {filtered.length}건
           </span>
           {refreshing && (
             <span style={{
@@ -561,8 +574,8 @@ function RecentSection({
       ) : filtered.length === 0 ? (
         <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 12.5 }}>
           {selectedFactory
-            ? `${selectedFactory} — 지난 1시간 내 악화 전환이 없습니다.`
-            : '지난 1시간 내 악화 전환이 없습니다.'}
+            ? `${selectedFactory} — 지난 10분 내 악화 전환이 없습니다.`
+            : '지난 10분 내 악화 전환이 없습니다.'}
         </div>
       ) : (
         <div>

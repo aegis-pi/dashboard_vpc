@@ -145,7 +145,7 @@ const FACTORIES = [
 
 // History windows keyed by factory_id + window
 const HISTORY = {}
-const PTS = { '1h': 60, '6h': 72, '12h': 72, '24h': 96 }
+const PTS = { '10m': 20, '1h': 60, '6h': 72, '12h': 72, '24h': 96 }
 FACTORIES.forEach((f) => {
   HISTORY[f.factory_id] = {}
   Object.entries(PTS).forEach(([win, n]) => {

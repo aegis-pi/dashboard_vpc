@@ -58,10 +58,10 @@ function FleetPulse({ factories }) {
   const areaH = 78 + maxStack * 18
   return (
     <div className="card" style={{ marginBottom: 18 }}>
-      <div style={{ padding: '16px 22px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+      <div style={{ padding: '20px 24px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
         <div>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>Fleet Safety Pulse</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>오른쪽에 가까울수록 안전. 점은 각 공장의 현재 안전 점수.</div>
+          <div className="eyebrow" style={{ marginBottom: 8, fontSize: 11.5 }}>Fleet Safety Pulse</div>
+          <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>오른쪽에 가까울수록 안전. 점은 각 공장의 현재 안전 점수.</div>
         </div>
         <div style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 4px', borderRadius: 7, background: 'var(--surface-2)', border: '1px solid var(--line-2)' }}>
           <PulseStat label="공장" value={total} /><StatDivider />
@@ -70,13 +70,13 @@ function FleetPulse({ factories }) {
           <PulseStat label="안전" value={safe} dotColor="var(--safe)" active={safe > 0} />
         </div>
       </div>
-      <div style={{ padding: '4px 22px 18px' }}>
-        <div style={{ position: 'relative', padding: '6px 6px 0', maxWidth: 1080, margin: '0 auto' }}>
-          <div style={{ position: 'relative', height: 'clamp(32px, 3.2vw, 42px)', borderRadius: 10, border: '1px solid var(--line-2)', overflow: 'hidden', background: 'var(--surface-2)' }}>
+      <div style={{ padding: '6px 24px 22px' }}>
+        <div style={{ position: 'relative', padding: '6px 4px 0', width: '100%' }}>
+          <div style={{ position: 'relative', height: 'clamp(44px, 4vw, 56px)', borderRadius: 10, border: '1px solid var(--line-2)', overflow: 'hidden', background: 'var(--surface-2)' }}>
             {BANDS.map((b) => <div key={b.label} style={{ position: 'absolute', left: `${b.from}%`, width: `${b.to - b.from}%`, top: 0, bottom: 0, background: `color-mix(in srgb, ${b.color} 7%, transparent)` }} />)}
             {BANDS.map((b) => (
               <div key={`lbl-${b.label}`} style={{ position: 'absolute', left: `${b.from}%`, width: `${b.to - b.from}%`, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: b.color, fontWeight: 700, opacity: 0.95 }}>{b.label}</span>
+                <span className="mono" style={{ fontSize: 12.5, letterSpacing: '.14em', textTransform: 'uppercase', color: b.color, fontWeight: 700, opacity: 0.95 }}>{b.label}</span>
               </div>
             ))}
             <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'var(--line-3)' }} />
@@ -95,7 +95,7 @@ function FleetPulse({ factories }) {
               const color = riskColor(f.level)
               return (
                 <div key={`dot-${f.factory_id}`} style={{ position: 'absolute', left: `${dotXs[i]}%`, top: -7 + (dotStack[i] ?? 0) * 18, transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: color, boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 18%, transparent), 0 0 0 1px var(--surface)` }} />
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: color, boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 18%, transparent), 0 0 0 1px var(--surface)` }} />
                 </div>
               )
             })}
@@ -103,8 +103,8 @@ function FleetPulse({ factories }) {
               const color = riskColor(f.level)
               return (
                 <div key={`lbl-${f.factory_id}`} style={{ position: 'absolute', left: `${labelXs[i]}%`, bottom: 0, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <span className="tnum" style={{ fontFamily: SERIF, fontSize: 30, lineHeight: 0.85, color, letterSpacing: '-0.01em', display: 'inline-block', transform: 'scaleY(0.84) scaleX(1.06)', transformOrigin: 'center bottom' }}>{f.score ?? '—'}</span>
-                  <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-2)', letterSpacing: '.03em', marginTop: 4, fontWeight: 500, whiteSpace: 'nowrap' }}>{f.factory_id}</span>
+                  <span className="tnum" style={{ fontFamily: SERIF, fontSize: 38, lineHeight: 0.85, color, letterSpacing: '-0.01em', display: 'inline-block', transform: 'scaleY(0.84) scaleX(1.06)', transformOrigin: 'center bottom' }}>{f.score ?? '—'}</span>
+                  <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-2)', letterSpacing: '.03em', marginTop: 4, fontWeight: 500, whiteSpace: 'nowrap' }}>{f.factory_id}</span>
                 </div>
               )
             })}
@@ -121,12 +121,12 @@ function FleetPulse({ factories }) {
   )
 }
 
-// ─── Compact 1h trend for factory card ───────────────────────────────────
+// ─── Compact 10m trend for factory card ──────────────────────────────────
 function CompactTrendChart({ data, color }) {
-  const VW = 240, VH = 70, pX = 8, pT = 10, pB = 12
-  const cW = VW - pX * 2, cH = VH - pT - pB
+  const VW = 260, VH = 86, pL = 26, pR = 12, pT = 12, pB = 20
+  const cW = VW - pL - pR, cH = VH - pT - pB
   const hasData = data.length >= 2
-  const xOf = (i) => pX + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
+  const xOf = (i) => pL + (data.length < 2 ? 0 : (i / (data.length - 1)) * cW)
   const yOf = (v) => pT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
   const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
   const areaD = hasData ? `M ${xOf(0).toFixed(1)},${pT + cH} L ${data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')} L ${xOf(data.length - 1).toFixed(1)},${pT + cH} Z` : ''
@@ -136,8 +136,12 @@ function CompactTrendChart({ data, color }) {
   return (
     <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" style={{ display: 'block' }}>
       {[50, 85].map((v) => (
-        <line key={v} x1={pX} x2={pX + cW} y1={yOf(v)} y2={yOf(v)} stroke="var(--line-2)" strokeWidth={0.8} strokeDasharray="3,3" />
+        <line key={v} x1={pL} x2={pL + cW} y1={yOf(v)} y2={yOf(v)} stroke="var(--line-2)" strokeWidth={0.8} strokeDasharray="3,3" />
       ))}
+      <line x1={pL} x2={pL} y1={pT} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+      <line x1={pL} x2={pL + cW} y1={pT + cH} y2={pT + cH} stroke="var(--line-2)" strokeWidth={0.8} />
+      {[0, 50, 100].map((v) => <text key={v} x={pL - 4} y={yOf(v) + 2.5} textAnchor="end" fontSize={7} fill="var(--ink-4)" fontFamily="monospace">{v}</text>)}
+      <text x={7} y={pT + cH / 2} textAnchor="middle" fontSize={7.5} fill="var(--ink-4)" transform={`rotate(-90, 7, ${pT + cH / 2})`}>안전 점수</text>
       {hasData && <path d={areaD} fill={color} opacity={0.1} />}
       {hasData && <polyline points={pts} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />}
       {hasData && lastV != null && (
@@ -146,6 +150,9 @@ function CompactTrendChart({ data, color }) {
           <text x={Math.min(lastX, VW - 17)} y={Math.max(8, lastY - 6)} textAnchor="middle" fontSize={8} fill={color} fontFamily="monospace" fontWeight="600">{lastV}</text>
         </>
       )}
+      <text x={pL} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">10m 전</text>
+      <text x={pL + cW} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">현재</text>
+      <text x={pL + cW / 2} y={VH - 3} textAnchor="middle" fontSize={8} fill="var(--ink-4)">시간</text>
       {!hasData && <text x={VW / 2} y={pT + cH / 2 + 3} textAnchor="middle" fontSize={9} fill="var(--ink-5)">데이터 없음</text>}
     </svg>
   )
@@ -155,7 +162,7 @@ function CompactTrendChart({ data, color }) {
 function FactoryCard({ f, onClick }) {
   const color = riskColor(f.level)
   const causes = Array.isArray(f.top_causes) ? f.top_causes : []
-  const sparkData = (window.MOCK.HISTORY[f.factory_id]?.['1h'] ?? []).map((h) => h.risk_score).filter((v) => v != null)
+  const sparkData = (window.MOCK.HISTORY[f.factory_id]?.['10m'] ?? []).map((h) => h.risk_score).filter((v) => v != null)
   const score = f.score ?? null
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
   return (
@@ -192,7 +199,7 @@ function FactoryCard({ f, onClick }) {
         </div>
         <div className="factory-card-trend">
           <div className="factory-trend-head">
-            <span className="eyebrow">1h trend</span>
+            <span className="eyebrow">10m trend</span>
             <span className="mono">{sparkData.length}pt</span>
           </div>
           <CompactTrendChart data={sparkData} color={color} />
@@ -260,14 +267,15 @@ function FilterPill({ label, active, onClick }) {
 
 function RecentSection({ events, factoryIds }) {
   const [selectedFactory, setSelectedFactory] = useState(null)
-  const worsening = events.filter((e) => (LEVEL_RANK[e.to] ?? 0) > (LEVEL_RANK[e.from] ?? 0))
+  const cutoff = Date.now() - 10 * 60 * 1000
+  const worsening = events.filter((e) => (LEVEL_RANK[e.to] ?? 0) > (LEVEL_RANK[e.from] ?? 0) && e.ts >= cutoff)
   const filtered = selectedFactory ? worsening.filter((e) => e.factory_id === selectedFactory) : worsening
   return (
     <div className="card">
       <div className="card-hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <h2 className="h2" style={{ whiteSpace: 'nowrap' }}>최근 상태 변화</h2>
-          <span className="micro" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>악화 전환 · {filtered.length}건</span>
+          <span className="micro" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>최근 10분 악화 전환 · {filtered.length}건</span>
         </div>
         {factoryIds.length > 0 && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
@@ -278,7 +286,7 @@ function RecentSection({ events, factoryIds }) {
       </div>
       {filtered.length === 0 ? (
         <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 12.5 }}>
-          {selectedFactory ? `${selectedFactory} — 지난 1시간 내 악화 전환이 없습니다.` : '지난 1시간 내 악화 전환이 없습니다.'}
+          {selectedFactory ? `${selectedFactory} — 지난 10분 내 악화 전환이 없습니다.` : '지난 10분 내 악화 전환이 없습니다.'}
         </div>
       ) : <div>{filtered.map((e, i) => <RecentRow key={i} e={e} />)}</div>}
     </div>
