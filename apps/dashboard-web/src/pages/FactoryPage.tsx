@@ -14,8 +14,6 @@ import { useFactoryHistory, type HistoryWindow } from '../hooks/useFactoryHistor
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { FactoryDetail, NodeStatus, WorkloadStatus, DeviceEntry } from '../api/types'
 
-const SERIF = '"Instrument Serif", ui-serif, Georgia, serif'
-
 type TabId = 'overview' | 'history' | 'infrastructure' | 'timeline'
 
 const TABS: { id: TabId; label: string }[] = [
@@ -43,36 +41,15 @@ function FactoryHeader({
     : 'var(--surface)'
 
   return (
-    <div style={{
-      position: 'relative',
-      display: 'grid', gridTemplateColumns: '1fr auto',
-      gap: 28, alignItems: 'stretch',
-      borderRadius: 12, border: '1px solid var(--line)',
-      background: tintBg,
-      marginBottom: 18, overflow: 'hidden',
-      padding: '19px 26px 19px 28px',
-    }}>
-      {/* Left status stripe */}
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} />
+    <div className="factory-hero" style={{ background: tintBg }}>
+      <div className="factory-hero-accent" style={{ background: color }} />
 
-      {/* Decorative serif character */}
-      <span aria-hidden style={{
-        position: 'absolute', right: 320, bottom: -34,
-        fontFamily: SERIF,
-        fontSize: 220, lineHeight: 0.85, fontWeight: 400,
-        color, opacity: 0.045, letterSpacing: '-0.04em', pointerEvents: 'none',
-      }}>π</span>
-
-      {/* Left: badges + factory_id + summary */}
-      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div className="factory-hero-copy">
+        <div className="factory-hero-badges">
           {envType && (
             <>
-              <span className="mono" style={{
-                fontSize: 10.5, color: 'var(--ink-3)',
-                letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 600,
-              }}>{envType}</span>
-              <span style={{ color: 'var(--ink-5)' }}>·</span>
+              <span className="mono factory-hero-env">{envType}</span>
+              <span className="factory-hero-dot">·</span>
             </>
           )}
           <LevelBadge level={riskLevel} />
@@ -80,61 +57,37 @@ function FactoryHeader({
           <StaleBadge lastFactoryStateAt={f.last_factory_state_at} lastInfraStateAt={f.last_infra_state_at} />
         </div>
         <div>
-          <h1 style={{
-            font: `400 42px/0.82 ${SERIF}`,
-            letterSpacing: '-0.015em',
-            color: 'var(--ink)', margin: 0,
-            display: 'inline-block', whiteSpace: 'nowrap',
-            transform: 'scaleY(0.76) scaleX(1.08)',
-            transformOrigin: 'left center',
-          }}>{f.factory_id}</h1>
-          <p className="sub" style={{ margin: '4px 0 0', maxWidth: 560 }}>
+          <h1 className="factory-hero-title">{f.factory_id}</h1>
+          <p className="factory-hero-summary">
             {f.dashboard?.summary ?? '미수신'}
           </p>
         </div>
       </div>
 
-      {/* Right: score + sparkline + meta */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 22,
-        paddingLeft: 24, borderLeft: '1px solid var(--line-2)',
-        position: 'relative', zIndex: 1,
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 110 }}>
+      <div className="factory-hero-status">
+        <div className="factory-hero-score-block">
           <span className="eyebrow">safety score</span>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span className="tnum" style={{
-              fontFamily: SERIF,
-              fontSize: 72, lineHeight: 0.8,
-              color, letterSpacing: '-0.02em', fontWeight: 400,
-              transform: 'scaleY(0.84) scaleX(1.06)',
-              transformOrigin: 'left bottom', display: 'inline-block',
-            }}>{riskScore ?? '—'}</span>
-            <span className="mono tnum" style={{ fontSize: 12.5, color: 'var(--ink-3)', letterSpacing: '.04em', fontWeight: 500 }}>
-              /100
-            </span>
+          <div className="factory-hero-score-row">
+            <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? '—'}</span>
+            <span className="mono tnum factory-hero-score-unit">/100</span>
           </div>
         </div>
 
-        <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--line-2)' }} />
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 140 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div className="factory-hero-spark">
+          <div className="factory-hero-spark-head">
             <span className="eyebrow">last 24h</span>
-            <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
-              {sparkData.length}pt
-            </span>
+            <span className="mono tnum">{sparkData.length}pt</span>
           </div>
-          <Sparkline data={sparkData} width={160} height={36} color={color} strokeWidth={1.4} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-3)' }}>
+          <div className="factory-hero-sparkline">
+            <Sparkline data={sparkData} width={190} height={42} color={color} strokeWidth={1.6} />
+          </div>
+          <div className="factory-hero-meta">
             <span className="mono">
               node <span className="tnum" style={{ color: 'var(--ink)' }}>
                 {ns ? `${ns.ready}/${ns.total}` : '—'}
               </span>
             </span>
-            <span className="mono" style={{ color: 'var(--ink-4)' }}>
-              {relTime(f.updated_at)}
-            </span>
+            <span className="mono">{relTime(f.updated_at)}</span>
           </div>
         </div>
       </div>
@@ -195,7 +148,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
   return (
     <>
       {/* Top causes */}
-      <div className="card" style={{ marginBottom: 14 }}>
+      <div className="card factory-section-card">
         <div className="card-hd">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <h2 className="h2">주요 원인</h2>
@@ -221,7 +174,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
       </div>
 
       {/* Environment + Infrastructure */}
-      <div className="grid row2" style={{ marginBottom: 14 }}>
+      <div className="factory-overview-grid">
         {/* Current environment */}
         <div className="card">
           <div className="card-hd">
@@ -230,7 +183,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
               <span className="micro">factory_state · 평균값</span>
             </div>
           </div>
-          <div className="card-bd" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card-bd factory-card-stack">
             <div className="grid row3" style={{ gap: 10 }}>
               <MetricLine label="온도" value={sensor.temperature} unit="°C" />
               <MetricLine label="습도" value={sensor.humidity} unit="%" />
@@ -283,7 +236,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
               <span className="micro">infra_state · 요약</span>
             </div>
           </div>
-          <div className="card-bd" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card-bd factory-card-stack">
             <div className="grid row2" style={{ gap: 10 }}>
               <SummaryLine
                 label="Node Ready"
@@ -1397,20 +1350,20 @@ export function FactoryPage() {
 
       {data && (
         <>
-          {/* Hero header */}
           <FactoryHeader f={data} sparkData={sparkData} />
 
-          {/* Tab bar */}
-          <div className="tabs" style={{ margin: '0 -24px 20px', padding: '0 24px' }}>
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                className={`tab ${activeTab === t.id ? 'active' : ''}`}
-                onClick={() => handleTabChange(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div className="factory-tabs-panel">
+            <div className="tabs factory-tabs">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  className={`tab ${activeTab === t.id ? 'active' : ''}`}
+                  onClick={() => handleTabChange(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {activeTab === 'overview' && <OverviewTab data={data} />}
