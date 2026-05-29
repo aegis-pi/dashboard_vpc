@@ -1,7 +1,7 @@
 # Change Records
 
 상태: source of truth
-기준일: 2026-05-21
+기준일: 2026-05-29
 
 ## 목적
 
@@ -42,6 +42,10 @@
 | 0020 | data-processor 계약 정렬: 팀원 코드 수용, DDB pk/sk, TTL 48h, S3 processed 경로 스펙 보정 | accepted | 2026-05-21 | M4 데이터 플레인, apps/data-processor, 중간 DDB table(0022에서 교체) |
 | 0021 | Lambda data processor IoT Rule 트리거: 신규 Rule 2개 추가 (factory_state / infra_state), 기존 Rule 미수정 | accepted | 2026-05-21 | Phase 1 Step 4, M4 합류 지점, infra/data-dashboard, IoT Rule |
 | 0022 | Dashboard hot store: 신규 `aegis-factory-status` 대신 기존 `AEGIS-DynamoDB-FactoryStatus` 사용 | accepted | 2026-05-21 | Phase 1 Step 3~6, DynamoDB, Lambda data processor/notifier, Dashboard Backend |
+| 0023 | GitHub OIDC Web Deploy Role: 별도 role 신설 (ADR 0023) | accepted | 2026-05-26 | Phase 1 Step 9, GitHub Actions, IAM, S3/CloudFront |
+| 0024 | Permanent resource split: CloudFront/Cognito/ECR/S3-web 영구 root 분리 | accepted | 2026-05-26 | Phase 1 Step 9.5, infra/data-dashboard-permanent/, Terraform state |
+| 0025 | Multi-resolution history storage: history_raw TTL 2h + GRAPH#5M 5분 집계 | accepted | 2026-05-29 | Phase 1 data pipeline, DynamoDB HISTORY/GRAPH#5M, Lambda Aggregator(팀원 배포), Dashboard Backend/Frontend |
+| 0026 | DynamoDB key model: FACTORY pk + LATEST/HISTORY#STATE/GRAPH#5M sk 운영 확인 | accepted | 2026-05-29 | AEGIS-DynamoDB-FactoryStatus, Dashboard Backend, data pipeline |
 
 ## 파일 형식
 

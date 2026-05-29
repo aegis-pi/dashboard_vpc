@@ -1,8 +1,10 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-05-27
+기준일: 2026-05-29
 수정 이력:
+  - 2026-05-29 v1.7  ADR 0025 구현 완료 반영. 알려진 이슈 섹션 현행화. window=6h/12h/24h → GRAPH#5M 분기 완료.
+  - 2026-05-28 v1.6  알려진 이슈 섹션 추가. DynamoDB HISTORY cascade 504 사고 및 임시방편(max_items=500 cap), 근본 해결 방향(ADR 0025) 기록.
   - 2026-05-27 v1.5  세션 종료 전 infra/data-dashboard destroy 완료 반영. 73 destroyed, state empty, permanent/dns No changes.
   - 2026-05-27 v1.4  dashboard-backend CORS 운영 origin 명시 수정 반영. backend image `sha-f6422a7` ECS 적용, API health/preflight 정상.
   - 2026-05-27 v1.3  TopBar refresh interval + Fleet/Factory auto polling 반영. Fleet은 선택 간격 단순 갱신, Factory는 WS 우선 + 미연결 시 polling 구조.
@@ -17,6 +19,39 @@
   - 2026-05-26 v0.4  Step 9 end-to-end 통합 검증 결과 섹션 추가. Backend/Web/Auth/DDB/Lambda/IoT/Cognito/CloudFront 검증 완료 항목과 미검증 항목 분리 기록.
   - 2026-05-26 v0.3  Step 9 S3+CloudFront 배포 CI/CD 구현 반영. GitHub Actions workflow, IAM role, GitHub Secret/Variable 목록 추가.
   - 2026-05-26 v0.2  Step 7.5 Route53 Hosted Zone 영구 분리 반영. `infra/data-dashboard-dns/`와 state 이전 절차 추가.
+
+## 알려진 이슈 / 현행 상태
+
+### DynamoDB HISTORY cascade 504 — ADR 0025 구현 완료 (2026-05-29)
+
+**사고 개요**: 2026-05-28 `/history?window=24h` 3공장 동시 조회 시 cascade 504 Gateway Timeout 발생.
+자세한 사고 분석: `docs/ops/04_troubleshooting.md` #42
+
+**현행 아키텍처 (ADR 0025 완료)**:
+
+| window | 조회 경로 | 최대 아이템 수 |
+| --- | --- | --- |
+| `1h` | `HISTORY#STATE#` + max_items=500 cap | 500개 (ScanIndexForward=False) |
+| `6h` | `GRAPH#5M#` | 최대 72개 |
+| `12h` | `GRAPH#5M#` | 최대 144개 |
+| `24h` | `GRAPH#5M#` | 최대 288개 |
+
+**HISTORY#STATE TTL 현황**:
+- 현재: 48h (data-processor 환경변수 미변경)
+- 목표: 2h (ADR 0025 기준)
+- TTL 변경은 `HISTORY_TTL_HOURS=2` data-pipeline 재배포 필요. 기존 아이템 자연 만료까지 시간 소요.
+- TTL 2h 적용 전까지는 max_items=500 cap 유지.
+
+**GRAPH#5M 데이터 현황 (2026-05-29)**:
+- factory-b, factory-c: Lambda GraphAggregator5m 배포 후 GRAPH#5M 데이터 적재 중
+- factory-a: Edge Agent 비활성으로 데이터 없을 수 있음. 없으면 해당 window에서 빈 차트 표시
+
+**잔여 한계**:
+- `window=1h` max_items=500 cap 유지: 1h 이내에서도 500개 초과 구간 스파이크 유실 가능
+- HISTORY#STATE TTL이 48h인 동안은 테이블 아이템 수 여전히 많음
+- GRAPH#5M 조회는 해당 공장에 GRAPH#5M 데이터가 없으면 빈 배열 반환
+
+---
 
 ## 목적
 

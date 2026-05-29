@@ -2213,3 +2213,125 @@ infra/data-dashboard-dns plan:
 재발 방지/주의
 
 Hosted Zone은 Data/Dashboard destroy 대상이 아니다. destroy 후에도 남는 영구 자원으로 간주하고, 비용 기준에는 Route53 hosted zone `$0.50/월`을 계속 반영한다.
+
+## 42. DynamoDB HISTORY 과부하로 인한 cascade 504 Gateway Timeout
+
+날짜: 2026-05-28
+
+증상
+
+`/history?window=24h` 엔드포인트에 3공장 동시 조회 요청이 들어올 때 cascade 504 Gateway Timeout이 발생했다.
+
+```text
+GET /factories/factory-a/history?window=24h → 504 Gateway Timeout
+GET /factories/factory-b/history?window=24h → 504 Gateway Timeout
+GET /factories/factory-c/history?window=24h → 504 Gateway Timeout
+```
+
+원인
+
+DynamoDB HISTORY 테이블(`AEGIS-DynamoDB-FactoryStatus`)에 `HISTORY_TTL_HOURS=48h` × factory_state 3초 주기 × 3공장 기준으로 약 116,000개 이상의 `HISTORY#STATE` 아이템이 상주했다.
+
+`/history?window=24h` 조회는 24시간 구간 내 모든 아이템을 페이지 단위로 쿼리한다. 3공장이 동시에 요청하면 50개 이상의 DynamoDB Query 페이지 호출이 병렬로 발생해 backend asyncio semaphore(한도 10)가 포화됐다. 포화된 semaphore 대기열에 새 요청이 쌓이면서 연쇄적으로 504가 발생했다.
+
+아이템 수 구조:
+
+```text
+factory_state: 3초 주기 × 3,600초 × 48h = 공장당 약 57,600개
+infra_state:   20초 주기 × 3,600초 × 48h = 공장당 약  8,640개
+3공장 합계: 약 200,000개 이상 → DynamoDB Query 페이지 50회+ 병렬 발생
+```
+
+임시 조치 (sha-e17dbbf, 2026-05-28)
+
+`apps/dashboard-backend/services/ddb.py` `_get_history_sync()` 수정:
+
+```python
+ScanIndexForward=False  # 최신 아이템부터 역순 쿼리
+Limit=300               # 페이지당 최대 300개
+max_items=500           # 전체 최대 500개 cap
+# 이후 reversed() 로 오름차순 반환
+```
+
+Frontend `useFleetRecentChanges` window를 24h → 1h로 변경.
+
+최신 500개를 역순으로 가져온 뒤 오름차순으로 반환해 최신 데이터를 보존한다. 과거 구간보다 현재에 가까운 데이터가 유지된다.
+
+한계
+
+500개 cap으로 1시간 이상 이전 구간의 데이터를 버리기 때문에 해당 구간에서 발생한 스파이크(위험 수치 급등 이벤트)가 차트에서 표시되지 않는 데이터 유실 문제가 잔존한다.
+
+근본 해결 — ADR 0025 구현 완료 (2026-05-29)
+
+Multi-resolution storage 아키텍처로 전환 완료.
+
+```text
+HISTORY#STATE:  기존 HISTORY#STATE#* TTL 48h → 2h 예정 (data-processor 변경 필요).
+                현재는 48h 유지, window=1h 전용 raw 조회 경로로 사용.
+GRAPH#5M:       기존 DynamoDB 테이블 내 GRAPH#5M#* prefix. 5분 단위 집계. TTL 48h.
+                Lambda AEGIS-Lambda-GraphAggregator5m (EventBridge 5분 주기) 운영 중.
+Backend:        window=1h → HISTORY#STATE# query + max_items=500 cap 유지
+                window=6h/12h/24h → GRAPH#5M# query (cap 없음, 최대 288 items/공장)
+Frontend:       RiskScoreChart: ComposedChart — risk_score_avg Area + risk_score_min 마커
+                NodeResourceChart: GRAPH#5M 데이터 시 aggregate line fallback
+```
+
+2026-05-29 기준 DDB 상태:
+
+```text
+GRAPH#5M items: 공장당 12개 (Aggregator 최근 배포, 약 1시간치)
+HISTORY#STATE TTL: 48h (data-processor TTL 2h 변경 미적용)
+HISTORY#STATE 1h window items: ~1,700개/공장 (max_items=500 cap으로 제한)
+```
+
+현재 재발 상태:
+
+- `window=6h/12h/24h` 요청은 GRAPH#5M 경로로 분기 → semaphore 포화 없음 ✅
+- `window=1h` 요청은 max_items=500 cap 유지 → 최신 데이터 500개만 반환 ✅
+
+HISTORY#STATE TTL 2h 변경 시 추가 작업:
+
+```bash
+# data-pipeline Terraform에서 HISTORY_TTL_HOURS=2 적용 후 apply
+terraform -chdir=infra/data-pipeline plan -var="dynamodb_history_ttl_hours=2"
+terraform -chdir=infra/data-pipeline apply -var="dynamodb_history_ttl_hours=2"
+```
+
+TTL 변경 적용 후 기존 48h 아이템이 자연 만료(DynamoDB TTL eventually consistent)될 때까지
+일정 시간이 걸릴 수 있다. 그동안은 max_items=500 cap이 여전히 유효하다.
+max_items cap 제거는 HISTORY#STATE steady-state item count가 3h 미만으로 안정된 후에 한다.
+
+확인 명령
+
+```bash
+# HISTORY#STATE item count 현황
+for FACTORY in factory-a factory-b factory-c; do
+  echo -n "$FACTORY HISTORY: "
+  aws dynamodb query \
+    --region ap-south-1 \
+    --table-name AEGIS-DynamoDB-FactoryStatus \
+    --key-condition-expression 'pk = :pk AND sk BETWEEN :s AND :e' \
+    --expression-attribute-values "{\":pk\":{\"S\":\"FACTORY#$FACTORY\"},\":s\":{\"S\":\"HISTORY#STATE#\"},\":e\":{\"S\":\"HISTORY#STATE#~\"}}" \
+    --select COUNT \
+    --query 'Count' \
+    --output text
+  echo -n "$FACTORY GRAPH#5M: "
+  aws dynamodb query \
+    --region ap-south-1 \
+    --table-name AEGIS-DynamoDB-FactoryStatus \
+    --key-condition-expression 'pk = :pk AND sk BETWEEN :s AND :e' \
+    --expression-attribute-values "{\":pk\":{\"S\":\"FACTORY#$FACTORY\"},\":s\":{\"S\":\"GRAPH#5M#\"},\":e\":{\"S\":\"GRAPH#5M#~\"}}" \
+    --select COUNT \
+    --query 'Count' \
+    --output text
+done
+
+# ECS backend 로그에서 semaphore/timeout 에러 확인
+aws logs filter-log-events \
+  --region ap-south-1 \
+  --log-group-name /ecs/kjw-aegis-data-backend \
+  --filter-pattern "semaphore OR timeout OR DynamoDB" \
+  --start-time $(date -d '1 hour ago' +%s)000 \
+  --query 'events[*].message' \
+  --output text
+```

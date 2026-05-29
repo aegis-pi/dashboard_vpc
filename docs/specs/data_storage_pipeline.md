@@ -1,19 +1,24 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-05-21
+기준일: 2026-05-29
+수정 이력:
+  - 2026-05-29  ADR 0025 구현 완료 반영. GRAPH#5M 계층 추가, 데이터 흐름 갱신, Dashboard 조회 기준 window 분기 현행화.
+  - 2026-05-28  HISTORY 섹션에 TTL 48h 스케일 이슈와 Multi-resolution 전환 계획(ADR 0025) 추가.
 
 ## 목적
 
 이 문서는 AWS IoT Core 수신 이후 데이터를 어디에 어떤 형태로 저장하는지 정의한다.
 
-범위는 아래 네 가지 저장 계층이다.
+범위는 아래 다섯 가지 저장 계층이다.
 
 ```text
 S3 raw
 S3 processed
+S3 processed_agg (GRAPH#5M 보조 복사본)
 DynamoDB LATEST
-DynamoDB HISTORY
+DynamoDB HISTORY#STATE  (short-term 실시간 buffer, TTL 2h 목표)
+DynamoDB GRAPH#5M       (5분 집계 버킷, TTL 48h)
 ```
 
 전송 데이터 포맷 자체는 `docs/specs/iot_data_format.md`를 따른다. 이 문서는 해당 메시지를 cloud-side에서 어떻게 저장하고 Dashboard가 어떻게 조회하는지를 정의한다.
@@ -25,20 +30,27 @@ MVP 기준 Dashboard의 현재 상태 조회는 S3 `latest/` 객체가 아니라
 최종 MVP 데이터 처리 흐름은 아래 구조를 기준으로 한다.
 
 ```text
-factory-a-log-adapter / dummy-data-generator
+factory-{a,b,c} edge-agent / dummy-sensor
   -> local spool/outbox
   -> edge-iot-publisher
   -> AWS IoT Core
       -> IoT Rule
           -> S3 raw
-      -> Lambda
+      -> Lambda AEGIS-Lambda-DataProcessor
           -> DynamoDB LATEST
-          -> DynamoDB HISTORY
+          -> DynamoDB HISTORY#STATE  (TTL: 현재 48h, 목표 2h)
           -> S3 processed
 
+EventBridge Scheduler (5분 주기)
+  -> Lambda AEGIS-Lambda-GraphAggregator5m
+      -> DynamoDB HISTORY#STATE query (직전 5분 window)
+      -> DynamoDB GRAPH#5M put  (TTL 48h)
+      -> S3 processed_agg
+
 Dashboard API/Web
-  -> DynamoDB LATEST/HISTORY
-  -> S3 processed
+  -> DynamoDB LATEST          (현재 상태 카드)
+  -> DynamoDB HISTORY#STATE   (window=1h 그래프)
+  -> DynamoDB GRAPH#5M        (window=6h/12h/24h 그래프)
 ```
 
 역할:
@@ -47,11 +59,14 @@ Dashboard API/Web
 | --- | --- |
 | IoT Core | factory별 MQTT 데이터 수신 진입점 |
 | IoT Rule | 수신 원본을 S3 raw에 저장 |
-| Lambda | 메시지 정규화, Risk 계산, latest/history/processed 저장 |
+| Lambda DataProcessor | 메시지 정규화, Risk 계산, LATEST/HISTORY#STATE/S3 processed 저장 |
+| Lambda GraphAggregator5m | 5분마다 HISTORY#STATE → GRAPH#5M 집계. EventBridge 5분 주기 |
 | DynamoDB LATEST | Dashboard 카드와 현재 상태 조회 |
-| DynamoDB HISTORY | 최근 1시간/2시간 그래프 조회 |
+| DynamoDB HISTORY#STATE | 1h 실시간 그래프용 raw snapshot buffer |
+| DynamoDB GRAPH#5M | 6h/12h/24h 그래프용 5분 집계 버킷 |
 | S3 raw | Edge data-plane 원본 JSON 장기 보존 |
 | S3 processed | Lambda 계산 결과와 상태 요약 이력 보존 |
+| S3 processed_agg | GRAPH#5M 보조 JSON 복사본. 장기 재처리용 |
 
 ## 저장 계층 구분
 
@@ -59,8 +74,10 @@ Dashboard API/Web
 | --- | --- | --- | --- |
 | `S3 raw` | Edge data-plane 원본 `factory_state`, `infra_state` | 감사, 재처리, 원본 확인 | 장기 보존 |
 | `S3 processed` | Lambda가 계산한 Risk 결과, pipeline summary, status summary | 리포트, 장기 이력, 재처리 비교 | 장기 보존 |
+| `S3 processed_agg` | GraphAggregator5m이 생성한 GRAPH#5M 보조 JSON | 장기 재처리, 검증 | 장기 보존 |
 | `DynamoDB LATEST` | 공장별 현재 상태 1건 | 대시보드 상단 카드, 현재 노드 상태 | 계속 overwrite |
-| `DynamoDB HISTORY` | 최근 그래프용 short-term 시계열 | 최근 1h/2h 그래프 | TTL로 최근 N시간/일만 보존 |
+| `DynamoDB HISTORY#STATE` | 최근 1h 그래프용 raw snapshot buffer | window=1h 그래프 | TTL 2h (현재 48h 유지 중) |
+| `DynamoDB GRAPH#5M` | 5분 avg/min 집계 버킷 | window=6h/12h/24h 그래프 | TTL 48h |
 
 DynamoDB는 원본의 source of truth가 아니다. 원본 정본은 `S3 raw`이고, 처리 결과 이력 정본은 `S3 processed`다. DynamoDB는 Dashboard가 빠르게 읽기 위한 hot store다.
 
@@ -299,17 +316,27 @@ Dashboard 사용처:
 }
 ```
 
-## DynamoDB HISTORY
+## DynamoDB HISTORY#STATE
 
-`HISTORY` item은 최근 그래프를 빠르게 그리기 위한 short-term 시계열이다. `LATEST`와 필드 구조를 동일하게 유지하고, `sk`와 `ttl`만 history용으로 바꾼 스냅샷을 저장한다.
+`HISTORY#STATE` item은 `window=1h` 그래프를 위한 short-term raw snapshot buffer다. `LATEST`와 필드 구조를 동일하게 유지하고, `sk`와 `ttl`만 history용으로 바꾼 스냅샷을 저장한다.
 
 보존:
 
 ```text
-TTL: 48시간
+목표 TTL: 2시간 (window=1h의 2배 버퍼)
+현재 TTL: 48시간 (data-processor 환경변수 변경 미적용 상태)
 ```
 
-MVP Dashboard는 최근 1시간 또는 2시간 그래프를 기본으로 조회한다. TTL은 48시간이 기본값이며, Lambda 환경변수 `HISTORY_TTL_HOURS`로 조정 가능하다.
+**Multi-resolution storage 전환 (ADR 0025, 2026-05-29 구현 완료)**
+
+| 계층 | sk prefix | TTL | Dashboard 역할 | 아이템 수 (3공장) |
+| --- | --- | --- | --- | --- |
+| HISTORY#STATE | `HISTORY#STATE#*` | 2h 목표 (현재 48h) | window=1h 실시간 정밀 차트 | ~7,200개 (TTL 2h 기준) |
+| GRAPH#5M | `GRAPH#5M#*` (기존 테이블 내) | 48h | window=6h/12h/24h 5분 집계 차트 | ~864개 (24h 기준) |
+
+Lambda AEGIS-Lambda-GraphAggregator5m이 EventBridge 5분 주기로 HISTORY#STATE → GRAPH#5M 집계를 수행한다. (2026-05-29 배포 완료)
+
+cascade 504 사고 배경: `docs/ops/04_troubleshooting.md` #42
 
 키:
 
@@ -377,6 +404,108 @@ sk = HISTORY#STATE#{updated_at}   ← 예: HISTORY#STATE#2026-05-14T12:00:06.123
 }
 ```
 
+## DynamoDB GRAPH#5M
+
+`GRAPH#5M` item은 `window=6h/12h/24h` 그래프를 위한 5분 단위 집계 버킷이다. Lambda GraphAggregator5m이 5분마다 직전 window의 HISTORY#STATE를 읽어 집계하고 저장한다.
+
+보존:
+
+```text
+TTL: 48시간 (window=24h의 2배 버퍼, TTL eventually-consistent 삭제 edge case 방지)
+```
+
+키:
+
+```text
+pk = FACTORY#{factory_id}
+sk = GRAPH#5M#{bucket_start}   ← 예: GRAPH#5M#2026-05-29T00:35:00Z
+```
+
+bucket_start는 5분 경계 UTC ISO-8601 문자열이다. 밀리초 없음.
+
+```text
+5분 경계: 00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55분
+예) bucket_start=2026-05-29T00:35:00Z, bucket_end=2026-05-29T00:39:59.999Z
+```
+
+주요 필드 (실제 DDB 구조 기준, 2026-05-29 확인):
+
+```json
+{
+  "pk": "FACTORY#factory-b",
+  "sk": "GRAPH#5M#2026-05-29T00:35:00Z",
+  "factory_id": "factory-b",
+  "item_type": "GRAPH#5M",
+  "schema_version": "graph-5m-v0.1.0",
+  "bucket_minutes": 5,
+  "bucket_start": "2026-05-29T00:35:00Z",
+  "bucket_end": "2026-05-29T00:39:59.999Z",
+  "ttl": 1780188090,
+  "sensor": {
+    "temperature_celsius": { "mean": 24.41, "min": 21.58, "max": 27.48, "count": 100 },
+    "humidity_percent":    { "mean": 45.50, "min": 37.01, "max": 52.95, "count": 100 },
+    "pressure_hpa":        { "mean": 1013.56, "min": 1012.0, "max": 1014.99, "count": 100 }
+  },
+  "risk": {
+    "score": { "mean": 99.80, "min": 79.83, "max": 100.0, "count": 100 }
+  },
+  "ai_detection": {
+    "threshold": 0.7,
+    "max_score": 0.6559,
+    "max_score_type": "bend_score",
+    "max_score_at": "2026-05-29T00:39:38Z",
+    "above_threshold_count": 0,
+    "by_type": {
+      "fire_score": { "max": 0.3805, "mean": 0.004, "count": 100, "threshold": 0.7, "above_threshold_count": 0 },
+      "fall_score": { "max": 0.4249, "mean": 0.004, "count": 100, "threshold": 0.7, "above_threshold_count": 0 },
+      "bend_score": { "max": 0.6559, "mean": 0.007, "count": 100, "threshold": 0.7, "above_threshold_count": 0 }
+    }
+  },
+  "infra": {
+    "cpu_usage_percent":    { "mean": 8.26,  "max": 9.55, "last": 9.55, "count": 16 },
+    "memory_usage_percent": { "mean": 34.35, "max": 37.24, "last": 34.55, "count": 16 },
+    "disk_usage_percent":   { "mean": 24.85, "max": 25.86, "last": 24.33, "count": 16 }
+  },
+  "quality": {
+    "source_dataset": "DynamoDB HISTORY#STATE",
+    "source_count": 216,
+    "expected_count": 100,
+    "collection_rate": 1.0,
+    "is_empty": false,
+    "is_partial": false,
+    "infra_values_from_snapshot": true
+  },
+  "created_at": "2026-05-29T00:41:30Z",
+  "updated_at": "2026-05-29T00:41:30Z"
+}
+```
+
+주의:
+- `infra` 섹션의 `count`는 5분 window 내 infra_state 수신 횟수다 (20초 주기 → 약 16개).
+- `quality.source_count`가 `expected_count`보다 클 수 있다 (factory_state 3초 주기 실제 수신량).
+- source item이 없는 bucket은 `sensor: {}`, `risk: {}`, `infra: {}` 구조로 저장되고 `quality.is_empty=true`가 된다.
+- Dashboard는 `is_empty=true` bucket을 필터링해 그래프 공백으로 표현한다.
+
+Dashboard 추출 필드 (backend `_extract_graph_5m` 기준):
+
+| Dashboard 필드 | 원천 경로 | 용도 |
+| --- | --- | --- |
+| `risk_score` / `risk_score_avg` | `risk.score.mean` | Risk Score 평균 라인 |
+| `risk_score_min` | `risk.score.min` | 경고/위험 마커 기준 (`≤84`: 주의, `≤49`: 위험) |
+| `temperature_celsius_avg` | `sensor.temperature_celsius.mean` | 온도 그래프 |
+| `humidity_percent_avg` | `sensor.humidity_percent.mean` | 습도 그래프 |
+| `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | 기압 그래프 |
+| `fire_score` | `ai_detection.by_type.fire_score.max` | AI 탐지 그래프 (버킷 최대값) |
+| `fall_score` | `ai_detection.by_type.fall_score.max` | AI 탐지 그래프 |
+| `bend_score` | `ai_detection.by_type.bend_score.max` | AI 탐지 그래프 |
+| `cpu_usage_percent_mean` | `infra.cpu_usage_percent.mean` | 인프라 그래프 |
+| `memory_usage_percent_mean` | `infra.memory_usage_percent.mean` | 인프라 그래프 |
+| `disk_usage_percent_last` | `infra.disk_usage_percent.last` | 인프라 그래프 |
+
+공장별 GRAPH#5M 데이터 존재 여부:
+- factory-b, factory-c: GRAPH#5M 데이터 존재 (2026-05-29 기준)
+- factory-a: Edge Agent 비활성 구간에 따라 데이터 없을 수 있음. 빈 결과는 EmptyChart로 표시
+
 ## 환경 데이터와 노드 상태 데이터 분리
 
 ### 환경 데이터
@@ -399,7 +528,8 @@ factory_state
 | --- | --- | --- |
 | `DynamoDB LATEST.factory_state` | 3초마다 overwrite | 현재 환경 상태 카드 |
 | `DynamoDB LATEST.risk` | 3초마다 overwrite | 현재 Risk 카드 |
-| `DynamoDB HISTORY#STATE` | LATEST snapshot + TTL | 온도/습도/기압/AI score/Risk 그래프 |
+| `DynamoDB HISTORY#STATE` | LATEST snapshot + TTL | window=1h 온도/습도/기압/AI score/Risk 그래프 |
+| `DynamoDB GRAPH#5M` | 5분 집계 (GraphAggregator) | window=6h/12h/24h 그래프 |
 | `S3 raw` | 3초 원본 전체 | 원본 보존 |
 | `S3 processed` | 3초 계산 결과 | 장기 이력/재처리 |
 
@@ -423,50 +553,55 @@ infra_state
 | --- | --- | --- |
 | `DynamoDB LATEST.infra_state` | 20초마다 overwrite | 현재 노드/워크로드/장치 상태 |
 | `DynamoDB LATEST.pipeline_status` | 20초마다 overwrite | 현재 파이프라인 상태 |
-| `DynamoDB HISTORY#STATE` | LATEST snapshot + TTL | 노드 CPU/memory/disk/Ready 그래프 |
+| `DynamoDB HISTORY#STATE` | LATEST snapshot + TTL | window=1h 노드 CPU/memory/disk/Ready 그래프 |
+| `DynamoDB GRAPH#5M` | 5분 집계 인프라 평균 (GraphAggregator) | window=6h/12h/24h 집계 인프라 그래프 |
 | `S3 raw` | 20초 원본 전체 | 장애 분석/원본 보존 |
 | `S3 processed` | 20초 상태 요약 | 운영 이력/리포트 |
 
 ## Dashboard 조회 기준
 
-| 화면 요소 | 기본 조회 저장소 | 설명 |
+| 화면 요소 | 조회 저장소 | 설명 |
 | --- | --- | --- |
 | 공장별 현재 Risk 카드 | `DynamoDB LATEST` | score, level, top causes |
 | 현재 환경 상태 | `DynamoDB LATEST.factory_state` | 온도, 습도, 기압, AI score |
 | 현재 노드 상태 | `DynamoDB LATEST.infra_state` | Ready, CPU, memory, disk |
 | 현재 pipeline 상태 | `DynamoDB LATEST.pipeline_status` | normal/warning/critical |
-| 최근 Risk 그래프 | `DynamoDB HISTORY#STATE` | factory_state 수신 시점 snapshot |
-| 최근 환경 그래프 | `DynamoDB HISTORY#STATE` | factory_state 수신 시점 snapshot |
-| 최근 노드 그래프 | `DynamoDB HISTORY#STATE` | infra_state 수신 시점 snapshot |
+| 24h header sparkline | `DynamoDB GRAPH#5M` | window=24h, risk_score (mean) |
+| 최근 그래프 window=1h | `DynamoDB HISTORY#STATE` | raw snapshot, max_items=500 cap |
+| 최근 그래프 window=6h/12h/24h | `DynamoDB GRAPH#5M` | 5분 avg/min 집계, 최대 288 items |
 | 장기 이력/감사 | `S3 processed`, `S3 raw` | 장기 조회, 재처리, 리포트 |
 
-Dashboard API 예시:
+Dashboard API:
 
 ```text
-GET /factories
-  -> DynamoDB LATEST list/query
+GET /factories/{factory_id}/history?window=1h
+  -> DynamoDB HISTORY#STATE query (max_items=500 cap, ScanIndexForward=False)
+  -> 응답: timestamp, risk_score, temperature_celsius_avg, fire_score, nodes[], ...
 
-GET /factories/{factory_id}
-  -> DynamoDB LATEST get item
-
-GET /factories/{factory_id}/risk-history?window=1h
-  -> DynamoDB HISTORY#STATE query, risk 필드 추출
-
-GET /factories/{factory_id}/factory-history?window=1h
-  -> DynamoDB HISTORY#STATE query, factory_state 필드 추출
-
-GET /factories/{factory_id}/infra-history?window=1h
-  -> DynamoDB HISTORY#STATE query, infra_state 필드 추출
+GET /factories/{factory_id}/history?window=6h|12h|24h
+  -> DynamoDB GRAPH#5M query (ScanIndexForward=True, 최대 288 items)
+  -> 응답: timestamp, is_bucket=true, risk_score_avg, risk_score_min,
+           temperature_celsius_avg, fire_score, cpu_usage_percent_mean, ...
+  -> 해당 공장에 GRAPH#5M 데이터 없으면 []
 ```
+
+Risk Score 방향: **100 = 최안전, 0 = 최위험**. 낮은 값이 이상 징후 기준.
+
+| 구간 | level |
+| --- | --- |
+| 85 ~ 100 | 안전 |
+| 50 ~ 84 | 주의 (risk_score_min ≤ 84 → warning 마커) |
+| 0 ~ 49 | 위험 (risk_score_min ≤ 49 → danger 마커) |
 
 ## 구현 기준
 
-- Lambda는 `message_id` 기준으로 idempotent하게 처리한다.
+- Lambda DataProcessor는 `message_id` 기준으로 idempotent하게 처리한다.
 - `S3 raw` 저장은 IoT Rule이 담당한다.
-- Lambda는 `DynamoDB LATEST`, `DynamoDB HISTORY`, `S3 processed`를 담당한다.
+- Lambda DataProcessor는 `DynamoDB LATEST`, `DynamoDB HISTORY#STATE`, `S3 processed`를 담당한다.
+- Lambda GraphAggregator5m은 `DynamoDB GRAPH#5M`, `S3 processed_agg`를 담당한다.
 - Dashboard current state는 S3 `latest/` prefix가 아니라 DynamoDB LATEST를 기준으로 조회한다.
 - `DynamoDB HISTORY#STATE`는 갱신된 `LATEST`와 같은 구조를 저장하고 TTL만 추가한다.
 - `S3 processed state_snapshot`은 `DynamoDB HISTORY#STATE`와 같은 구조를 저장하되 TTL은 제외한다.
-- `DynamoDB HISTORY`에는 TTL을 적용한다.
+- `DynamoDB HISTORY#STATE`와 `DynamoDB GRAPH#5M` 모두 TTL을 적용한다.
 - 장기 보존과 재처리는 DynamoDB가 아니라 S3 raw/processed를 기준으로 한다.
 - Dashboard는 기본적으로 DynamoDB를 조회하고, 상세/감사/장기 이력에서만 S3를 조회한다.

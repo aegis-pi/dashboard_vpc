@@ -1,9 +1,10 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-05-27
+기준일: 2026-05-29
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-05-29 v2.9  ADR 0025 Multi-resolution history storage 반영. GraphAggregator5m/EventBridge와 GRAPH#5M 추가 write/storage는 무료 티어 또는 소액 usage-based이며 고정 시간 비용 변화 없음.
   - 2026-05-27 v2.8  Aegis-frontend 기준 운영 Dashboard UI 포팅 진행 상태와 top_causes 표시 보정 반영. web `e055583` 배포, backend image `sha-3b8439f` ECS 적용. 신규 AWS 리소스/고정 비용 변화 없음.
   - 2026-05-27 v2.7  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. backend image `sha-439e27a`, web/backend GitHub Actions 성공. 신규 AWS 리소스/고정 비용 변화 없음.
   - 2026-05-27 v2.6  사용자 요청으로 infra/data-dashboard 일시 root 재기동 완료 반영. VPC/NAT/ALB/ECS/RDS/Redis/Lambda/IoT Rules active, API /healthz HTTP 200. 비용 기준은 Phase 1 가동 시 표 적용.
@@ -79,6 +80,7 @@
 | Data/Dashboard VPC | ElastiCache Redis `kjw-aegis-data-redis` | 1 node | active |
 | Data/Dashboard VPC | Secrets Manager (RDS + Redis AUTH) | 2 | active |
 | Data/Dashboard VPC | Lambda data processor `KJW-AEGIS-Data-Lambda-data-processor` | 1 | active |
+| Data/Dashboard VPC | Lambda GraphAggregator5m / EventBridge schedule | 1 | active, ADR 0025. 5분 단위 `GRAPH#5M` 집계, 고정 비용 없음 |
 | Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_factory_state_processor` | 1 | active |
 | Data/Dashboard VPC | IoT Rule `KJW_AEGIS_Data_IoTRule_infra_state_processor` | 1 | active |
 | Data/Dashboard VPC | Lambda notifier `KJW-AEGIS-Data-Lambda-notifier` | 1 | active |
@@ -205,23 +207,26 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | CloudFront data out | `$0.085 / GB` (1TB 무료 후) | < 5GB/월 (관제 SPA) | `~$0.00` (무료 티어 내) |
 | CloudFront requests | `$0.0075 / 10k HTTPS` | < 100k/월 | `~$0.08` |
 | Lambda data processor invocations | `$0.20 / 1M` (1M 무료) | < 200k/월 | `~$0.00` (무료 티어 내) |
+| Lambda GraphAggregator5m invocations | `$0.20 / 1M` (1M 무료) | 5분 주기 = ~8,640/월 | `~$0.00` (무료 티어 내) |
 | Lambda notifier invocations (DDB Streams) | `$0.20 / 1M` | < 200k/월 | `~$0.00` |
 | Lambda report-generator invocations | `$0.20 / 1M` | 팀원/후속 LLM 보고서 도입 시 3 호출/일 × 30 = 90/월 | `~$0.00` |
 | Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k 무료) | < 100k GB-sec | `~$0.00` |
 | Bedrock Claude 3 Haiku (input) | `$0.00025 / 1k tokens` | 팀원/후속 LLM 보고서 도입 시 일간 보고서 + 이상 요약 ≈ 60k tokens/월 | `~$0.015` |
 | Bedrock Claude 3 Haiku (output) | `$0.00125 / 1k tokens` | 팀원/후속 LLM 보고서 도입 시 ≈ 15k tokens/월 | `~$0.019` |
 | DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3s/20s 주기 = ~120k write/월 | `~$0.15` |
+| DynamoDB GRAPH#5M write/read/storage | on-demand/storage | 3공장 기준 5분 bucket ~25,920 write/월 + < 1GB | `~$0.03` |
 | DynamoDB on-demand read | `$0.25 / 1M RCU` | Backend 캐시 hit으로 read 감소 ~50k/월 | `~$0.013` |
 | DynamoDB Streams read | `$0.02 / 100k stream read` | ~120k/월 | `~$0.024` |
 | DynamoDB storage (LATEST + HISTORY + daily-report) | `$0.25 / GB-month` | < 2GB | `~$0.50` |
 | S3 `aegis-bucket-data` storage (raw + processed + reports) | `$0.025 / GB-month` | factory-a 1개월 누적 ~3GB | `~$0.08` |
+| S3 processed_agg PUT/storage | S3 Standard | GRAPH#5M 보조 JSON, 월 수만 건 미만 | `~$0.02` |
 | S3 dashboard-web bucket storage | `$0.025 / GB-month` | < 50MB | `~$0.00` |
 | S3 PUT requests | `$0.005 / 1k` | ~120k/월 | `~$0.60` |
 | S3 GET requests | `$0.0004 / 1k` | < 100k/월 | `~$0.04` |
 | Route53 DNS queries | `$0.40 / 1M` (첫 1B) | < 100k/월 | `~$0.04` |
 | X-Ray traces | `$5.00 / 1M traces` (100k 무료) | < 100k/월 | `~$0.00` |
 | NAT Gateway data processing (ECR pull + Bedrock + Secrets) | `$0.056 / GB` | < 5GB/월 | `~$0.28` |
-| **사용량 합계 (factory-a 단독)** | | | **`~$1.85 / month`** |
+| **사용량 합계 (factory-a 단독)** | | | **`~$1.90 / month`** |
 
 > 외부 도메인 등록비: Gabia `.com` 연 ~₩15,000 / `.kr` 연 ~₩20,000 (별도, AWS 청구서에 포함되지 않음).
 
@@ -229,8 +234,8 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 
 | 운영 패턴 | 고정 | 사용량 | 합계 |
 | --- | ---: | ---: | ---: |
-| 상시 가동 (24/7) | ~$123.08/월 | ~$1.85/월 | **`~$124.93 / month`** |
-| 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.85/월 | **`~$8.40 / month`** |
+| 상시 가동 (24/7) | ~$123.08/월 | ~$1.90/월 | **`~$124.98 / month`** |
+| 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.90/월 | **`~$8.45 / month`** |
 | destroy 후 (Step 9.5 이전 — Route53 hosted zone + RDS snapshot) | snapshot/storage 기준 + hosted zone $0.50/월 | ~$0.60/월 | Route53 hosted zone은 영구 자원 (Step 7.5 분리). snapshot 크기에 따라 추가 |
 | destroy 후 (Step 9.5 migration 완료 후 — permanent root 잔여) | permanent root 고정 $0.50/월 + ECR ~$0.05/월 | ~$0.05/월 | **~$0.50~0.55/월 (Route53 $0.50 + ECR ~$0.05)**. Cognito/DDB/S3-web/CloudFront/ACM/IAM: ~$0.00. 상세는 아래 표 참조 |
 
