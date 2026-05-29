@@ -160,10 +160,14 @@ export interface WorkloadStatus {
 // ─── History item (from GET /factories/{id}/history) ─────────────────
 export interface HistoryItem {
   timestamp?: string
-  // risk fields
+  // risk fields (raw 1h snapshots)
   risk_score?: number
   risk_level?: RiskLevel
   top_cause_names?: string[]
+  // GRAPH#5M aggregate risk (window=6h/12h/24h, ADR 0025)
+  is_bucket?: boolean
+  risk_score_avg?: number | null
+  risk_score_min?: number | null
   // factory_state fields
   temperature_celsius_avg?: number | null
   humidity_percent_avg?: number | null
@@ -171,10 +175,17 @@ export interface HistoryItem {
   fire_score?: number | null
   fall_score?: number | null
   bend_score?: number | null
-  // infra fields
+  // infra fields (raw snapshots — per-node)
   node_summary?: { ready?: number; total?: number; not_ready?: number }
   nodes?: NodeStatus[]
   workload_summary?: { unhealthy?: number }
+  // infra fields (GRAPH#5M aggregate — no per-node breakdown)
+  cpu_usage_percent_mean?: number | null
+  memory_usage_percent_mean?: number | null
+  disk_usage_percent_last?: number | null
+  // GRAPH#5M bucket window
+  bucket_start?: string
+  bucket_end?: string
   // raw DDB item (may have sk containing timestamp)
   sk?: string
   pk?: string

@@ -1,5 +1,8 @@
+import React from 'react'
 import {
   LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -11,6 +14,8 @@ import {
 } from 'recharts'
 import type { HistoryItem } from '../api/types'
 import { subsampleData } from '../utils/subsample'
+
+const NODE_COLORS = ['var(--accent)', 'var(--warn)', 'var(--safe)', 'var(--crit)']
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function extractTimestamp(item: HistoryItem): string | undefined {
@@ -34,8 +39,95 @@ function fmtTime(ts?: string): string {
 }
 
 // ─── Risk score chart ─────────────────────────────────────────────────
+// window=1h  → LineChart (raw snapshots)
+// window=6h/12h/24h → ComposedChart with Area (avg) + Scatter markers (min)
 export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
   const sampledItems = subsampleData(items)
+  const isBucket = items.length > 0 && items[0]?.is_bucket === true
+
+  if (isBucket) {
+    const data = sampledItems
+      .map((it) => {
+        const score = it.risk_score_avg ?? null
+        const scoreMin = it.risk_score_min ?? null
+        return {
+          ts: fmtTime(it.timestamp),
+          score,
+          // warn_y / danger_y placed at avg height for visual alignment
+          warn_y: scoreMin != null && scoreMin <= 84 && scoreMin > 49 ? score : null,
+          danger_y: scoreMin != null && scoreMin <= 49 ? score : null,
+        }
+      })
+      .filter((d) => d.score != null)
+
+    if (data.length === 0) {
+      return <EmptyChart message="선택한 시간 범위에 Risk 데이터가 없습니다" />
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const warnDot = (props: any): React.ReactElement => {
+      if ((props.payload?.warn_y as number | null) == null) return <g />
+      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--warn)" opacity={0.85} />
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dangerDot = (props: any): React.ReactElement => {
+      if ((props.payload?.danger_y as number | null) == null) return <g />
+      return <circle cx={props.cx as number} cy={props.cy as number} r={5} fill="var(--crit)" opacity={0.85} />
+    }
+
+    return (
+      <div className="chart-wrap">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
+            <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
+            <Tooltip
+              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: 'var(--ink-3)' }}
+            />
+            <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
+            <ReferenceLine y={50} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
+            <Area
+              type="monotone"
+              dataKey="score"
+              name="Risk Score (평균)"
+              stroke="var(--accent)"
+              fill="var(--accent)"
+              fillOpacity={0.1}
+              strokeWidth={1.8}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+            {/* Warning markers: 50 < risk_score_min ≤ 84 */}
+            <Line
+              type="monotone"
+              dataKey="warn_y"
+              stroke="none"
+              strokeWidth={0}
+              dot={warnDot}
+              activeDot={false}
+              legendType="none"
+              isAnimationActive={false}
+            />
+            {/* Danger markers: risk_score_min ≤ 49 */}
+            <Line
+              type="monotone"
+              dataKey="danger_y"
+              stroke="none"
+              strokeWidth={0}
+              dot={dangerDot}
+              activeDot={false}
+              legendType="none"
+              isAnimationActive={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
+
+  // window=1h: raw LineChart
   const data = sampledItems
     .map((it) => ({
       ts: fmtTime(extractTimestamp(it)),
@@ -58,7 +150,6 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
             contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
             labelStyle={{ color: 'var(--ink-3)' }}
           />
-          {/* Threshold bands */}
           <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
           <ReferenceLine y={50} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
           <Line
@@ -160,13 +251,14 @@ export function AIScoreChart({ items }: { items: HistoryItem[] }) {
 }
 
 // ─── Node CPU/memory chart ────────────────────────────────────────────
+// window=1h  → per-node series from HISTORY#STATE nodes[]
+// window=6h/12h/24h → single aggregate line from GRAPH#5M infra.*_mean
 export function NodeResourceChart({ items, field, label }: {
   items: HistoryItem[]
   field: 'cpu_usage_percent' | 'memory_usage_percent' | 'disk_usage_percent'
   label: string
 }) {
   const sampledItems = subsampleData(items)
-  // Extract per-node series
   const nodeIds = new Set<string>()
   sampledItems.forEach((it) => {
     if (Array.isArray(it.nodes)) {
@@ -174,6 +266,52 @@ export function NodeResourceChart({ items, field, label }: {
     }
   })
 
+  // GRAPH#5M fallback: use pre-aggregated infra mean/last values
+  if (nodeIds.size === 0) {
+    const aggField =
+      field === 'cpu_usage_percent' ? 'cpu_usage_percent_mean' :
+      field === 'memory_usage_percent' ? 'memory_usage_percent_mean' :
+      'disk_usage_percent_last'
+    const aggLabel = field === 'disk_usage_percent' ? `${label} (last)` : `${label} (평균)`
+
+    const aggData = sampledItems
+      .map((it) => ({
+        ts: fmtTime(extractTimestamp(it)),
+        value: (it[aggField] as number | null | undefined) ?? null,
+      }))
+      .filter((d) => d.value != null)
+
+    if (aggData.length === 0) {
+      return <EmptyChart message={`${label} 데이터 없음`} />
+    }
+
+    return (
+      <div className="chart-wrap">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={aggData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
+            <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30}
+              tickFormatter={(v: number) => `${v}%`} />
+            <Tooltip
+              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
+              formatter={(v: number) => [`${v?.toFixed(1)}%`, aggLabel]}
+            />
+            <Line
+              type="monotone"
+              dataKey="value"
+              name={aggLabel}
+              stroke={NODE_COLORS[0]}
+              strokeWidth={1.6}
+              dot={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
+
+  // window=1h: per-node series
   const data = sampledItems.map((it) => {
     const row: Record<string, string | number | null> = {
       ts: fmtTime(extractTimestamp(it)),
@@ -186,12 +324,6 @@ export function NodeResourceChart({ items, field, label }: {
     })
     return row
   })
-
-  if (data.length === 0 || nodeIds.size === 0) {
-    return <EmptyChart message={`${label} 데이터 없음`} />
-  }
-
-  const COLORS = ['var(--accent)', 'var(--warn)', 'var(--safe)', 'var(--crit)']
 
   return (
     <div className="chart-wrap">
@@ -212,7 +344,7 @@ export function NodeResourceChart({ items, field, label }: {
               type="monotone"
               dataKey={nid}
               name={nid}
-              stroke={COLORS[i % COLORS.length]}
+              stroke={NODE_COLORS[i % NODE_COLORS.length]}
               strokeWidth={1.6}
               dot={false}
             />

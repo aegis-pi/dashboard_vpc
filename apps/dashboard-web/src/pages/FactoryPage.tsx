@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Shell } from '../components/Layout'
@@ -31,7 +31,7 @@ function FactoryHeader({
 }: { f: FactoryDetail; sparkData: number[] }) {
   const riskLevel = f.risk?.level
   const riskScore = f.risk?.score
-  const ns = f.infra_state?.node_summary
+  const ns = resolveNodeSummary(f.infra_state)
   const color = riskColor(riskLevel)
   const envType = f.environment_type
   const tintPct =
@@ -129,7 +129,7 @@ function FactoryHeader({
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-3)' }}>
             <span className="mono">
               node <span className="tnum" style={{ color: 'var(--ink)' }}>
-                {ns ? `${ns.ready ?? '—'}/${ns.total ?? '—'}` : '—'}
+                {ns ? `${ns.ready}/${ns.total}` : '—'}
               </span>
             </span>
             <span className="mono" style={{ color: 'var(--ink-4)' }}>
@@ -143,6 +143,21 @@ function FactoryHeader({
 }
 
 // ─── Overview tab ─────────────────────────────────────────────────────
+function resolveNodeSummary(infra: FactoryDetail['infra_state']): { ready: number; total: number; not_ready: number } | null {
+  if (!infra) return null
+  if (infra.node_summary?.total != null) {
+    const total = infra.node_summary.total
+    const ready = infra.node_summary.ready ?? 0
+    return { ready, total, not_ready: infra.node_summary.not_ready ?? (total - ready) }
+  }
+  if (infra.nodes && infra.nodes.length > 0) {
+    const total = infra.nodes.length
+    const ready = infra.nodes.filter((n) => n.ready === true).length
+    return { ready, total, not_ready: total - ready }
+  }
+  return null
+}
+
 function resolveDevices(infra: FactoryDetail['infra_state']): {
   bme280: DeviceEntry | null
   camera: DeviceEntry | null
@@ -172,7 +187,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
   const sensor = extractSensor(data.factory_state)
   const ai     = extractAI(data.factory_state)
   const infra  = data.infra_state
-  const ns     = infra?.node_summary
+  const ns     = resolveNodeSummary(infra)
   const ws     = infra?.workload_summary
   const devices = resolveDevices(infra)
   const causes = risk?.top_causes ?? []
@@ -1298,8 +1313,6 @@ export function FactoryPage() {
   // Tracks which tabs have ever been visited so their components stay mounted
   // (display:none instead of unmount), preserving cached data across tab switches.
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(() => new Set<TabId>(['overview']))
-  const wsThrottleRef = useRef<number>(0)
-
   const { data, loading, error, refresh } = useFactory(factoryId)
   const hasFactoryData = data !== null
   const { status: wsStatus, lastMessage } = useWebSocket(factoryId)
@@ -1318,23 +1331,13 @@ export function FactoryPage() {
     setRefreshSignalKey((k) => k + 1)
   }, [refresh, refreshHistory24h, refreshFleet])
 
-  // WS-triggered refresh — throttled to at most once per 3 s.
-  // Manual refresh button (onRefresh) is not subject to this throttle.
   useEffect(() => {
-    if (wsStatus !== 'connected' || !lastMessage) return
-    const now = Date.now()
-    if (now - wsThrottleRef.current < 3000) return
-    wsThrottleRef.current = now
-    refreshPageData()
-  }, [lastMessage, wsStatus, refreshPageData])
-
-  useEffect(() => {
-    if (refreshInterval <= 0 || wsStatus === 'connected') return
+    if (refreshInterval <= 0) return
     const id = window.setInterval(() => {
       refreshPageData()
     }, refreshInterval)
     return () => window.clearInterval(id)
-  }, [refreshInterval, refreshPageData, wsStatus])
+  }, [refreshInterval, refreshPageData])
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId)

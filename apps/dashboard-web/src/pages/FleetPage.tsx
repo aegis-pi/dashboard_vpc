@@ -6,6 +6,7 @@ import { LevelBadge, PipelineBadge, StaleBadge } from '../components/Badge'
 import { relTime, riskColor } from '../utils/format'
 import { Sparkline } from '../components/Sparkline'
 import { useFactories } from '../hooks/useFactories'
+import { useFactoryHistory } from '../hooks/useFactoryHistory'
 import { useFleetRecentChanges, type RecentChange } from '../hooks/useFleetRecentChanges'
 import { AuthError } from '../api/client'
 import type { FactorySummary } from '../api/types'
@@ -275,6 +276,10 @@ function FactoryCard({
 }: { f: ReturnType<typeof normalizeFactory>; onClick: () => void }) {
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
+  const { data: history1h } = useFactoryHistory(f.factory_id, '1h')
+  const sparkData = history1h
+    .map((h) => h.risk_score)
+    .filter((v): v is number => v != null)
 
   return (
     <div
@@ -330,10 +335,9 @@ function FactoryCard({
             <span className="micro" style={{ marginTop: 6, whiteSpace: 'nowrap' }}>/100 · 안전 점수</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingBottom: 6 }}>
-            {/* Sparkline: 24h data not available from LATEST endpoint */}
-            <Sparkline data={[]} color={color} width={120} height={32} strokeWidth={1.4} />
+            <Sparkline data={sparkData} color={color} width={120} height={32} strokeWidth={1.4} />
             <span className="mono" style={{ fontSize: 9.5, color: 'var(--ink-4)', letterSpacing: '.06em', textAlign: 'right' }}>
-              지난 24h
+              지난 1h · {sparkData.length}pt
             </span>
           </div>
         </div>
@@ -467,7 +471,7 @@ export function FleetPage() {
   const hasFleetData = data !== null
 
   const factories = (data?.factories ?? []).map(normalizeFactory)
-  const sorted = [...factories].sort((a, b) => (a.riskScore ?? 50) - (b.riskScore ?? 50))
+  const sorted = [...factories].sort((a, b) => a.factory_id.localeCompare(b.factory_id))
 
   const sidebarFactories = sorted.map((f) => ({
     factory_id: f.factory_id,
@@ -555,7 +559,7 @@ export function FleetPage() {
           <div style={{ marginBottom: 18 }}>
             <div className="section-header">
               <h2 className="h2">Factories</h2>
-              <span className="micro">안전 점수 오름차순 · 위험한 것 먼저</span>
+              <span className="micro">factory_id 알파벳순</span>
             </div>
             {sorted.length === 0 ? (
               <div className="empty-state">
