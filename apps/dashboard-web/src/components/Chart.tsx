@@ -159,10 +159,17 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
 
 // ─── Sensor chart (temp / humidity / pressure) ────────────────────────
 // window=1h  → simple LineChart (avg only)
-// window=6h/12h/24h → ComposedChart: avg solid + max dashed + avg-to-max band
+// window=6h/12h/24h → ComposedChart: avg line + risk-relevant extreme/range band
 
 type SensorAvgField = 'temperature_celsius_avg' | 'humidity_percent_avg' | 'pressure_hpa_avg'
+type SensorMinField = 'temperature_celsius_min' | 'humidity_percent_min' | 'pressure_hpa_min'
 type SensorMaxField = 'temperature_celsius_max' | 'humidity_percent_max' | 'pressure_hpa_max'
+
+const SENSOR_MIN_FIELD: Record<SensorAvgField, SensorMinField> = {
+  temperature_celsius_avg: 'temperature_celsius_min',
+  humidity_percent_avg: 'humidity_percent_min',
+  pressure_hpa_avg: 'pressure_hpa_min',
+}
 
 const SENSOR_MAX_FIELD: Record<SensorAvgField, SensorMaxField> = {
   temperature_celsius_avg: 'temperature_celsius_max',
@@ -227,11 +234,19 @@ function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function SensorBandTooltip({ active, payload, unit }: { active?: boolean; payload?: any[]; label?: string; unit: string }) {
+function SensorBandTooltip({ active, payload, unit, mode }: {
+  active?: boolean
+  payload?: any[]
+  label?: string
+  unit: string
+  mode: 'upper' | 'range'
+}) {
   if (!active || !payload?.length) return null
   const d = payload[0]?.payload as Record<string, unknown> | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const avg = (payload.find((p: any) => p.dataKey === 'avg')?.value as number | undefined) ?? null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const min = (payload.find((p: any) => p.dataKey === 'min')?.value as number | undefined) ?? null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const max = (payload.find((p: any) => p.dataKey === 'max')?.value as number | undefined) ?? null
 
@@ -259,6 +274,20 @@ function SensorBandTooltip({ active, payload, unit }: { active?: boolean; payloa
           </span>&nbsp;<span style={{ color: 'var(--ink-4)' }}>{unit}</span>
         </div>
       )}
+      {mode === 'range' && min != null && (
+        <div style={{ color: 'var(--ink-2)' }}>
+          최소&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+            {min.toFixed(2)}
+          </span>&nbsp;<span style={{ color: 'var(--ink-4)' }}>{unit}</span>
+        </div>
+      )}
+      {mode === 'range' && min != null && max != null && (
+        <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 4 }}>
+          변동폭&nbsp;<span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
+            {(max - min).toFixed(2)} {unit}
+          </span>
+        </div>
+      )}
       {(d?.sample_count as number | null) != null && (
         <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 4 }}>
           샘플 {d!.sample_count as number}개
@@ -281,15 +310,18 @@ export function SensorChart({ items, field, label, unit }: {
 }) {
   const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
+  const minField = SENSOR_MIN_FIELD[field]
   const maxField = SENSOR_MAX_FIELD[field]
   const bucketMinutes = isBucket ? (items[0]?.bucket_minutes ?? 5) : null
   const is24h = bucketMinutes === 20
+  const mode = field === 'temperature_celsius_avg' ? 'upper' : 'range'
 
   if (isBucket) {
     const data = sampledItems
       .map((it) => ({
         ts: fmtTimeShort(it.bucket_start || it.timestamp),
         avg: (it[field] as number | null | undefined) ?? null,
+        min: (it[minField] as number | null | undefined) ?? null,
         max: (it[maxField] as number | null | undefined) ?? null,
         sample_count: it.sample_count ?? null,
         bucket_minutes: it.bucket_minutes ?? null,
@@ -306,14 +338,15 @@ export function SensorChart({ items, field, label, unit }: {
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            {/* max area fills 0→max; avg area paints over 0→avg (reveals only avg-to-max band) */}
             <Area
-              type="monotone" dataKey="max"
+              type="monotone"
+              dataKey="max"
               fill="var(--accent)" fillOpacity={fillOpacity}
               stroke="none" isAnimationActive={false}
             />
             <Area
-              type="monotone" dataKey="avg"
+              type="monotone"
+              dataKey={mode === 'upper' ? 'avg' : 'min'}
               fill="var(--surface)" fillOpacity={0.95}
               stroke="none" isAnimationActive={false}
             />
@@ -322,19 +355,39 @@ export function SensorChart({ items, field, label, unit }: {
             <YAxis tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
             <Tooltip content={(props) => (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              <SensorBandTooltip {...props as any} unit={unit} />
+              <SensorBandTooltip {...props as any} unit={unit} mode={mode} />
             )} />
-            {/* avg: solid bold line */}
+            {field === 'temperature_celsius_avg' && (
+              <>
+                <ReferenceLine y={38} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
+                <ReferenceLine y={32} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
+              </>
+            )}
+            {field === 'humidity_percent_avg' && (
+              <>
+                <ReferenceLine y={85} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
+                <ReferenceLine y={70} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
+              </>
+            )}
             <Line
               type="monotone" dataKey="avg" name={`${label} 평균`}
               stroke="var(--accent)" strokeWidth={2}
               dot={false} activeDot={{ r: 4 }}
             />
-            {/* max: thin dashed line */}
+            {mode === 'range' && (
+              <Line
+                type="monotone" dataKey="min" name={`${label} 최소`}
+                stroke="var(--ink-4)" strokeWidth={1} strokeDasharray="4 2"
+                dot={false} activeDot={false} strokeOpacity={0.7}
+              />
+            )}
             <Line
               type="monotone" dataKey="max" name={`${label} 최대`}
-              stroke="var(--accent)" strokeWidth={1} strokeDasharray="4 2"
-              dot={false} activeDot={false} strokeOpacity={0.65}
+              stroke="var(--warn)" strokeWidth={mode === 'upper' ? 1.4 : 1}
+              strokeDasharray="4 2"
+              dot={mode === 'upper' ? { r: 2.8, fill: 'var(--warn)', stroke: 'var(--surface)', strokeWidth: 1 } : false}
+              activeDot={mode === 'upper' ? { r: 4.5, fill: 'var(--warn)', stroke: 'var(--surface)', strokeWidth: 1 } : false}
+              strokeOpacity={0.85}
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -374,6 +427,62 @@ export function SensorChart({ items, field, label, unit }: {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AIScoreBucketTooltip({ active, payload }: { active?: boolean; payload?: any[]; label?: string }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload as Record<string, unknown> | undefined
+  if (!d) return null
+
+  const timeStr = (d.bucket_start && d.bucket_end)
+    ? `${fmtTimeShort(d.bucket_start as string)} ~ ${fmtTimeShort(d.bucket_end as string)}`
+    : (d.ts as string | undefined) ?? ''
+
+  const rows = [
+    { label: '화재', avg: d.fire as number | null | undefined, max: d.fire_max as number | null | undefined, color: 'var(--crit)' },
+    { label: '넘어짐', avg: d.fall as number | null | undefined, max: d.fall_max as number | null | undefined, color: 'var(--warn)' },
+    { label: '굽힘', avg: d.bend as number | null | undefined, max: d.bend_max as number | null | undefined, color: 'var(--accent)' },
+  ].filter((row) => row.avg != null || row.max != null)
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--line)',
+      borderRadius: 8, padding: '8px 12px', fontSize: 12,
+      minWidth: 180,
+    }}>
+      <div style={{ color: 'var(--ink-3)', marginBottom: 6, fontSize: 11 }}>{timeStr}</div>
+      {rows.map((row) => (
+        <div key={row.label} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr', gap: 8, alignItems: 'baseline' }}>
+          <span style={{ color: row.color, fontWeight: 600 }}>{row.label}</span>
+          <span style={{ color: 'var(--ink-2)' }}>
+            평균&nbsp;<span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+              {row.avg == null ? '—' : row.avg.toFixed(3)}
+            </span>
+          </span>
+          <span style={{ color: 'var(--ink-2)' }}>
+            최대&nbsp;<span style={{
+              fontFamily: 'var(--font-mono)',
+              color: row.max != null && row.max >= 0.8 ? 'var(--crit)' : 'var(--ink)',
+              fontWeight: row.max != null && row.max >= 0.8 ? 700 : 500,
+            }}>
+              {row.max == null ? '—' : row.max.toFixed(3)}
+            </span>
+          </span>
+        </div>
+      ))}
+      {(d.sample_count as number | null) != null && (
+        <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 6 }}>
+          샘플 {d.sample_count as number}개
+        </div>
+      )}
+      {(d.bucket_minutes as number | null) != null && (
+        <div style={{ color: 'var(--ink-5)', fontSize: 10 }}>
+          {d.bucket_minutes as number}분 집계
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── AI score chart ───────────────────────────────────────────────────
 // window=1h  → LineChart (raw snapshots, instant values)
 // window=6h/12h/24h → ComposedChart: mean lines + spike dot markers (max ≥ 0.8)
@@ -392,9 +501,16 @@ export function AIScoreChart({ items }: { items: HistoryItem[] }) {
           fire: it.fire_score ?? null,
           fall: it.fall_score ?? null,
           bend: it.bend_score ?? null,
+          fire_max: fireMax,
+          fall_max: fallMax,
+          bend_max: bendMax,
           fire_spike: fireMax != null && fireMax >= 0.8 ? fireMax : null,
           fall_spike: fallMax != null && fallMax >= 0.8 ? fallMax : null,
           bend_spike: bendMax != null && bendMax >= 0.8 ? bendMax : null,
+          sample_count: it.sample_count ?? null,
+          bucket_minutes: it.bucket_minutes ?? null,
+          bucket_start: it.bucket_start,
+          bucket_end: it.bucket_end,
         }
       })
       .filter((d) => d.fire != null || d.fall != null || d.bend != null)
@@ -426,9 +542,10 @@ export function AIScoreChart({ items }: { items: HistoryItem[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
             <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
             <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
-            <Tooltip
-              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-            />
+            <Tooltip content={(props) => (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <AIScoreBucketTooltip {...props as any} />
+            )} />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
             <ReferenceLine y={0.8} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
             <ReferenceLine y={0.3} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />

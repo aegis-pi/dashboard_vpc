@@ -204,7 +204,10 @@ export interface HistoryItem {
   bucket_end?: string
   bucket_minutes?: number | null
   sample_count?: number | null
-  // sensor max (available in GRAPH#5M and re-aggregated buckets)
+  // sensor min/max (available in GRAPH#5M and re-aggregated buckets)
+  temperature_celsius_min?: number | null
+  humidity_percent_min?: number | null
+  pressure_hpa_min?: number | null
   temperature_celsius_max?: number | null
   humidity_percent_max?: number | null
   pressure_hpa_max?: number | null

@@ -500,7 +500,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
     ? 'risk_score 평균선 + 최소선 + 변동 음영'
     : 'risk_score · 100이 가장 안전'
   const sensorMetricLabel = isBucketedWindow
-    ? `온도 · 습도 · 기압 · ${bucketMinutes ?? 5}분 평균+최대`
+    ? `온도=평균+최대, 습도/기압=평균+범위 · ${bucketMinutes ?? 5}분 집계`
     : '온도 · 습도 · 기압'
   const aiMetricLabel = isBucketedWindow
     ? `fire / fall / bend · 선=${bucketMinutes ?? 5}분 평균, 점=최대 ≥0.8`
@@ -562,7 +562,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
           {loading
             ? <LoadingChart />
             : isEmpty ? <EmptyNote /> : isBucketedWindow ? (
-              // 6h/12h/24h: full ComposedChart with avg+max band per sensor
+              // 6h/12h/24h: bucketed sensor charts with risk-relevant extremes
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <SensorChart items={history} field="temperature_celsius_avg" label="온도" unit="°C" />
                 <SensorChart items={history} field="humidity_percent_avg" label="습도" unit="%" />
@@ -582,6 +582,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
                   data={history.map((h) => h.pressure_hpa_avg ?? null)} />
               </div>
             )}
+          {!loading && !isEmpty && isBucketedWindow && <SensorAggregationLegend />}
         </div>
       </div>
 
@@ -728,6 +729,27 @@ function RiskThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
   )
 }
 
+function SensorAggregationLegend() {
+  return (
+    <div style={{
+      display: 'flex', gap: 14, marginTop: 10,
+      padding: '8px 12px', borderRadius: 7,
+      background: 'var(--surface-2)', border: '1px solid var(--line-2)',
+      fontSize: 11.5, color: 'var(--ink-3)', flexWrap: 'wrap', alignItems: 'center',
+    }}>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 600, whiteSpace: 'nowrap' }}>
+        sensor bands
+      </span>
+      <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
+      <span style={{ color: 'var(--ink-3)' }}>온도: 파란 실선=평균, 주황 점선/점=최대, 음영=평균~최대</span>
+      <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
+      <span style={{ color: 'var(--ink-3)' }}>습도/기압: 파란 실선=평균, 음영=최소~최대</span>
+      <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
+      <span style={{ color: 'var(--ink-3)' }}>온도 임계값 32/38°C, 습도 임계값 70/85%</span>
+    </div>
+  )
+}
+
 function AIScoreThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
   return (
     <div style={{
@@ -753,7 +775,7 @@ function AIScoreThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
       {bucketed && (
         <>
           <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-          <span style={{ color: 'var(--ink-3)' }}>선=집계 평균, 점=집계 최대 ≥0.8</span>
+          <span style={{ color: 'var(--ink-3)' }}>선=집계 평균, 점=집계 최대 ≥0.8, tooltip=평균/최대</span>
         </>
       )}
     </div>
