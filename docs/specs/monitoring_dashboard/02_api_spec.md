@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  history endpoint의 `window<=1h` HISTORY#STATE 조회 기준과 Timeline `10m/custom` 사용 범위 반영.
   - 2026-06-01  Cloud Infra Status API(`/cloud-infra`, `/cloud-infra/history`) 추가. 데이터 계약은 `docs/planning/29` / ADR 0027, BE/FE 계약은 `06_cloud_infra_view.md`.
   - 2026-06-01  GRAPH#5M 응답 필드에 센서 min/max와 AI mean/max 분리 기준 추가.
   - 2026-05-29  안전 점수 그래프용 `risk_score_max` 응답 필드 추가.
@@ -87,8 +88,8 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/healthz` | 없음 | liveness | `{"status":"ok"}` | 구현 완료 |
 | GET | `/factories` | Cognito JWT | 공장 목록 + latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) | 구현 완료 |
 | GET | `/factories/{factory_id}` | Cognito JWT | 단일 공장 latest 전체 | DDB GetItem | 구현 완료 |
-| GET | `/factories/{factory_id}/history?window=1h` | Cognito JWT | 시계열 (risk/factory_state/infra_state 통합) | DDB Query (`sk BETWEEN HISTORY#STATE#`, max_items=500 cap) | 구현 완료 |
-| GET | `/factories/{factory_id}/history?window=6h\|12h\|24h` | Cognito JWT | 5분 avg/min/max 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 최대 288 items) | **구현 완료** (ADR 0025) |
+| GET | `/factories/{factory_id}/history?window=10m\|1h` | Cognito JWT | 원시 시계열 (risk/factory_state/infra_state 통합, Timeline 원인 표시 포함) | DDB Query (`sk BETWEEN HISTORY#STATE#`, `limit` cap) | 구현 완료 |
+| GET | `/factories/{factory_id}/history?window=>1h` (`6h\|12h\|24h` 등) | Cognito JWT | 5분 avg/min/max 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 24h 기준 최대 288 items) | **구현 완료** (ADR 0025) |
 | GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — LLM report-generator 후속 작업 이후 | skeleton |
 | GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — LLM report-generator 후속 작업 이후 | skeleton |
 
@@ -107,11 +108,12 @@ Authorization: Bearer <Cognito Access Token>
 - 응답 본문(`fast`/`slow`/`reasons[]`/`errors[]`)은 `docs/planning/29`의 `CLOUD#infra` 스키마 그대로.
 
 **Note**: history endpoint sk prefix 규칙 (ADR 0022 + ADR 0025):
-- `HISTORY#STATE#*`: window=1h 전용. max_items=500 cap으로 semaphore 포화 방지.
-- `GRAPH#5M#*`: window=6h/12h/24h 전용. 5분 집계, 최대 288 items/factory.
+- `HISTORY#STATE#*`: `window<=1h` 전용. 기본 `limit=500`, Timeline은 필요 시 `limit=2000`까지 요청 가능.
+- `GRAPH#5M#*`: `window>1h` 전용. 5분 집계, 24h 기준 최대 288 items/factory.
 - `HISTORY#RISK`, `HISTORY#FACTORY`, `HISTORY#INFRA` prefix는 사용하지 않는다.
+- Timeline의 원인 설명은 현재 `HISTORY#STATE.risk.top_causes`에서 추출한 `top_cause_names`만 사용한다. `GRAPH#5M` 집계 item에는 원인 설명 필드가 없다.
 
-**window=1h 응답 필드 (HISTORY#STATE)**:
+**window<=1h 응답 필드 (HISTORY#STATE)**:
 
 | 필드 | 설명 |
 | --- | --- |

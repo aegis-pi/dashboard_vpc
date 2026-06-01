@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Timeline을 `/history` 기반 client-side derive 구조로 현행화하고 `10m/1h/custom` 범위, `top_causes` 원인 표시 기준 반영.
   - 2026-06-01  Environment History 기압 표시 범위를 950~1050hPa로 조정하고 센서별 차트 헤더 식별 기준 반영.
   - 2026-06-01  Environment History 센서 차트 고정 표시 범위와 max/avg/min 영역 렌더링 기준 반영.
   - 2026-06-01  Environment History 6h/12h/24h 환경 센서·AI 탐지 점수 렌더링 기준 갱신.
@@ -752,46 +753,50 @@ critical -> 위험
 
 ### 화면 목적
 
-Risk, 환경, 인프라, pipeline 변화 이벤트를 시간순으로 보여준다.
+Risk 변화 이벤트를 시간순으로 보여준다. 원인 설명은 현재 데이터 계약상 `risk.top_causes`에서 추출한 `top_cause_names`만 사용한다.
 
 ### 화면 wireframe
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ factory-a > Timeline                                          │
+│ factory-a > Timeline                    [10M] [1H] [CUSTOM]   │
 ├──────────────────────────────────────────────────────────────┤
+│ range Latest 10M · HISTORY#STATE · top_causes                 │
+│                                                              │
 │ 12:00:30  Risk 주의 -> 위험                                   │
-│          원인: fall_score 0.67, temperature 38.2°C             │
+│          risk_score: 71 -> 48 (-23.0) · top_causes: fall_score │
 │                                                              │
-│ 11:58:20  Microphone unavailable                              │
-│                                                              │
-│ 11:56:00  worker2 CPU 80% 초과                                │
-│                                                              │
-│ 11:52:30  Pipeline normal                                     │
+│ 11:58:20  Risk Score 회복 +12.0                               │
+│          risk_score: 55 -> 67 (+12.0) · top_causes: humidity   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### API
+### 시간 범위
 
-```text
-GET /factories/{factory_id}/timeline?window=1h
-```
+| UI | API 조회 | 표시 기준 |
+| --- | --- | --- |
+| `10M` | `GET /factories/{factory_id}/history?window=10m&limit=2000` | 기본값. 최근 이상 징후 빠른 확인 |
+| `1H` | `GET /factories/{factory_id}/history?window=1h&limit=2000` | 최근 1시간 원시 스냅샷 |
+| `CUSTOM` | 선택 시작 시각 기준으로 `window` 산출 후 `/history` 조회, client-side로 시작~종료 필터 | 최신 기준 최대 24h. 1h 초과 시 `GRAPH#5M` 조회라 `top_cause_names`가 없음 |
 
-### Backend 조회
+### Backend 조회 / Frontend derive
 
 MVP 기본:
 
 ```text
-Query HISTORY#STATE
-Query HISTORY#STATE
-Query HISTORY#STATE
-merge by timestamp
-derive changes in API layer
+GET /factories/{factory_id}/history?window=10m|1h|<custom-derived-window>&limit=2000
+Frontend:
+  normalize history points
+  optional custom start/end filter
+  compare adjacent points
+  derive timeline events
 ```
 
 후속 최적화:
 
 ```text
+GET /factories/{factory_id}/timeline?window=...
+or
 HISTORY#EVENT#{timestamp}
 ```
 
@@ -802,41 +807,16 @@ MVP에서는 별도 event item 없이 history point를 비교해 timeline을 만
 | 이벤트 | 비교 필드 | 생성 조건 |
 | --- | --- | --- |
 | Risk level 변화 | `HISTORY#STATE.risk_level` | 이전 point와 값이 다름 |
-| Risk 급등 | `HISTORY#STATE.risk_score` | 이전 point 대비 +10 이상 |
-| 주요 원인 변화 | `HISTORY#STATE.top_cause_names` | 목록이 바뀜 |
-| 온도 상승 | `HISTORY#STATE.temperature_celsius_avg` | 이전 point 대비 +5 이상 또는 threshold 초과 |
-| AI score 상승 | `fire_score`, `fall_score`, `bend_score` | 이전 point 대비 +0.3 이상 |
-| Pipeline 변화 | `HISTORY#STATE.pipeline_status.status` | 이전 point와 값이 다름 |
-| Node Ready 변화 | `HISTORY#STATE.node_summary.ready/not_ready` | 이전 point와 값이 다름 |
-| Workload 이상 | `HISTORY#STATE.workload_summary.unhealthy` | 0에서 1 이상으로 증가 |
-| Device 이상 | `device_summary.*_available` | true에서 false로 변경 |
+| Risk Score 급락 | `HISTORY#STATE.risk_score` | 이전 point 대비 -10 이하. 낮은 score가 더 위험하므로 `danger` |
+| Risk Score 회복 | `HISTORY#STATE.risk_score` | 이전 point 대비 +10 이상. `info` |
 
-### 응답 예시
+### 원인 표시
 
-```json
-{
-  "factory_id": "factory-a",
-  "window": "1h",
-  "events": [
-    {
-      "timestamp": "2026-05-14T12:00:30Z",
-      "type": "risk_level_changed",
-      "severity": "danger",
-      "title": "Risk 주의 -> 위험",
-      "description": "fall_score 0.67, temperature 38.2°C",
-      "source": "HISTORY#STATE"
-    },
-    {
-      "timestamp": "2026-05-14T11:58:20Z",
-      "type": "device_unavailable",
-      "severity": "warning",
-      "title": "Microphone unavailable",
-      "description": "microphone_available=false",
-      "source": "HISTORY#STATE"
-    }
-  ]
-}
-```
+| 데이터 | 표시 |
+| --- | --- |
+| `top_cause_names` 존재 | `top_causes: <최대 3개>` |
+| `top_cause_names` 없음 | `top_causes 없음` |
+| `GRAPH#5M` 집계 구간 | 집계 item에 원인 필드가 없으므로 `top_causes 없음` |
 
 ### 렌더링 로직
 
@@ -892,11 +872,12 @@ Severity:
 
 ### Timeline
 
-- [ ] `GET /timeline` API 구현
-- [ ] RISK/FACTORY/INFRA history merge
-- [ ] 이전 point와 비교해 이벤트 생성
-- [ ] severity 계산
-- [ ] 이벤트 없을 때 empty state 표시
+- [x] `/history` 기반 client-side derive 구현
+- [x] 10m/1h quick range 구현
+- [x] Custom start/end range 구현
+- [x] 최신 기준 최대 24h guard 구현
+- [x] `top_cause_names` 기반 원인 표시
+- [x] 이벤트 없을 때 empty state 표시
 
 ## S3 조회 사용 기준
 
