@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Environment History 센서 차트 고정 표시 범위와 max/avg/min 영역 렌더링 기준 반영.
   - 2026-06-01  Environment History 6h/12h/24h 환경 센서·AI 탐지 점수 렌더링 기준 갱신.
   - 2026-05-29  Environment History 안전 점수 그래프를 avg/max/threshold/tooltip 기준으로 갱신.
 
@@ -433,21 +434,21 @@ sk BETWEEN GRAPH#5M#{from} AND GRAPH#5M#{to}
 | 최소 안전 점수 | `risk_score_min` | Y | 주황 점선 + 점 |
 | 변동 폭 | `risk_score_avg` ~ `risk_score_min` | Y | 연한 음영 |
 | 샘플 수 | `sample_count` | Y | tooltip |
-| 임계값 | 85, 50 | Y | 수평 점선 |
+| 임계값 | 85, 50 | Y | 수평 점선. 50점 위험 경계는 빨간 점선 |
 
 ### GRAPH#5M 환경 센서 필드 (6h/12h/24h)
 
 | 화면 요소 | 필드 경로 | 필수 | 렌더링 |
 | --- | --- | --- | --- |
-| 온도 평균 | `temperature_celsius_avg` | Y | 파란 실선 |
-| 온도 최대 | `temperature_celsius_max` | Y | 주황 점선 + 점 |
-| 온도 변동 폭 | `temperature_celsius_avg` ~ `temperature_celsius_max` | Y | 연한 음영 |
-| 온도 임계값 | 32°C, 38°C | Y | 수평 점선 |
-| 습도 평균 | `humidity_percent_avg` | Y | 파란 실선 |
-| 습도 범위 | `humidity_percent_min` ~ `humidity_percent_max` | Y | 연한 음영 |
-| 습도 임계값 | 70%, 85% | Y | 수평 점선 |
-| 기압 평균 | `pressure_hpa_avg` | Y | 파란 실선 |
-| 기압 변동 폭 | `pressure_hpa_min` ~ `pressure_hpa_max` | Y | 연한 음영 |
+| 온도 표시 범위 | 20~50°C | Y | y축 고정 |
+| 습도 표시 범위 | 30~80% | Y | y축 고정 |
+| 기압 표시 범위 | 800~1200hPa | Y | y축 고정 |
+| 최대값 | `*_max` | Y | 빨간 선 |
+| 평균값 | `*_avg` | Y | 파란 선 |
+| 최소값 | `*_min` | Y | 초록 선 |
+| 최대~평균 영역 | `*_max` ~ `*_avg` | Y | 빨간 계열 음영 |
+| 평균~최소 영역 | `*_avg` ~ `*_min` | Y | 초록 계열 음영 |
+| 범위 밖 최대/최소 | `*_max`, `*_min` | Y | 표시 범위 경계에 빨간 점 |
 
 ### GRAPH#5M AI 탐지 필드 (6h/12h/24h)
 
