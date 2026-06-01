@@ -40,7 +40,7 @@ function fmtTime(ts?: string): string {
 
 // ─── Risk score chart ─────────────────────────────────────────────────
 // window=1h  → LineChart (raw snapshots)
-// window=6h/12h/24h → ComposedChart: avg solid + max dashed + avg-to-max band
+// window=6h/12h/24h → ComposedChart: avg solid + min dashed/dots + avg-to-min band
 export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
   const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
@@ -50,13 +50,13 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
       .map((it) => ({
         ts: fmtTimeShort(it.bucket_start || it.timestamp),
         avg: it.risk_score_avg ?? null,
-        max: it.risk_score_max ?? null,
+        min: it.risk_score_min ?? null,
         sample_count: it.sample_count ?? null,
         bucket_minutes: it.bucket_minutes ?? null,
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }))
-      .filter((d) => d.avg != null || d.max != null)
+      .filter((d) => d.avg != null || d.min != null)
 
     if (data.length === 0) {
       return <EmptyChart message="선택한 시간 범위에 Risk 데이터가 없습니다" />
@@ -68,7 +68,7 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
           <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <Area
               type="monotone"
-              dataKey="max"
+              dataKey="avg"
               fill="var(--accent)"
               fillOpacity={0.12}
               stroke="none"
@@ -76,7 +76,7 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
             />
             <Area
               type="monotone"
-              dataKey="avg"
+              dataKey="min"
               fill="var(--surface)"
               fillOpacity={0.96}
               stroke="none"
@@ -102,14 +102,14 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
             />
             <Line
               type="monotone"
-              dataKey="max"
-              name="안전 점수 최대"
-              stroke="var(--accent)"
-              strokeWidth={1}
+              dataKey="min"
+              name="안전 점수 최소"
+              stroke="var(--warn)"
+              strokeWidth={1.4}
               strokeDasharray="4 2"
-              strokeOpacity={0.65}
-              dot={false}
-              activeDot={false}
+              strokeOpacity={0.9}
+              dot={{ r: 2.8, fill: 'var(--warn)', stroke: 'var(--surface)', strokeWidth: 1 }}
+              activeDot={{ r: 4.5, fill: 'var(--warn)', stroke: 'var(--surface)', strokeWidth: 1 }}
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -186,7 +186,7 @@ function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const avg = (payload.find((p: any) => p.dataKey === 'avg')?.value as number | undefined) ?? null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const max = (payload.find((p: any) => p.dataKey === 'max')?.value as number | undefined) ?? null
+  const min = (payload.find((p: any) => p.dataKey === 'min')?.value as number | undefined) ?? null
 
   const timeStr = (d?.bucket_start && d?.bucket_end)
     ? `${fmtTimeShort(d.bucket_start as string)} ~ ${fmtTimeShort(d.bucket_end as string)}`
@@ -205,10 +205,10 @@ function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[
           </span>
         </div>
       )}
-      {max != null && (
+      {min != null && (
         <div style={{ color: 'var(--ink-2)' }}>
-          최대&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
-            {max.toFixed(2)}
+          최소&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+            {min.toFixed(2)}
           </span>
         </div>
       )}
