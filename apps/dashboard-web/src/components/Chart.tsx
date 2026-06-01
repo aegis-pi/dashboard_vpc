@@ -90,7 +90,7 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
               <RiskBandTooltip {...props as any} />
             )} />
             <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
-            <ReferenceLine y={50} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
+            <ReferenceLine y={50} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
             <Line
               type="monotone"
               dataKey="avg"
@@ -141,7 +141,7 @@ export function RiskScoreChart({ items }: { items: HistoryItem[] }) {
             labelStyle={{ color: 'var(--ink-3)' }}
           />
           <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
-          <ReferenceLine y={50} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
+          <ReferenceLine y={50} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
           <Line
             type="monotone"
             dataKey="score"
@@ -175,6 +175,12 @@ const SENSOR_MAX_FIELD: Record<SensorAvgField, SensorMaxField> = {
   temperature_celsius_avg: 'temperature_celsius_max',
   humidity_percent_avg: 'humidity_percent_max',
   pressure_hpa_avg: 'pressure_hpa_max',
+}
+
+const SENSOR_DISPLAY_RANGE: Record<SensorAvgField, { min: number; max: number }> = {
+  temperature_celsius_avg: { min: 20, max: 50 },
+  humidity_percent_avg: { min: 30, max: 80 },
+  pressure_hpa_avg: { min: 800, max: 1200 },
 }
 
 function fmtTimeShort(ts?: string): string {
@@ -234,21 +240,20 @@ function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function SensorBandTooltip({ active, payload, unit, mode }: {
+function SensorBandTooltip({ active, payload, unit }: {
   active?: boolean
   payload?: any[]
   label?: string
   unit: string
-  mode: 'upper' | 'range'
 }) {
   if (!active || !payload?.length) return null
   const d = payload[0]?.payload as Record<string, unknown> | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const avg = (payload.find((p: any) => p.dataKey === 'avg')?.value as number | undefined) ?? null
+  const avg = (d?.avgRaw as number | null | undefined) ?? null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const min = (payload.find((p: any) => p.dataKey === 'min')?.value as number | undefined) ?? null
+  const min = (d?.minRaw as number | null | undefined) ?? null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const max = (payload.find((p: any) => p.dataKey === 'max')?.value as number | undefined) ?? null
+  const max = (d?.maxRaw as number | null | undefined) ?? null
 
   const timeStr = (d?.bucket_start && d?.bucket_end)
     ? `${fmtTimeShort(d.bucket_start as string)} ~ ${fmtTimeShort(d.bucket_end as string)}`
@@ -274,14 +279,14 @@ function SensorBandTooltip({ active, payload, unit, mode }: {
           </span>&nbsp;<span style={{ color: 'var(--ink-4)' }}>{unit}</span>
         </div>
       )}
-      {mode === 'range' && min != null && (
+      {min != null && (
         <div style={{ color: 'var(--ink-2)' }}>
           최소&nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
             {min.toFixed(2)}
           </span>&nbsp;<span style={{ color: 'var(--ink-4)' }}>{unit}</span>
         </div>
       )}
-      {mode === 'range' && min != null && max != null && (
+      {min != null && max != null && (
         <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 4 }}>
           변동폭&nbsp;<span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
             {(max - min).toFixed(2)} {unit}
@@ -314,25 +319,48 @@ export function SensorChart({ items, field, label, unit }: {
   const maxField = SENSOR_MAX_FIELD[field]
   const bucketMinutes = isBucket ? (items[0]?.bucket_minutes ?? 5) : null
   const is24h = bucketMinutes === 20
-  const mode = field === 'temperature_celsius_avg' ? 'upper' : 'range'
+  const displayRange = SENSOR_DISPLAY_RANGE[field]
+  const clamp = (value: number | null) => (
+    value == null ? null : Math.max(displayRange.min, Math.min(displayRange.max, value))
+  )
 
   if (isBucket) {
     const data = sampledItems
-      .map((it) => ({
-        ts: fmtTimeShort(it.bucket_start || it.timestamp),
-        avg: (it[field] as number | null | undefined) ?? null,
-        min: (it[minField] as number | null | undefined) ?? null,
-        max: (it[maxField] as number | null | undefined) ?? null,
-        sample_count: it.sample_count ?? null,
-        bucket_minutes: it.bucket_minutes ?? null,
-        bucket_start: it.bucket_start,
-        bucket_end: it.bucket_end,
-      }))
-      .filter((d) => d.avg != null || d.max != null)
+      .map((it) => {
+        const avgRaw = (it[field] as number | null | undefined) ?? null
+        const minRaw = (it[minField] as number | null | undefined) ?? null
+        const maxRaw = (it[maxField] as number | null | undefined) ?? null
+        const avg = clamp(avgRaw)
+        const min = clamp(minRaw)
+        const max = clamp(maxRaw)
+        return {
+          ts: fmtTimeShort(it.bucket_start || it.timestamp),
+          avg,
+          min,
+          max,
+          avgRaw,
+          minRaw,
+          maxRaw,
+          upperBand: avg != null && max != null ? [avg, max] : null,
+          lowerBand: min != null && avg != null ? [min, avg] : null,
+          maxOutlier: maxRaw != null && maxRaw > displayRange.max ? displayRange.max : null,
+          minOutlier: minRaw != null && minRaw < displayRange.min ? displayRange.min : null,
+          sample_count: it.sample_count ?? null,
+          bucket_minutes: it.bucket_minutes ?? null,
+          bucket_start: it.bucket_start,
+          bucket_end: it.bucket_end,
+        }
+      })
+      .filter((d) => d.avg != null || d.max != null || d.min != null)
 
     if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
 
-    const fillOpacity = is24h ? 0.08 : 0.15
+    const fillOpacity = is24h ? 0.12 : 0.2
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const boundaryDot = (props: any): React.ReactElement => {
+      if (props.value == null) return <g />
+      return <circle cx={props.cx as number} cy={props.cy as number} r={4.5} fill="var(--crit)" stroke="var(--surface)" strokeWidth={1.2} />
+    }
 
     return (
       <div className="chart-wrap">
@@ -340,55 +368,44 @@ export function SensorChart({ items, field, label, unit }: {
           <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <Area
               type="monotone"
-              dataKey="max"
-              fill="var(--accent)" fillOpacity={fillOpacity}
+              dataKey="upperBand"
+              name={`${label} 최대~평균`}
+              fill="var(--crit)" fillOpacity={fillOpacity}
               stroke="none" isAnimationActive={false}
             />
             <Area
               type="monotone"
-              dataKey={mode === 'upper' ? 'avg' : 'min'}
-              fill="var(--surface)" fillOpacity={0.95}
+              dataKey="lowerBand"
+              name={`${label} 평균~최소`}
+              fill="var(--safe)" fillOpacity={fillOpacity}
               stroke="none" isAnimationActive={false}
             />
             <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
             <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
-            <YAxis tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
+            <YAxis domain={[displayRange.min, displayRange.max]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
             <Tooltip content={(props) => (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              <SensorBandTooltip {...props as any} unit={unit} mode={mode} />
+              <SensorBandTooltip {...props as any} unit={unit} />
             )} />
-            {field === 'temperature_celsius_avg' && (
-              <>
-                <ReferenceLine y={38} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
-                <ReferenceLine y={32} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
-              </>
-            )}
-            {field === 'humidity_percent_avg' && (
-              <>
-                <ReferenceLine y={85} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
-                <ReferenceLine y={70} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
-              </>
-            )}
+            <Line
+              type="monotone" dataKey="max" name={`${label} 최대`}
+              stroke="var(--crit)" strokeWidth={1.5}
+              dot={false} activeDot={{ r: 4 }}
+              strokeOpacity={0.9}
+            />
             <Line
               type="monotone" dataKey="avg" name={`${label} 평균`}
               stroke="var(--accent)" strokeWidth={2}
               dot={false} activeDot={{ r: 4 }}
             />
-            {mode === 'range' && (
-              <Line
-                type="monotone" dataKey="min" name={`${label} 최소`}
-                stroke="var(--ink-4)" strokeWidth={1} strokeDasharray="4 2"
-                dot={false} activeDot={false} strokeOpacity={0.7}
-              />
-            )}
             <Line
-              type="monotone" dataKey="max" name={`${label} 최대`}
-              stroke="var(--warn)" strokeWidth={mode === 'upper' ? 1.4 : 1}
-              strokeDasharray="4 2"
-              dot={mode === 'upper' ? { r: 2.8, fill: 'var(--warn)', stroke: 'var(--surface)', strokeWidth: 1 } : false}
-              activeDot={mode === 'upper' ? { r: 4.5, fill: 'var(--warn)', stroke: 'var(--surface)', strokeWidth: 1 } : false}
-              strokeOpacity={0.85}
+              type="monotone" dataKey="min" name={`${label} 최소`}
+              stroke="var(--safe)" strokeWidth={1.5}
+              dot={false} activeDot={{ r: 4 }}
+              strokeOpacity={0.9}
             />
+            <Line type="monotone" dataKey="maxOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
+            <Line type="monotone" dataKey="minOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

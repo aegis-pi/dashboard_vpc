@@ -500,7 +500,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
     ? 'risk_score 평균선 + 최소선 + 변동 음영'
     : 'risk_score · 100이 가장 안전'
   const sensorMetricLabel = isBucketedWindow
-    ? `온도=평균+최대, 습도/기압=평균+범위 · ${bucketMinutes ?? 5}분 집계`
+    ? `최대/평균/최소 · ${bucketMinutes ?? 5}분 집계 · 고정 표시 범위`
     : '온도 · 습도 · 기압'
   const aiMetricLabel = isBucketedWindow
     ? `fire / fall / bend · 선=${bucketMinutes ?? 5}분 평균, 점=최대 ≥0.8`
@@ -722,7 +722,7 @@ function RiskThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
       {bucketed && (
         <>
           <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-          <span style={{ color: 'var(--ink-3)' }}>파란 실선=평균, 주황 점선/점=최소, 음영=평균~최소</span>
+          <span style={{ color: 'var(--ink-3)' }}>파란 실선=평균, 주황 점선/점=최소, 음영=평균~최소, 50점 경계=빨간 점선</span>
         </>
       )}
     </div>
@@ -741,11 +741,13 @@ function SensorAggregationLegend() {
         sensor bands
       </span>
       <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-      <span style={{ color: 'var(--ink-3)' }}>온도: 파란 실선=평균, 주황 점선/점=최대, 음영=평균~최대</span>
+      <span style={{ color: 'var(--ink-3)' }}>빨간 선=최대, 파란 선=평균, 초록 선=최소</span>
       <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-      <span style={{ color: 'var(--ink-3)' }}>습도/기압: 파란 실선=평균, 음영=최소~최대</span>
+      <span style={{ color: 'var(--ink-3)' }}>빨간 음영=최대~평균, 초록 음영=평균~최소</span>
       <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-      <span style={{ color: 'var(--ink-3)' }}>온도 임계값 32/38°C, 습도 임계값 70/85%</span>
+      <span style={{ color: 'var(--ink-3)' }}>표시 범위: 온도 20~50°C, 습도 30~80%, 기압 800~1200hPa</span>
+      <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
+      <span style={{ color: 'var(--ink-3)' }}>범위 밖 min/max는 경계의 빨간 점</span>
     </div>
   )
 }
