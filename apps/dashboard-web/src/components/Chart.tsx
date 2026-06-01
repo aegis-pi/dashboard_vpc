@@ -183,6 +183,12 @@ const SENSOR_DISPLAY_RANGE: Record<SensorAvgField, { min: number; max: number }>
   pressure_hpa_avg: { min: 800, max: 1200 },
 }
 
+const SENSOR_GRAPH_KEY: Record<SensorAvgField, 'temperature_celsius' | 'humidity_percent' | 'pressure_hpa'> = {
+  temperature_celsius_avg: 'temperature_celsius',
+  humidity_percent_avg: 'humidity_percent',
+  pressure_hpa_avg: 'pressure_hpa',
+}
+
 function fmtTimeShort(ts?: string): string {
   if (!ts) return ''
   try {
@@ -323,13 +329,23 @@ export function SensorChart({ items, field, label, unit }: {
   const clamp = (value: number | null) => (
     value == null ? null : Math.max(displayRange.min, Math.min(displayRange.max, value))
   )
+  const sensorKey = SENSOR_GRAPH_KEY[field]
+  const readBucketValue = (it: HistoryItem, flatField: string, metric: 'mean' | 'min' | 'max') => {
+    const flatValue = (it as Record<string, unknown>)[flatField]
+    if (typeof flatValue === 'number') return flatValue
+
+    const sensor = (it as Record<string, unknown>).sensor as Record<string, unknown> | undefined
+    const nested = sensor?.[sensorKey] as Record<string, unknown> | undefined
+    const nestedValue = nested?.[metric]
+    return typeof nestedValue === 'number' ? nestedValue : null
+  }
 
   if (isBucket) {
     const data = sampledItems
       .map((it) => {
-        const avgRaw = (it[field] as number | null | undefined) ?? null
-        const minRaw = (it[minField] as number | null | undefined) ?? null
-        const maxRaw = (it[maxField] as number | null | undefined) ?? null
+        const avgRaw = readBucketValue(it, field, 'mean')
+        const minRaw = readBucketValue(it, minField, 'min')
+        const maxRaw = readBucketValue(it, maxField, 'max')
         const avg = clamp(avgRaw)
         const min = clamp(minRaw)
         const max = clamp(maxRaw)
@@ -341,8 +357,6 @@ export function SensorChart({ items, field, label, unit }: {
           avgRaw,
           minRaw,
           maxRaw,
-          upperBand: avg != null && max != null ? [avg, max] : null,
-          lowerBand: min != null && avg != null ? [min, avg] : null,
           maxOutlier: maxRaw != null && maxRaw > displayRange.max ? displayRange.max : null,
           minOutlier: minRaw != null && minRaw < displayRange.min ? displayRange.min : null,
           sample_count: it.sample_count ?? null,
@@ -368,17 +382,17 @@ export function SensorChart({ items, field, label, unit }: {
           <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <Area
               type="monotone"
-              dataKey="upperBand"
+              dataKey={(row) => row.avg != null && row.max != null ? [row.avg, row.max] : null}
               name={`${label} 최대~평균`}
               fill="var(--crit)" fillOpacity={fillOpacity}
-              stroke="none" isAnimationActive={false}
+              stroke="none" isAnimationActive={false} connectNulls
             />
             <Area
               type="monotone"
-              dataKey="lowerBand"
+              dataKey={(row) => row.min != null && row.avg != null ? [row.min, row.avg] : null}
               name={`${label} 평균~최소`}
               fill="var(--safe)" fillOpacity={fillOpacity}
-              stroke="none" isAnimationActive={false}
+              stroke="none" isAnimationActive={false} connectNulls
             />
             <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
             <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
@@ -390,19 +404,24 @@ export function SensorChart({ items, field, label, unit }: {
             <Line
               type="monotone" dataKey="max" name={`${label} 최대`}
               stroke="var(--crit)" strokeWidth={1.5}
-              dot={false} activeDot={{ r: 4 }}
+              dot={{ r: 2.2, fill: 'var(--crit)', stroke: 'var(--surface)', strokeWidth: 0.8 }}
+              activeDot={{ r: 4 }}
               strokeOpacity={0.9}
+              connectNulls
             />
             <Line
               type="monotone" dataKey="avg" name={`${label} 평균`}
               stroke="var(--accent)" strokeWidth={2}
               dot={false} activeDot={{ r: 4 }}
+              connectNulls
             />
             <Line
               type="monotone" dataKey="min" name={`${label} 최소`}
               stroke="var(--safe)" strokeWidth={1.5}
-              dot={false} activeDot={{ r: 4 }}
+              dot={{ r: 2.2, fill: 'var(--safe)', stroke: 'var(--surface)', strokeWidth: 0.8 }}
+              activeDot={{ r: 4 }}
               strokeOpacity={0.9}
+              connectNulls
             />
             <Line type="monotone" dataKey="maxOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
             <Line type="monotone" dataKey="minOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
