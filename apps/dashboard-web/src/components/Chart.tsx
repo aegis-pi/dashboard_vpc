@@ -687,6 +687,8 @@ export function NodeResourceChart({ items, field, label }: {
   label: string
 }) {
   const sampledItems = subsampleData(items)
+
+  // HISTORY#STATE (1h): per-node raw series
   const nodeIds = new Set<string>()
   sampledItems.forEach((it) => {
     if (Array.isArray(it.nodes)) {
@@ -694,8 +696,16 @@ export function NodeResourceChart({ items, field, label }: {
     }
   })
 
-  // GRAPH#5M fallback: use pre-aggregated infra mean/last values
-  if (nodeIds.size === 0) {
+  // GRAPH#5M (6h/12h/24h): per-node mean series
+  const nodeIdsMean = new Set<string>()
+  sampledItems.forEach((it) => {
+    if (Array.isArray(it.nodes_mean)) {
+      it.nodes_mean.forEach((n) => nodeIdsMean.add(n.node_id))
+    }
+  })
+
+  // Fallback: whole-infra aggregate when no per-node data at all
+  if (nodeIds.size === 0 && nodeIdsMean.size === 0) {
     const aggField =
       field === 'cpu_usage_percent' ? 'cpu_usage_percent_mean' :
       field === 'memory_usage_percent' ? 'memory_usage_percent_mean' :
@@ -739,16 +749,26 @@ export function NodeResourceChart({ items, field, label }: {
     )
   }
 
-  // window=1h: per-node series
+  // Resolve active node set and data source
+  const activeIds = nodeIds.size > 0 ? nodeIds : nodeIdsMean
+  const useMean = nodeIds.size === 0
+
   const data = sampledItems.map((it) => {
     const row: Record<string, string | number | null> = {
       ts: fmtTime(extractTimestamp(it)),
     }
-    nodeIds.forEach((nid) => {
-      const node = Array.isArray(it.nodes)
-        ? it.nodes.find((n) => n.node_id === nid)
-        : undefined
-      row[nid] = node?.[field] ?? null
+    activeIds.forEach((nid) => {
+      if (useMean) {
+        const node = Array.isArray(it.nodes_mean)
+          ? it.nodes_mean.find((n) => n.node_id === nid)
+          : undefined
+        row[nid] = node?.[field] ?? null
+      } else {
+        const node = Array.isArray(it.nodes)
+          ? it.nodes.find((n) => n.node_id === nid)
+          : undefined
+        row[nid] = node?.[field] ?? null
+      }
     })
     return row
   })
@@ -766,7 +786,7 @@ export function NodeResourceChart({ items, field, label }: {
             formatter={(v: number) => [`${v?.toFixed(1)}%`, label]}
           />
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-          {[...nodeIds].map((nid, i) => (
+          {[...activeIds].map((nid, i) => (
             <Line
               key={nid}
               type="monotone"

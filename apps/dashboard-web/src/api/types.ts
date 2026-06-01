@@ -195,10 +195,12 @@ export interface HistoryItem {
   node_summary?: { ready?: number; total?: number; not_ready?: number }
   nodes?: NodeStatus[]
   workload_summary?: { unhealthy?: number }
-  // infra fields (GRAPH#5M aggregate — no per-node breakdown)
+  // infra fields (GRAPH#5M aggregate)
   cpu_usage_percent_mean?: number | null
   memory_usage_percent_mean?: number | null
   disk_usage_percent_last?: number | null
+  // GRAPH#5M per-node means (when aggregator writes infra.nodes)
+  nodes_mean?: { node_id: string; cpu_usage_percent?: number | null; memory_usage_percent?: number | null; disk_usage_percent?: number | null }[] | null
   // GRAPH#5M bucket window
   bucket_start?: string
   bucket_end?: string

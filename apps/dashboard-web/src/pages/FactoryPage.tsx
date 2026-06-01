@@ -899,12 +899,11 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
           <div className="card-hd">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <h2 className="h2">Pipeline</h2>
-              <span className="micro">latest age vs LATEST 수신 시각</span>
+              <span className="micro">S3 raw 파이프라인 지연</span>
             </div>
             <PipelineBadge status={ps.status} />
           </div>
-          <div className="card-bd" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'center' }}>
-            <PipelineAge label="latest_infra_state_age" seconds={ps.latest_infra_state_age_seconds} warn={40} crit={60} />
+          <div className="card-bd">
             <PipelineAge label="latest_s3_raw_age" seconds={ps.latest_s3_raw_age_seconds} warn={60} crit={120} />
           </div>
         </div>
@@ -976,7 +975,9 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
         <div className="card-hd">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <h2 className="h2">노드 사용률 추이</h2>
-            <span className="micro">HISTORY#STATE · node별 시리즈</span>
+            <span className="micro">
+              {win === '1h' ? 'HISTORY#STATE · node별 원시값' : `GRAPH#5M · node별 ${win === '6h' ? '5분' : win === '12h' ? '10분' : '20분'} 평균`}
+            </span>
           </div>
           <div className="seg">
             {HISTORY_WINDOWS.map((w) => (
