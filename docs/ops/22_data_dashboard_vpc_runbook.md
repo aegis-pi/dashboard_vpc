@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01 v2.4  Factory Timeline `10m/1h/custom` 범위와 `top_causes` 기반 원인 표시 반영. Dashboard backend image `sha-311adc6` ECS task definition revision 23 적용, rollout completed, `/healthz`와 `/readyz` 정상.
   - 2026-06-01 v2.3  Environment History 환경 센서 기압 표시 범위를 950~1050hPa로 조정. 센서별 차트 헤더에 온도/습도/기압 이름, 단위, 표시 범위, max/avg/min 구분을 표시하도록 반영.
   - 2026-06-01 v2.2  Dashboard backend image `sha-e9f7e5b` ECS task definition revision 21 적용. GRAPH#5M sensor min 필드 응답 운영 반영, `/healthz` 정상.
   - 2026-06-01 v2.1  Environment History 센서 차트 표시 범위 고정. 온도 20~50°C, 습도 30~80%, 기압 800~1200hPa. max/avg/min 선과 최대~평균 빨간 음영, 평균~최소 초록 음영, 범위 밖 min/max 경계 빨간 점 표시 반영. 안전 점수 50점 경계선은 빨간 점선으로 변경.
@@ -62,6 +63,14 @@
   - 영역: 최대~평균은 빨간 계열, 평균~최소는 초록 계열로 칠한다.
   - 범위를 벗어난 min/max는 실제 값을 축 밖으로 확장하지 않고 표시 범위 경계에 빨간 점으로 표시한다.
 - AI 탐지 점수: fire/fall/bend 평균선을 유지하고, 버킷 최대값이 0.8 이상인 지점만 점으로 강조한다. tooltip은 평균과 최대값을 함께 표시한다.
+
+**Factory Timeline 표현 기준 (2026-06-01)**:
+- 기본 범위는 `Latest 10m`다.
+- 빠른 선택은 `10m`, `1h`만 제공하고, 긴 구간은 `Custom` 시작/종료 시각으로 지정한다.
+- Custom 범위는 최신 기준 최대 24h까지만 허용한다.
+- 1h 이하 범위는 `HISTORY#STATE` 원시 스냅샷을 조회하고, Timeline 원인 설명은 `risk.top_causes`에서 추출한 `top_cause_names`만 표시한다.
+- 1h 초과 범위는 `GRAPH#5M` 집계 item을 조회할 수 있으나, 집계 item에는 원인 필드가 없어 `top_causes 없음`으로 표시한다.
+- 이벤트는 risk level 변경, risk score 10점 이상 급락, risk score 10점 이상 회복을 표시한다.
 
 **잔여 한계**:
 - `window=1h` max_items=500 cap 유지: 1h 이내에서도 500개 초과 구간 스파이크 유실 가능
