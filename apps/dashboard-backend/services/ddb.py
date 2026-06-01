@@ -251,6 +251,61 @@ async def get_factory_history(
 
 # ─── Private utilities ────────────────────────────────────────────────────────
 
+def _extract_infra_nodes_mean(infra: dict) -> list[dict] | None:
+    """Extract per-node mean values from GRAPH#5M infra.nodes list.
+
+    Each node entry: {node_id, cpu_usage_percent: {mean}, memory_usage_percent: {mean},
+                      disk_usage_percent: {last|mean}}
+    Returns a flat list consumable by the frontend NodeResourceChart.
+    """
+    raw_nodes = infra.get("nodes") or []
+    result = []
+    for n in raw_nodes:
+        node_id = n.get("node_id") or n.get("name")
+        if not node_id:
+            continue
+        cpu_field = n.get("cpu_usage_percent") or {}
+        mem_field = n.get("memory_usage_percent") or {}
+        disk_field = n.get("disk_usage_percent") or {}
+        result.append({
+            "node_id": node_id,
+            "cpu_usage_percent": cpu_field.get("mean") if isinstance(cpu_field, dict) else cpu_field,
+            "memory_usage_percent": mem_field.get("mean") if isinstance(mem_field, dict) else mem_field,
+            "disk_usage_percent": (
+                disk_field.get("last") or disk_field.get("mean")
+                if isinstance(disk_field, dict) else disk_field
+            ),
+        })
+    return result if result else None
+
+
+def _merge_nodes_mean(group: list[dict]) -> list[dict] | None:
+    """Merge per-node mean values across a group of extracted GRAPH#5M buckets.
+
+    For each node_id: simple average of cpu/memory means, last value for disk.
+    """
+    node_buckets: dict[str, list[dict]] = {}
+    for g in group:
+        for n in g.get("nodes_mean") or []:
+            nid = n.get("node_id")
+            if nid:
+                node_buckets.setdefault(nid, []).append(n)
+    if not node_buckets:
+        return None
+    result = []
+    for nid, entries in node_buckets.items():
+        cpu_vals = [e["cpu_usage_percent"] for e in entries if e.get("cpu_usage_percent") is not None]
+        mem_vals = [e["memory_usage_percent"] for e in entries if e.get("memory_usage_percent") is not None]
+        disk_vals = [e["disk_usage_percent"] for e in entries if e.get("disk_usage_percent") is not None]
+        result.append({
+            "node_id": nid,
+            "cpu_usage_percent": sum(cpu_vals) / len(cpu_vals) if cpu_vals else None,
+            "memory_usage_percent": sum(mem_vals) / len(mem_vals) if mem_vals else None,
+            "disk_usage_percent": disk_vals[-1] if disk_vals else None,
+        })
+    return result if result else None
+
+
 def _extract_graph_5m(item: dict) -> dict:
     """Extract aggregated metrics from a GRAPH#5M bucket item for frontend charts.
 
@@ -260,6 +315,7 @@ def _extract_graph_5m(item: dict) -> dict:
       risk.score → risk_score (mean) / risk_score_avg / risk_score_min / risk_score_max
       ai_detection.by_type.*.max → fire_score / fall_score / bend_score
       infra.*    → cpu_usage_percent_mean / memory_usage_percent_mean / disk_usage_percent_last
+      infra.nodes → nodes_mean (per-node mean, when available)
     """
     bucket_start = item.get("bucket_start", "")
     sk = item.get("sk", "")
@@ -318,10 +374,12 @@ def _extract_graph_5m(item: dict) -> dict:
         "fall_score_max": ai_fall.get("max"),
         "bend_score_max": ai_bend.get("max"),
         "ai_max_score": ai.get("max_score"),
-        # infra aggregates (no per-node breakdown in GRAPH#5M)
+        # infra aggregates
         "cpu_usage_percent_mean": cpu.get("mean"),
         "memory_usage_percent_mean": memory.get("mean"),
         "disk_usage_percent_last": disk.get("last"),
+        # per-node means (when aggregator writes infra.nodes)
+        "nodes_mean": _extract_infra_nodes_mean(infra),
         "quality": quality if quality else None,
     }
 
@@ -412,6 +470,7 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
         "cpu_usage_percent_mean": _wavg("cpu_usage_percent_mean"),
         "memory_usage_percent_mean": _wavg("memory_usage_percent_mean"),
         "disk_usage_percent_last": last.get("disk_usage_percent_last"),
+        "nodes_mean": _merge_nodes_mean(group),
         "quality": None,
     }
 

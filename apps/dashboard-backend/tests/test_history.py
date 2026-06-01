@@ -149,6 +149,31 @@ def test_graph_5m_items_have_infra_aggregate(client, ddb_mock):
         assert item.get("disk_usage_percent_last") is not None
 
 
+def test_graph_5m_items_have_nodes_mean(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=6h").json()
+    for item in items:
+        nodes = item.get("nodes_mean")
+        assert nodes is not None and len(nodes) == 3
+        node_ids = {n["node_id"] for n in nodes}
+        assert node_ids == {"factory-a-master", "factory-a-worker1", "factory-a-worker2"}
+        for n in nodes:
+            assert n.get("cpu_usage_percent") is not None
+            assert n.get("memory_usage_percent") is not None
+            assert n.get("disk_usage_percent") is not None
+
+
+def test_graph_12h_nodes_mean_merged(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=12h").json()
+    assert len(items) == 1
+    nodes = items[0].get("nodes_mean")
+    assert nodes is not None and len(nodes) == 3
+    # factory-a-master cpu: avg of 35.0 and 38.0 = 36.5
+    master = next(n for n in nodes if n["node_id"] == "factory-a-master")
+    assert abs(master["cpu_usage_percent"] - 36.5) < 0.01
+    # disk_usage_percent: last bucket's value (38 → 66.0)
+    assert master["disk_usage_percent"] == 66.0
+
+
 def test_graph_5m_items_have_ai_scores(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=6h").json()
     # fire_score = mean (line), fire_score_max = max (spike marker)

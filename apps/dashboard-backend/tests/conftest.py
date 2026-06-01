@@ -355,6 +355,11 @@ def ddb_mock():
                     "cpu_usage_percent": {"mean": 40.0, "max": 60.0, "min": 20.0, "count": 97},
                     "memory_usage_percent": {"mean": 55.0, "max": 65.0, "min": 45.0, "count": 97},
                     "disk_usage_percent": {"last": 70.0, "mean": 70.0, "max": 71.0, "min": 69.0, "count": 97},
+                    "nodes": [
+                        {"node_id": "factory-a-master",  "cpu_usage_percent": {"mean": 35.0}, "memory_usage_percent": {"mean": 50.0}, "disk_usage_percent": {"last": 65.0}},
+                        {"node_id": "factory-a-worker1", "cpu_usage_percent": {"mean": 42.0}, "memory_usage_percent": {"mean": 58.0}, "disk_usage_percent": {"last": 72.0}},
+                        {"node_id": "factory-a-worker2", "cpu_usage_percent": {"mean": 38.0}, "memory_usage_percent": {"mean": 57.0}, "disk_usage_percent": {"last": 68.0}},
+                    ],
                 },
                 "quality": {"source_count": 97, "expected_count": 100, "is_empty": False, "is_partial": False},
             },
@@ -393,6 +398,11 @@ def ddb_mock():
                     "cpu_usage_percent": {"mean": 45.0, "max": 55.0, "min": 35.0, "count": 97},
                     "memory_usage_percent": {"mean": 58.0, "max": 68.0, "min": 48.0, "count": 97},
                     "disk_usage_percent": {"last": 71.0, "mean": 71.0, "max": 72.0, "min": 70.0, "count": 97},
+                    "nodes": [
+                        {"node_id": "factory-a-master",  "cpu_usage_percent": {"mean": 38.0}, "memory_usage_percent": {"mean": 53.0}, "disk_usage_percent": {"last": 66.0}},
+                        {"node_id": "factory-a-worker1", "cpu_usage_percent": {"mean": 50.0}, "memory_usage_percent": {"mean": 62.0}, "disk_usage_percent": {"last": 73.0}},
+                        {"node_id": "factory-a-worker2", "cpu_usage_percent": {"mean": 41.0}, "memory_usage_percent": {"mean": 59.0}, "disk_usage_percent": {"last": 69.0}},
+                    ],
                 },
                 "quality": {"source_count": 97, "expected_count": 100, "is_empty": False, "is_partial": False},
             },
