@@ -239,20 +239,20 @@ function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TooltipPayloadItem = {
+  payload?: Record<string, unknown>
+}
+
 function SensorBandTooltip({ active, payload, unit }: {
   active?: boolean
-  payload?: any[]
+  payload?: TooltipPayloadItem[]
   label?: string
   unit: string
 }) {
   if (!active || !payload?.length) return null
   const d = payload[0]?.payload as Record<string, unknown> | undefined
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const avg = (d?.avgRaw as number | null | undefined) ?? null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const min = (d?.minRaw as number | null | undefined) ?? null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const max = (d?.maxRaw as number | null | undefined) ?? null
 
   const timeStr = (d?.bucket_start && d?.bucket_end)
