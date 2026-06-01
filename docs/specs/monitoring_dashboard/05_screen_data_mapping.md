@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Environment History 기압 표시 범위를 950~1050hPa로 조정하고 센서별 차트 헤더 식별 기준 반영.
   - 2026-06-01  Environment History 센서 차트 고정 표시 범위와 max/avg/min 영역 렌더링 기준 반영.
   - 2026-06-01  Environment History 6h/12h/24h 환경 센서·AI 탐지 점수 렌더링 기준 갱신.
   - 2026-05-29  Environment History 안전 점수 그래프를 avg/max/threshold/tooltip 기준으로 갱신.
@@ -442,7 +443,8 @@ sk BETWEEN GRAPH#5M#{from} AND GRAPH#5M#{to}
 | --- | --- | --- | --- |
 | 온도 표시 범위 | 20~50°C | Y | y축 고정 |
 | 습도 표시 범위 | 30~80% | Y | y축 고정 |
-| 기압 표시 범위 | 800~1200hPa | Y | y축 고정 |
+| 기압 표시 범위 | 950~1050hPa | Y | y축 고정 |
+| 센서 구분 헤더 | label/unit/range | Y | 온도/습도/기압 이름, 단위, 표시 범위, max/avg/min 구분 표시 |
 | 최대값 | `*_max` | Y | 빨간 선 |
 | 평균값 | `*_avg` | Y | 파란 선 |
 | 최소값 | `*_min` | Y | 초록 선 |
