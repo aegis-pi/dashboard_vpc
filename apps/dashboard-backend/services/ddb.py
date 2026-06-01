@@ -255,7 +255,8 @@ def _extract_graph_5m(item: dict) -> dict:
     """Extract aggregated metrics from a GRAPH#5M bucket item for frontend charts.
 
     Follows the field mapping defined in example_data.md / ADR 0025:
-      sensor.*   → temperature_celsius_avg / humidity_percent_avg / pressure_hpa_avg
+      sensor.*   → temperature_celsius_avg/min/max, humidity_percent_avg/min/max,
+                   pressure_hpa_avg/min/max
       risk.score → risk_score (mean) / risk_score_avg / risk_score_min / risk_score_max
       ai_detection.by_type.*.max → fire_score / fall_score / bend_score
       infra.*    → cpu_usage_percent_mean / memory_usage_percent_mean / disk_usage_percent_last
@@ -302,7 +303,10 @@ def _extract_graph_5m(item: dict) -> dict:
         "temperature_celsius_avg": temp.get("mean"),
         "humidity_percent_avg": humidity.get("mean"),
         "pressure_hpa_avg": pressure.get("mean"),
-        # sensor max (for avg-to-max band in charts)
+        # sensor min/max (for range/volatility bands in charts)
+        "temperature_celsius_min": temp.get("min"),
+        "humidity_percent_min": humidity.get("min"),
+        "pressure_hpa_min": pressure.get("min"),
         "temperature_celsius_max": temp.get("max"),
         "humidity_percent_max": humidity.get("max"),
         "pressure_hpa_max": pressure.get("max"),
@@ -345,6 +349,7 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
     """Merge a group of extracted GRAPH#5M items into one bucket.
 
     - avg fields: weighted average by sample_count
+    - min fields: min(min)
     - max fields: max(max)
     - risk_score_min: min(min)  — worst dip in the window
     - risk_score_max: max(max)
@@ -388,7 +393,10 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
         "temperature_celsius_avg": _wavg("temperature_celsius_avg"),
         "humidity_percent_avg": _wavg("humidity_percent_avg"),
         "pressure_hpa_avg": _wavg("pressure_hpa_avg"),
-        # sensor max
+        # sensor min/max
+        "temperature_celsius_min": _fmin("temperature_celsius_min"),
+        "humidity_percent_min": _fmin("humidity_percent_min"),
+        "pressure_hpa_min": _fmin("pressure_hpa_min"),
         "temperature_celsius_max": _fmax("temperature_celsius_max"),
         "humidity_percent_max": _fmax("humidity_percent_max"),
         "pressure_hpa_max": _fmax("pressure_hpa_max"),

@@ -162,12 +162,17 @@ def test_graph_5m_items_have_ai_scores(client, ddb_mock):
         assert "bend_score_max" in item
 
 
-def test_graph_5m_items_have_sensor_max_fields(client, ddb_mock):
+def test_graph_5m_items_have_sensor_min_and_max_fields(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=6h").json()
     for item in items:
+        assert "temperature_celsius_min" in item
+        assert "humidity_percent_min" in item
+        assert "pressure_hpa_min" in item
         assert "temperature_celsius_max" in item
         assert "humidity_percent_max" in item
         assert "pressure_hpa_max" in item
+    mins = [round(i["temperature_celsius_min"], 1) for i in items]
+    assert mins == [24.0, 26.0]
     maxes = [round(i["temperature_celsius_max"], 1) for i in items]
     assert maxes == [26.0, 28.0]
 
@@ -207,6 +212,8 @@ def test_graph_12h_max_and_sample_count_correct(client, ddb_mock):
     assert items[0]["risk_score_max"] == 80.0
     # temp max: max(26.0, 28.0) = 28.0
     assert items[0]["temperature_celsius_max"] == 28.0
+    # temp min: min(24.0, 26.0) = 24.0
+    assert items[0]["temperature_celsius_min"] == 24.0
     # sample_count = 97 + 97 = 194
     assert items[0]["sample_count"] == 194
 
