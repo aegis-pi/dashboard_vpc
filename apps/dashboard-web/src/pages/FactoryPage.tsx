@@ -480,6 +480,8 @@ function ThresholdSwatch({ color, label }: { color: string; label: string }) {
 const HISTORY_WINDOWS: HistoryWindow[] = ['1h', '6h', '12h', '24h']
 const TIMELINE_PRESETS: HistoryWindow[] = ['10m', '1h']
 const TIMELINE_MAX_RANGE_MS = 24 * 60 * 60 * 1000
+const TIMELINE_RAW_RANGE_MS = 60 * 60 * 1000
+const TIMELINE_PICKER_GRACE_MS = 60 * 1000
 const TIMELINE_RAW_LIMIT = 2000
 
 function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refreshSignalKey: number }) {
@@ -1213,7 +1215,7 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
       <div className="card-hd">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <h2 className="h2">Timeline</h2>
-          <span className="micro">{sourceLabel} · {events.length}건</span>
+          <span className="micro">{sourceLabel} · {visibleHistory.length} pts · {events.length}건</span>
         </div>
         <div className="seg">
           {TIMELINE_PRESETS.map((w) => (
@@ -1260,7 +1262,11 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
       ) : error ? (
         <EmptyNote text={error.message} />
       ) : events.length === 0 ? (
-        <EmptyNote text="이 기간에 derive 가능한 이벤트가 없습니다." />
+        <EmptyNote text={
+          visibleHistory.length === 0
+            ? '선택한 시간 범위에 데이터가 없습니다.'
+            : `데이터 ${visibleHistory.length}건은 조회됐지만 risk level 변화나 score 10점 이상 변화가 없습니다.`
+        } />
       ) : (
         <div style={{ padding: '6px 0' }}>
           {events.map((e, i) => (
@@ -1391,14 +1397,15 @@ function resolveTimelineRange(startValue: string, endValue: string, nowMs = Date
   if (endMs > nowMs + 60 * 1000) {
     return { valid: false, message: '미래 시간은 선택할 수 없습니다.', startMs, endMs, window: '1h' }
   }
-  if (nowMs - startMs > TIMELINE_MAX_RANGE_MS) {
+  const ageMs = nowMs - startMs
+  if (ageMs > TIMELINE_MAX_RANGE_MS + TIMELINE_PICKER_GRACE_MS) {
     return { valid: false, message: 'Timeline은 최신 기준 최대 24시간까지만 조회합니다.', startMs, endMs, window: '24h' }
   }
 
-  const minutesFromStart = Math.max(1, Math.ceil((nowMs - startMs) / 60_000))
-  const window = minutesFromStart <= 60
-    ? `${minutesFromStart}m`
-    : `${Math.ceil(minutesFromStart / 60)}h`
+  const minutesFromStart = Math.max(1, Math.ceil(ageMs / 60_000))
+  const window = ageMs <= TIMELINE_RAW_RANGE_MS + TIMELINE_PICKER_GRACE_MS
+    ? ageMs > TIMELINE_RAW_RANGE_MS ? '1h' : `${minutesFromStart}m`
+    : `${Math.min(24, Math.ceil(minutesFromStart / 60))}h`
   return { valid: true, message: '', startMs, endMs, window: window as HistoryWindow }
 }
 
