@@ -1173,14 +1173,22 @@ function RestartCount({ value }: { value?: number | null }) {
 // ─── Timeline tab ─────────────────────────────────────────────────────
 function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refreshSignalKey: number }) {
   const now = new Date()
+  const [nowTick, setNowTick] = useState(() => Date.now())
   const [mode, setMode] = useState<'preset' | 'custom'>('preset')
   const [win, setWin] = useState<HistoryWindow>('10m')
   const [customStart, setCustomStart] = useState(() => toDatetimeLocalValue(new Date(now.getTime() - 60 * 60 * 1000)))
   const [customEnd, setCustomEnd] = useState(() => toDatetimeLocalValue(now))
 
-  const customRange = resolveTimelineRange(customStart, customEnd)
+  const pickerMax = toDatetimeLocalValue(new Date(nowTick))
+  const pickerMin = toDatetimeLocalValue(new Date(nowTick - TIMELINE_MAX_RANGE_MS))
+  const customRange = resolveTimelineRange(customStart, customEnd, nowTick)
   const queryWindow = mode === 'custom' ? customRange.window : win
   const { data: history, loading, error, refresh } = useFactoryHistory(factoryId, queryWindow, true, TIMELINE_RAW_LIMIT)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     if (refreshSignalKey === 0) return
@@ -1238,9 +1246,9 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
         </div>
         {mode === 'custom' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <TimelineDateInput label="start" value={customStart} onChange={setCustomStart} />
+            <TimelineDateInput label="start" value={customStart} min={pickerMin} max={pickerMax} onChange={setCustomStart} />
             <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>~</span>
-            <TimelineDateInput label="end" value={customEnd} onChange={setCustomEnd} />
+            <TimelineDateInput label="end" value={customEnd} min={pickerMin} max={pickerMax} onChange={setCustomEnd} />
           </div>
         )}
       </div>
@@ -1264,9 +1272,11 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
   )
 }
 
-function TimelineDateInput({ label, value, onChange }: {
+function TimelineDateInput({ label, value, min, max, onChange }: {
   label: string
   value: string
+  min: string
+  max: string
   onChange: (value: string) => void
 }) {
   return (
@@ -1275,6 +1285,8 @@ function TimelineDateInput({ label, value, onChange }: {
       <input
         type="datetime-local"
         value={value}
+        min={min}
+        max={max}
         onChange={(ev) => onChange(ev.target.value)}
         style={{
           height: 30, border: '1px solid var(--line-2)', borderRadius: 6,
@@ -1361,7 +1373,7 @@ function toDatetimeLocalValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function resolveTimelineRange(startValue: string, endValue: string): {
+function resolveTimelineRange(startValue: string, endValue: string, nowMs = Date.now()): {
   valid: boolean
   message: string
   startMs: number
@@ -1370,7 +1382,6 @@ function resolveTimelineRange(startValue: string, endValue: string): {
 } {
   const startMs = new Date(startValue).getTime()
   const endMs = new Date(endValue).getTime()
-  const nowMs = Date.now()
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
     return { valid: false, message: '시작/종료 시간을 입력하세요.', startMs, endMs, window: '1h' }
   }
