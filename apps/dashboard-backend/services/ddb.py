@@ -6,8 +6,8 @@ Key contract (ADR 0022 / ADR 0025):
   HISTORY_RAW : pk=FACTORY#{factory_id}  sk=HISTORY#STATE#{iso_timestamp}  TTL 2h
   GRAPH_5M    : pk=FACTORY#{factory_id}  sk=GRAPH#5M#{bucket_start_iso}    TTL 48h
 
-window=1h   → HISTORY#STATE# query (raw snapshots, ~2,760 items/factory at 3s interval)
-window=6h/12h/24h → GRAPH#5M# query (5-minute aggregates, max 72/144/288 items/factory)
+window<=1h → HISTORY#STATE# query (raw snapshots, capped by API limit)
+window>1h  → GRAPH#5M# query (5-minute aggregates, max 288 items for 24h)
 Only these two prefixes are queried.  No other HISTORY# or GRAPH# prefix is allowed.
 """
 import asyncio
@@ -229,7 +229,7 @@ async def get_factory_history(
 ) -> list[dict]:
     """Return history items for chart consumption.
 
-    window=1h  → HISTORY#STATE# raw snapshots (72 pts max)
+    window<=1h → HISTORY#STATE# raw snapshots
     window=6h  → GRAPH#5M# 5-min buckets (up to 72 pts)
     window=12h → GRAPH#5M# re-aggregated to 10-min buckets (2×5min, up to 72 pts)
     window=24h → GRAPH#5M# re-aggregated to 20-min buckets (4×5min, up to 72 pts)
@@ -237,7 +237,7 @@ async def get_factory_history(
     table_name = get_settings().ddb_table_status
     since = _since_iso(window)
 
-    if window == "1h":
+    if _parse_window(window) <= timedelta(hours=1):
         since_sk = f"{HISTORY_STATE_PREFIX}{since}"
         raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items)
         return [_extract(i) for i in raw]
