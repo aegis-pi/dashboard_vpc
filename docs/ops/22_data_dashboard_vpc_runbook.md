@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01 v2.2  Dashboard backend image `sha-e9f7e5b` ECS task definition revision 21 적용. GRAPH#5M sensor min 필드 응답 운영 반영, `/healthz` 정상.
   - 2026-06-01 v2.1  Environment History 센서 차트 표시 범위 고정. 온도 20~50°C, 습도 30~80%, 기압 800~1200hPa. max/avg/min 선과 최대~평균 빨간 음영, 평균~최소 초록 음영, 범위 밖 min/max 경계 빨간 점 표시 반영. 안전 점수 50점 경계선은 빨간 점선으로 변경.
   - 2026-06-01 v2.0  Environment History 6h/12h/24h 환경 센서·AI 탐지 점수 표현 갱신. 센서 min/max 응답 노출, 온도=max 피크, 습도/기압=min~max 범위, AI 평균선+max spike tooltip 기준.
   - 2026-05-29 v1.9  Environment History 안전 점수 avg/max/음영 그래프 반영. Dashboard web CloudFront invalidation 완료, backend image `sha-edc57b0-envhistory-20260529` ECS revision 19 적용, `/healthz` 정상.
