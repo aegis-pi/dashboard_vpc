@@ -180,13 +180,19 @@ const SENSOR_MAX_FIELD: Record<SensorAvgField, SensorMaxField> = {
 const SENSOR_DISPLAY_RANGE: Record<SensorAvgField, { min: number; max: number }> = {
   temperature_celsius_avg: { min: 20, max: 50 },
   humidity_percent_avg: { min: 30, max: 80 },
-  pressure_hpa_avg: { min: 800, max: 1200 },
+  pressure_hpa_avg: { min: 950, max: 1050 },
 }
 
 const SENSOR_GRAPH_KEY: Record<SensorAvgField, 'temperature_celsius' | 'humidity_percent' | 'pressure_hpa'> = {
   temperature_celsius_avg: 'temperature_celsius',
   humidity_percent_avg: 'humidity_percent',
   pressure_hpa_avg: 'pressure_hpa',
+}
+
+const SENSOR_CHART_ACCENT: Record<SensorAvgField, string> = {
+  temperature_celsius_avg: 'oklch(0.65 0.18 30)',
+  humidity_percent_avg: 'oklch(0.65 0.15 230)',
+  pressure_hpa_avg: 'oklch(0.55 0.10 280)',
 }
 
 function fmtTimeShort(ts?: string): string {
@@ -370,6 +376,8 @@ export function SensorChart({ items, field, label, unit }: {
     if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
 
     const fillOpacity = is24h ? 0.12 : 0.2
+    const rangeLabel = `${displayRange.min}~${displayRange.max}${unit}`
+    const chartAccent = SENSOR_CHART_ACCENT[field]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const boundaryDot = (props: any): React.ReactElement => {
       if (props.value == null) return <g />
@@ -377,56 +385,91 @@ export function SensorChart({ items, field, label, unit }: {
     }
 
     return (
-      <div className="chart-wrap">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <Area
-              type="monotone"
-              dataKey={(row) => row.avg != null && row.max != null ? [row.avg, row.max] : null}
-              name={`${label} 최대~평균`}
-              fill="var(--crit)" fillOpacity={fillOpacity}
-              stroke="none" isAnimationActive={false} connectNulls
-            />
-            <Area
-              type="monotone"
-              dataKey={(row) => row.min != null && row.avg != null ? [row.min, row.avg] : null}
-              name={`${label} 평균~최소`}
-              fill="var(--safe)" fillOpacity={fillOpacity}
-              stroke="none" isAnimationActive={false} connectNulls
-            />
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
-            <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
-            <YAxis domain={[displayRange.min, displayRange.max]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
-            <Tooltip content={(props) => (
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              <SensorBandTooltip {...props as any} unit={unit} />
-            )} />
-            <Line
-              type="monotone" dataKey="max" name={`${label} 최대`}
-              stroke="var(--crit)" strokeWidth={1.5}
-              dot={{ r: 2.2, fill: 'var(--crit)', stroke: 'var(--surface)', strokeWidth: 0.8 }}
-              activeDot={{ r: 4 }}
-              strokeOpacity={0.9}
-              connectNulls
-            />
-            <Line
-              type="monotone" dataKey="avg" name={`${label} 평균`}
-              stroke="var(--accent)" strokeWidth={2}
-              dot={false} activeDot={{ r: 4 }}
-              connectNulls
-            />
-            <Line
-              type="monotone" dataKey="min" name={`${label} 최소`}
-              stroke="var(--safe)" strokeWidth={1.5}
-              dot={{ r: 2.2, fill: 'var(--safe)', stroke: 'var(--surface)', strokeWidth: 0.8 }}
-              activeDot={{ r: 4 }}
-              strokeOpacity={0.9}
-              connectNulls
-            />
-            <Line type="monotone" dataKey="maxOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
-            <Line type="monotone" dataKey="minOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
+      <div style={{
+        border: '1px solid var(--line-2)',
+        borderRadius: 8,
+        padding: '10px 12px 12px',
+        background: 'var(--surface)',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 8,
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span style={{ width: 4, height: 20, borderRadius: 2, background: chartAccent, flexShrink: 0 }} />
+            <strong style={{ fontSize: 13, color: 'var(--ink)' }}>{label}</strong>
+            <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>{unit}</span>
+            <span style={{ color: 'var(--ink-4)', fontSize: 11.5, whiteSpace: 'nowrap' }}>
+              표시 범위 {rangeLabel}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-3)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              <span style={{ width: 16, height: 2, background: 'var(--crit)' }} />최대
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              <span style={{ width: 16, height: 2, background: 'var(--accent)' }} />평균
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              <span style={{ width: 16, height: 2, background: 'var(--safe)' }} />최소
+            </span>
+          </div>
+        </div>
+        <div className="chart-wrap">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <Area
+                type="monotone"
+                dataKey={(row) => row.avg != null && row.max != null ? [row.avg, row.max] : null}
+                name={`${label} 최대~평균`}
+                fill="var(--crit)" fillOpacity={fillOpacity}
+                stroke="none" isAnimationActive={false} connectNulls
+              />
+              <Area
+                type="monotone"
+                dataKey={(row) => row.min != null && row.avg != null ? [row.min, row.avg] : null}
+                name={`${label} 평균~최소`}
+                fill="var(--safe)" fillOpacity={fillOpacity}
+                stroke="none" isAnimationActive={false} connectNulls
+              />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
+              <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+              <YAxis domain={[displayRange.min, displayRange.max]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
+              <Tooltip content={(props) => (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                <SensorBandTooltip {...props as any} unit={unit} />
+              )} />
+              <Line
+                type="monotone" dataKey="max" name={`${label} 최대`}
+                stroke="var(--crit)" strokeWidth={1.5}
+                dot={{ r: 2.2, fill: 'var(--crit)', stroke: 'var(--surface)', strokeWidth: 0.8 }}
+                activeDot={{ r: 4 }}
+                strokeOpacity={0.9}
+                connectNulls
+              />
+              <Line
+                type="monotone" dataKey="avg" name={`${label} 평균`}
+                stroke="var(--accent)" strokeWidth={2}
+                dot={false} activeDot={{ r: 4 }}
+                connectNulls
+              />
+              <Line
+                type="monotone" dataKey="min" name={`${label} 최소`}
+                stroke="var(--safe)" strokeWidth={1.5}
+                dot={{ r: 2.2, fill: 'var(--safe)', stroke: 'var(--surface)', strokeWidth: 0.8 }}
+                activeDot={{ r: 4 }}
+                strokeOpacity={0.9}
+                connectNulls
+              />
+              <Line type="monotone" dataKey="maxOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
+              <Line type="monotone" dataKey="minOutlier" stroke="none" strokeWidth={0} dot={boundaryDot} activeDot={false} legendType="none" isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     )
   }

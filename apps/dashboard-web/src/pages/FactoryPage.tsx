@@ -745,7 +745,7 @@ function SensorAggregationLegend() {
       <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
       <span style={{ color: 'var(--ink-3)' }}>빨간 음영=최대~평균, 초록 음영=평균~최소</span>
       <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
-      <span style={{ color: 'var(--ink-3)' }}>표시 범위: 온도 20~50°C, 습도 30~80%, 기압 800~1200hPa</span>
+      <span style={{ color: 'var(--ink-3)' }}>표시 범위: 온도 20~50°C, 습도 30~80%, 기압 950~1050hPa</span>
       <span style={{ width: 1, height: 12, background: 'var(--line)' }} />
       <span style={{ color: 'var(--ink-3)' }}>범위 밖 min/max는 경계의 빨간 점</span>
     </div>
