@@ -12,6 +12,7 @@
 | `03_data_model.md` | InfluxDB, Prometheus, Risk 상태 데이터 모델 |
 | `04_risk_twin_web_screen_design.md` | Data / Dashboard VPC 기반 Risk Twin Web 화면 설계 |
 | `05_screen_data_mapping.md` | Risk Twin Web 화면별 DynamoDB/S3 데이터 필드 매핑 |
+| `06_cloud_infra_view.md` | Cloud infra 상태 화면 Backend/Frontend 구현 계약 (데이터 계약은 `../../planning/29`) |
 
 ## 기준
 

@@ -1,8 +1,9 @@
 # Monitoring Dashboard 화면 계획
 
 상태: source of truth
-기준일: 2026-05-29
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Cloud infra 상태 화면(sidebar 별도 항목 `클라우드 인프라`, route `/cloud-infra`) 추가. 상세 BE/FE 계약은 `06_cloud_infra_view.md`.
   - 2026-05-29  Risk Twin Web Environment History 그래프 기준 추가.
 
 ## 목적
@@ -80,6 +81,28 @@ Node Exporter Full 1860
 목적:
 - master, worker1, worker2의 CPU/Memory/Disk/Network 상태를 본다.
 - 장애 테스트 중 worker2 상태 변화를 확인한다.
+
+## Risk Twin Web - Cloud Infra (별도 화면)
+
+공장 상태와 분리된 Cloud infra 상태 화면이다. sidebar에 `System > 클라우드 인프라`(route `/cloud-infra`)로 추가한다.
+
+section 카드:
+
+```text
+요약 헤더      overall_status + 마지막 갱신 시각 + stale 배지
+Backend runtime ECS / ALB / CloudFront
+Datastores     Redis / RDS
+Data pipeline  Lambda / DynamoDB / SQS DLQ / Scheduler
+Factory freshness  공장별 freshness / risk
+EKS management  cluster / node / pod / ArgoCD
+Storage freshness  S3 object age
+추이           HISTORY#FAST / HISTORY#SLOW reduced 숫자 필드
+```
+
+표시 원칙:
+- status 색: normal=safe / warning=warn / critical=crit / **unknown=회색**(측정 실패·오래됨, 빨강 아님)
+- `reasons[]`는 그대로 칩으로 표시(이유 재계산 안 함). `unknown`이면 `errors[]` 노출
+- collector write 전에는 "수집 대기" empty-state. 상세 계약은 `06_cloud_infra_view.md`
 
 ## 화면 운영 원칙
 

@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Cloud Infra Status API(`/cloud-infra`, `/cloud-infra/history`) 추가. 데이터 계약은 `docs/planning/29` / ADR 0027, BE/FE 계약은 `06_cloud_infra_view.md`.
   - 2026-06-01  GRAPH#5M 응답 필드에 센서 min/max와 AI mean/max 분리 기준 추가.
   - 2026-05-29  안전 점수 그래프용 `risk_score_max` 응답 필드 추가.
   - 2026-05-29  ADR 0025 구현 완료 반영. history endpoint window 분기 현행화. GRAPH#5M 응답 필드 명세 추가.
@@ -90,6 +91,20 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/factories/{factory_id}/history?window=6h\|12h\|24h` | Cognito JWT | 5분 avg/min/max 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 최대 288 items) | **구현 완료** (ADR 0025) |
 | GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — LLM report-generator 후속 작업 이후 | skeleton |
 | GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — LLM report-generator 후속 작업 이후 | skeleton |
+
+### Cloud Infra Status API (계획 — BE/FE 계약은 `06_cloud_infra_view.md`)
+
+공장 상태와 분리된 Cloud infra 상태 화면용. Backend는 **기존 테이블의 `pk=CLOUD#infra` item만 read**하며 EKS/ArgoCD/CloudWatch에 직접 붙지 않는다(collector가 write, ADR 0027).
+
+| Method | Path | 인증 | 동작 | 백엔드 조회 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/cloud-infra` | Cognito JWT | 현재 Cloud infra 상태(LATEST) + staleness 플래그 | DDB GetItem (`pk=CLOUD#infra, sk=LATEST`) | 계획 |
+| GET | `/cloud-infra/history?window=1h\|6h\|24h&track=fast\|slow` | Cognito JWT | 추이(reduced) | DDB Query (`pk=CLOUD#infra, begins_with(sk, HISTORY#FAST#\|HISTORY#SLOW#)`) | 계획 |
+
+**Note (Cloud Infra)**:
+- item이 없으면(collector write 전) HTTP 200 + `{ "available": false }` 반환(404 아님). FE는 "수집 대기" empty-state.
+- staleness(`fast_stale`/`slow_stale`/`*_age_seconds`)는 backend가 read 시점에 `*_updated_at`으로 계산해 덧붙인다. 기준: fast > 180초, slow > 900초.
+- 응답 본문(`fast`/`slow`/`reasons[]`/`errors[]`)은 `docs/planning/29`의 `CLOUD#infra` 스키마 그대로.
 
 **Note**: history endpoint sk prefix 규칙 (ADR 0022 + ADR 0025):
 - `HISTORY#STATE#*`: window=1h 전용. max_items=500 cap으로 semaphore 포화 방지.

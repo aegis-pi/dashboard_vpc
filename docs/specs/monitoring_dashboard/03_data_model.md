@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Cloud infra read model(`pk=CLOUD#infra`) 추가. 데이터 계약은 `docs/planning/29` / ADR 0027, 화면 매핑은 `06_cloud_infra_view.md`.
   - 2026-06-01  GRAPH#5M 환경 센서 mean/min/max와 AI mean/max 화면 모델 반영.
   - 2026-05-29  GRAPH#5M 집계 모델과 안전 점수 avg/min/max 필드 반영.
   - 2026-05-15  ADR 0007/0009 반영. 후속 모델 섹션을 data_storage_pipeline.md 인용 + 화면-모델 매핑으로 갱신.
@@ -128,7 +129,9 @@ AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipel
 | DynamoDB `AEGIS-DynamoDB-FactoryStatus` LATEST | 공장 카드, 현재 상태 화면 |
 | DynamoDB `AEGIS-DynamoDB-FactoryStatus` HISTORY | 최근 1~2시간 그래프 |
 | DynamoDB `AEGIS-DynamoDB-FactoryStatus` GRAPH#5M | 6h/12h/24h 집계 그래프 |
+| DynamoDB `AEGIS-DynamoDB-FactoryStatus` `CLOUD#infra` | Cloud infra 상태 화면 (LATEST / HISTORY#FAST / HISTORY#SLOW) |
 | S3 `aegis-bucket-data/processed/...` | 장기 이력 / 감사 / drill-down |
+| S3 `aegis-bucket-data/processed/cloud_infra/...` | Cloud infra full snapshot (drill-down) |
 | S3 `aegis-bucket-data/raw/...` | 원본 보존 (Dashboard 직접 조회 제한) |
 
 ### 화면 ↔ 모델 매핑
@@ -147,6 +150,8 @@ AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipel
 | 환경 그래프 (6h/12h/24h) | `GRAPH#5M#*`의 `sensor.*.mean/min/max` | `sk begins_with GRAPH#5M#` |
 | AI 탐지 그래프 (6h/12h/24h) | `GRAPH#5M#*`의 `ai_detection.by_type.*.mean/max` | `sk begins_with GRAPH#5M#` |
 | 노드 그래프 (1h) | `HISTORY#STATE#*`의 `infra_state` | `sk begins_with HISTORY#STATE#` |
+| Cloud infra 상태 카드 | `CLOUD#infra` LATEST의 `fast`/`slow` + backend 계산 staleness | `pk=CLOUD#infra, sk=LATEST` |
+| Cloud infra 추이 | `CLOUD#infra` HISTORY reduced | `pk=CLOUD#infra, sk begins_with HISTORY#FAST#\|HISTORY#SLOW#` |
 | 장기 이력 / 감사 | S3 processed | `processed/{factory_id}/{dataset}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.json` |
 
 ### Risk Twin 상태 매핑 (LATEST.risk.level)
@@ -160,4 +165,5 @@ AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipel
 ### 명시적 비채택
 
 - Dashboard는 InfluxDB / Prometheus / EKS API / ArgoCD API에 직접 붙지 않는다 (`docs/planning/07_dashboard_vpc_extension_plan.md` 결정 유지)
+- Cloud infra 화면도 이 경계를 지킨다. Backend는 EKS/ArgoCD를 직접 조회하지 않고 collector가 써둔 `CLOUD#infra` read model만 읽는다 (EKS/ArgoCD 접근은 collector 책임, ADR 0027)
 - Replay/Near-miss/AI Worker 모델은 M7+ 후속

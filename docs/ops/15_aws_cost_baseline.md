@@ -4,6 +4,7 @@
 기준일: 2026-05-29
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-06-01 v3.1  ADR 0027 / `docs/planning/29` Cloud Infra Metrics Pipeline 계획 반영. CloudInfraFastCollector(1m)/SlowCollector(5m) Lambda + EventBridge schedule 2개를 `not deployed — 계획`으로 리소스 상태 표에 추가. 배포 시 사용량 ~$0.3~1.0/월(주로 CloudWatch GetMetricData API), 고정 시간 비용 없음(무료 티어 내). CloudWatch Container Insights는 기본 OFF 유지(상시 켜면 ~$65~75/월).
   - 2026-05-29 v3.0  Dashboard backend image `sha-3c20ec3` ECS revision 15 적용 완료. desired/running 1, rollout completed, `/healthz`와 `/readyz` 정상. 신규 AWS 리소스/고정 비용 변화 없음.
   - 2026-05-29 v2.9  ADR 0025 Multi-resolution history storage 반영. GraphAggregator5m/EventBridge와 GRAPH#5M 추가 write/storage는 무료 티어 또는 소액 usage-based이며 고정 시간 비용 변화 없음.
   - 2026-05-27 v2.8  Aegis-frontend 기준 운영 Dashboard UI 포팅 진행 상태와 top_causes 표시 보정 반영. web `e055583` 배포, backend image `sha-3b8439f` ECS 적용. 신규 AWS 리소스/고정 비용 변화 없음.
@@ -96,12 +97,15 @@
 | Data/Dashboard VPC | S3 web bucket deploy (PUT/DELETE/GET ops) | usage-based | Step 9 workflow 실행 완료. PUT ~$0.005/1000 req, GET ~$0.0004/1000 req |
 | Data/Dashboard VPC | CloudFront invalidation `//*` | usage-based | 월 1,000 paths 무료, 초과 $0.005/path |
 | Data/Dashboard VPC | Lambda report-generator | 0 | not deployed — LLM 일간 보고서 팀원/후속 작업 |
+| Data/Dashboard VPC | Lambda CloudInfraFastCollector + EventBridge schedule 1m | 0 | not deployed — 계획(ADR 0027, `docs/planning/29`). 팀원 구현 |
+| Data/Dashboard VPC | Lambda CloudInfraSlowCollector + EventBridge schedule 5m | 0 | not deployed — 계획(ADR 0027). EKS/ArgoCD read 경로는 합류 지점, 워크스트림 A 영향 |
 
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
 - 1번 Data/Dashboard VPC Backend는 active. ECS desired/running 1, ECR image `sha-3c20ec3`, `/healthz` 200 확인
 - Lambda report-generator / Bedrock 일간 보고서는 팀원/후속 작업으로 현재 Step 8 범위가 아님
+- Cloud Infra Metrics collector(ADR 0027 / `docs/planning/29`)는 팀원 구현 예정 계획. 배포 시 사용량 ~$0.3~1.0/월, 고정 비용 없음. CloudWatch Container Insights는 기본 OFF 유지
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산
 
@@ -227,7 +231,13 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | Route53 DNS queries | `$0.40 / 1M` (첫 1B) | < 100k/월 | `~$0.04` |
 | X-Ray traces | `$5.00 / 1M traces` (100k 무료) | < 100k/월 | `~$0.00` |
 | NAT Gateway data processing (ECR pull + Bedrock + Secrets) | `$0.056 / GB` | < 5GB/월 | `~$0.28` |
+| Lambda CloudInfraFastCollector invocations | `$0.20 / 1M` (1M 무료) | 계획(ADR 0027). 1분 주기 = ~43,200/월 | `~$0.00` (무료 티어 내) |
+| Lambda CloudInfraSlowCollector invocations | `$0.20 / 1M` (1M 무료) | 계획(ADR 0027). 5분 주기 = ~8,640/월 | `~$0.00` (무료 티어 내) |
+| CloudWatch GetMetricData API (collector) | `$0.01 / 1k metrics` | 계획. metric 수 × 51,840 호출/월 | `~$0.10~0.40` |
+| EventBridge Scheduler invocations (collector) | `$1.00 / 1M` (14M 무료) | 계획. ~51,840/월 | `~$0.00` (무료 티어 내) |
 | **사용량 합계 (factory-a 단독)** | | | **`~$1.90 / month`** |
+
+> 계획(ADR 0027) Cloud Infra collector는 위 합계에 미포함. 배포 시 사용량 ~$0.3~1.0/월 추가(주로 CloudWatch GetMetricData API). Lambda/Scheduler는 무료 티어 내, 고정 시간 비용 없음.
 
 > 외부 도메인 등록비: Gabia `.com` 연 ~₩15,000 / `.kr` 연 ~₩20,000 (별도, AWS 청구서에 포함되지 않음).
 
