@@ -1,8 +1,9 @@
 # Monitoring Dashboard Data Model
 
 상태: source of truth
-기준일: 2026-05-15
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  GRAPH#5M 환경 센서 mean/min/max와 AI mean/max 화면 모델 반영.
   - 2026-05-29  GRAPH#5M 집계 모델과 안전 점수 avg/min/max 필드 반영.
   - 2026-05-15  ADR 0007/0009 반영. 후속 모델 섹션을 data_storage_pipeline.md 인용 + 화면-모델 매핑으로 갱신.
   - 2026-04-28  초안
@@ -143,7 +144,8 @@ AWS Hub/Risk Twin 단계의 데이터 모델은 **`docs/specs/data_storage_pipel
 | Risk 그래프 (1h) | `HISTORY#STATE#*`의 `risk` | `sk begins_with HISTORY#STATE#` |
 | Risk 그래프 (6h/12h/24h) | `GRAPH#5M#*`의 `risk.score.mean/min/max` | `sk begins_with GRAPH#5M#` |
 | 환경 그래프 (1h) | `HISTORY#STATE#*`의 `factory_state` | `sk begins_with HISTORY#STATE#` |
-| 환경 그래프 (6h/12h/24h) | `GRAPH#5M#*`의 `sensor.*.mean/max` | `sk begins_with GRAPH#5M#` |
+| 환경 그래프 (6h/12h/24h) | `GRAPH#5M#*`의 `sensor.*.mean/min/max` | `sk begins_with GRAPH#5M#` |
+| AI 탐지 그래프 (6h/12h/24h) | `GRAPH#5M#*`의 `ai_detection.by_type.*.mean/max` | `sk begins_with GRAPH#5M#` |
 | 노드 그래프 (1h) | `HISTORY#STATE#*`의 `infra_state` | `sk begins_with HISTORY#STATE#` |
 | 장기 이력 / 감사 | S3 processed | `processed/{factory_id}/{dataset}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.json` |
 

@@ -1,8 +1,10 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-05-29
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01 v2.0  Environment History 6h/12h/24h 환경 센서·AI 탐지 점수 표현 갱신. 센서 min/max 응답 노출, 온도=max 피크, 습도/기압=min~max 범위, AI 평균선+max spike tooltip 기준.
+  - 2026-05-29 v1.9  Environment History 안전 점수 avg/max/음영 그래프 반영. Dashboard web CloudFront invalidation 완료, backend image `sha-edc57b0-envhistory-20260529` ECS revision 19 적용, `/healthz` 정상.
   - 2026-05-29 v1.8  Dashboard backend image `sha-3c20ec3` ECS revision 15 적용 완료. `/healthz`, `/readyz`, post-apply plan 정상.
   - 2026-05-29 v1.7  ADR 0025 구현 완료 반영. 알려진 이슈 섹션 현행화. window=6h/12h/24h → GRAPH#5M 분기 완료.
   - 2026-05-28 v1.6  알려진 이슈 섹션 추가. DynamoDB HISTORY cascade 504 사고 및 임시방편(max_items=500 cap), 근본 해결 방향(ADR 0025) 기록.
@@ -46,6 +48,14 @@
 **GRAPH#5M 데이터 현황 (2026-05-29)**:
 - factory-b, factory-c: Lambda GraphAggregator5m 배포 후 GRAPH#5M 데이터 적재 중
 - factory-a: Edge Agent 비활성으로 데이터 없을 수 있음. 없으면 해당 window에서 빈 차트 표시
+
+**Environment History 표현 기준 (2026-06-01)**:
+- 안전 점수: 평균은 파란 실선, 최소값은 주황 점선/점, 평균~최소 차이는 연한 음영으로 표시한다.
+- 환경 센서:
+  - 온도: 평균선 + 최대값 점선/점 + 평균~최대 음영. 임계값은 32°C/38°C 수평 점선.
+  - 습도: 평균선 + 최소~최대 음영. 임계값은 70%/85% 수평 점선.
+  - 기압: 평균선 + 최소~최대 음영. 절대 임계값보다 변동폭 확인을 우선한다.
+- AI 탐지 점수: fire/fall/bend 평균선을 유지하고, 버킷 최대값이 0.8 이상인 지점만 점으로 강조한다. tooltip은 평균과 최대값을 함께 표시한다.
 
 **잔여 한계**:
 - `window=1h` max_items=500 cap 유지: 1h 이내에서도 500개 초과 구간 스파이크 유실 가능

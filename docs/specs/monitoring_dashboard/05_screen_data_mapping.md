@@ -1,8 +1,9 @@
 # Risk Twin Web Screen Data Mapping
 
 상태: source of truth
-기준일: 2026-05-29
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  Environment History 6h/12h/24h 환경 센서·AI 탐지 점수 렌더링 기준 갱신.
   - 2026-05-29  Environment History 안전 점수 그래프를 avg/max/threshold/tooltip 기준으로 갱신.
 
 ## 목적
@@ -428,11 +429,36 @@ sk BETWEEN GRAPH#5M#{from} AND GRAPH#5M#{to}
 | --- | --- | --- | --- |
 | x축 | `bucket_start` 또는 `timestamp` | Y | chart timestamp |
 | 시간 구간 | `bucket_start` + `bucket_end` | Y | tooltip |
-| 평균 안전 점수 | `risk_score_avg` | Y | 굵은 실선 |
-| 최대 안전 점수 | `risk_score_max` | Y | 얇은 점선 |
-| 변동 폭 | `risk_score_avg` ~ `risk_score_max` | Y | 연한 음영 |
+| 평균 안전 점수 | `risk_score_avg` | Y | 파란 실선 |
+| 최소 안전 점수 | `risk_score_min` | Y | 주황 점선 + 점 |
+| 변동 폭 | `risk_score_avg` ~ `risk_score_min` | Y | 연한 음영 |
 | 샘플 수 | `sample_count` | Y | tooltip |
 | 임계값 | 85, 50 | Y | 수평 점선 |
+
+### GRAPH#5M 환경 센서 필드 (6h/12h/24h)
+
+| 화면 요소 | 필드 경로 | 필수 | 렌더링 |
+| --- | --- | --- | --- |
+| 온도 평균 | `temperature_celsius_avg` | Y | 파란 실선 |
+| 온도 최대 | `temperature_celsius_max` | Y | 주황 점선 + 점 |
+| 온도 변동 폭 | `temperature_celsius_avg` ~ `temperature_celsius_max` | Y | 연한 음영 |
+| 온도 임계값 | 32°C, 38°C | Y | 수평 점선 |
+| 습도 평균 | `humidity_percent_avg` | Y | 파란 실선 |
+| 습도 범위 | `humidity_percent_min` ~ `humidity_percent_max` | Y | 연한 음영 |
+| 습도 임계값 | 70%, 85% | Y | 수평 점선 |
+| 기압 평균 | `pressure_hpa_avg` | Y | 파란 실선 |
+| 기압 변동 폭 | `pressure_hpa_min` ~ `pressure_hpa_max` | Y | 연한 음영 |
+
+### GRAPH#5M AI 탐지 필드 (6h/12h/24h)
+
+| 화면 요소 | 필드 경로 | 필수 | 렌더링 |
+| --- | --- | --- | --- |
+| fire 평균 | `fire_score` | Y | 실선 |
+| fall 평균 | `fall_score` | Y | 실선 |
+| bend 평균 | `bend_score` | Y | 실선 |
+| fire/fall/bend 최대 | `*_score_max` | Y | 0.8 이상인 bucket만 점으로 강조 |
+| AI 임계값 | 0.8, 0.3 | Y | 수평 점선 |
+| 평균/최대 상세 | `*_score`, `*_score_max` | Y | tooltip |
 
 ### HISTORY#STATE 필드
 

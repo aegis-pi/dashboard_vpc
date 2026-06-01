@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: source of truth
-기준일: 2026-05-29
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  GRAPH#5M 응답 필드에 센서 min/max와 AI mean/max 분리 기준 추가.
   - 2026-05-29  안전 점수 그래프용 `risk_score_max` 응답 필드 추가.
   - 2026-05-29  ADR 0025 구현 완료 반영. history endpoint window 분기 현행화. GRAPH#5M 응답 필드 명세 추가.
   - 2026-05-28  history endpoint에 ADR 0025 window 분기 계획 추가. 현행 max_items=500 cap 임시방편 명시.
@@ -116,12 +117,16 @@ Authorization: Bearer <Cognito Access Token>
 | `timestamp` | `bucket_start` | 버킷 시작 시각 |
 | `is_bucket` | 고정 `true` | GRAPH#5M 아이템 구분 플래그 |
 | `risk_score` / `risk_score_avg` | `risk.score.mean` | 5분 평균 |
-| `risk_score_min` | `risk.score.min` | 5분 최솟값. 경고/위험 마커 기준 |
-| `risk_score_max` | `risk.score.max` | 5분 최댓값. 평균~최대 음영/최대 점선 기준 |
+| `risk_score_min` | `risk.score.min` | 5분 최솟값. 안전 점수 위험 피크와 평균~최소 음영 기준 |
+| `risk_score_max` | `risk.score.max` | 5분 최댓값. tooltip/검증용 |
 | `temperature_celsius_avg` | `sensor.temperature_celsius.mean` | 5분 평균 |
-| `humidity_percent_avg` | `sensor.humidity_percent.mean` | |
-| `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | |
-| `fire_score` / `fall_score` / `bend_score` | `ai_detection.by_type.*.max` | 버킷 내 최대값 (스파이크 보존) |
+| `temperature_celsius_min` / `temperature_celsius_max` | `sensor.temperature_celsius.min/max` | 온도 최대 피크·음영·tooltip |
+| `humidity_percent_avg` | `sensor.humidity_percent.mean` | 5분 평균 |
+| `humidity_percent_min` / `humidity_percent_max` | `sensor.humidity_percent.min/max` | 습도 최소~최대 범위 |
+| `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | 5분 평균 |
+| `pressure_hpa_min` / `pressure_hpa_max` | `sensor.pressure_hpa.min/max` | 기압 최소~최대 변동폭 |
+| `fire_score` / `fall_score` / `bend_score` | `ai_detection.by_type.*.mean` | AI 탐지 평균선 |
+| `fire_score_max` / `fall_score_max` / `bend_score_max` | `ai_detection.by_type.*.max` | 버킷 내 최대값. 0.8 이상 spike marker/tooltip |
 | `cpu_usage_percent_mean` | `infra.cpu_usage_percent.mean` | 노드 평균 집계 |
 | `memory_usage_percent_mean` | `infra.memory_usage_percent.mean` | |
 | `disk_usage_percent_last` | `infra.disk_usage_percent.last` | |

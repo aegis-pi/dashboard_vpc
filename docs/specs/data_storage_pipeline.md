@@ -1,8 +1,9 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-05-29
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  GRAPH#5M Dashboard 응답에 센서 min 필드와 AI mean/max 분리 기준 추가. Environment History 6h/12h/24h 렌더링 기준 현행화.
   - 2026-05-29  안전 점수 그래프용 `risk_score_max` 추출/응답 기준 추가.
   - 2026-05-29  ADR 0025 구현 완료 반영. GRAPH#5M 계층 추가, 데이터 흐름 갱신, Dashboard 조회 기준 window 분기 현행화.
   - 2026-05-28  HISTORY 섹션에 TTL 48h 스케일 이슈와 Multi-resolution 전환 계획(ADR 0025) 추가.
@@ -492,14 +493,23 @@ Dashboard 추출 필드 (backend `_extract_graph_5m` 기준):
 | Dashboard 필드 | 원천 경로 | 용도 |
 | --- | --- | --- |
 | `risk_score` / `risk_score_avg` | `risk.score.mean` | Risk Score 평균 라인 |
-| `risk_score_min` | `risk.score.min` | 경고/위험 마커 기준 (`≤84`: 주의, `≤49`: 위험) |
-| `risk_score_max` | `risk.score.max` | Risk Score 최대 라인과 평균~최대 음영 |
-| `temperature_celsius_avg` | `sensor.temperature_celsius.mean` | 온도 그래프 |
-| `humidity_percent_avg` | `sensor.humidity_percent.mean` | 습도 그래프 |
-| `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | 기압 그래프 |
-| `fire_score` | `ai_detection.by_type.fire_score.max` | AI 탐지 그래프 (버킷 최대값) |
-| `fall_score` | `ai_detection.by_type.fall_score.max` | AI 탐지 그래프 |
-| `bend_score` | `ai_detection.by_type.bend_score.max` | AI 탐지 그래프 |
+| `risk_score_min` | `risk.score.min` | 안전 점수 최저 피크와 평균~최소 음영 |
+| `risk_score_max` | `risk.score.max` | tooltip/검증용 최대값 |
+| `temperature_celsius_avg` | `sensor.temperature_celsius.mean` | 온도 평균선 |
+| `temperature_celsius_min` | `sensor.temperature_celsius.min` | 온도 tooltip/재집계 |
+| `temperature_celsius_max` | `sensor.temperature_celsius.max` | 온도 최대 피크와 평균~최대 음영 |
+| `humidity_percent_avg` | `sensor.humidity_percent.mean` | 습도 평균선 |
+| `humidity_percent_min` | `sensor.humidity_percent.min` | 습도 최소~최대 범위 음영 |
+| `humidity_percent_max` | `sensor.humidity_percent.max` | 습도 최소~최대 범위 음영 |
+| `pressure_hpa_avg` | `sensor.pressure_hpa.mean` | 기압 평균선 |
+| `pressure_hpa_min` | `sensor.pressure_hpa.min` | 기압 최소~최대 변동폭 음영 |
+| `pressure_hpa_max` | `sensor.pressure_hpa.max` | 기압 최소~최대 변동폭 음영 |
+| `fire_score` | `ai_detection.by_type.fire_score.mean` | AI 탐지 평균선 |
+| `fall_score` | `ai_detection.by_type.fall_score.mean` | AI 탐지 평균선 |
+| `bend_score` | `ai_detection.by_type.bend_score.mean` | AI 탐지 평균선 |
+| `fire_score_max` | `ai_detection.by_type.fire_score.max` | AI 탐지 spike marker/tooltip |
+| `fall_score_max` | `ai_detection.by_type.fall_score.max` | AI 탐지 spike marker/tooltip |
+| `bend_score_max` | `ai_detection.by_type.bend_score.max` | AI 탐지 spike marker/tooltip |
 | `cpu_usage_percent_mean` | `infra.cpu_usage_percent.mean` | 인프라 그래프 |
 | `memory_usage_percent_mean` | `infra.memory_usage_percent.mean` | 인프라 그래프 |
 | `disk_usage_percent_last` | `infra.disk_usage_percent.last` | 인프라 그래프 |
@@ -583,7 +593,9 @@ GET /factories/{factory_id}/history?window=1h
 GET /factories/{factory_id}/history?window=6h|12h|24h
   -> DynamoDB GRAPH#5M query (ScanIndexForward=True, 최대 288 items)
   -> 응답: timestamp, is_bucket=true, risk_score_avg, risk_score_min, risk_score_max,
-           temperature_celsius_avg, fire_score, cpu_usage_percent_mean, ...
+           temperature_celsius_avg/min/max, humidity_percent_avg/min/max,
+           pressure_hpa_avg/min/max, fire_score, fire_score_max,
+           cpu_usage_percent_mean, ...
   -> 해당 공장에 GRAPH#5M 데이터 없으면 []
 ```
 
