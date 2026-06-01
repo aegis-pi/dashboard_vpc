@@ -1,8 +1,9 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-05-29
+기준일: 2026-06-01
 수정 이력:
+  - 2026-06-01  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `bcf7ce5`, web `fad303c`, docs `e2e99f4`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-e2e99f4` push 확인, Terraform apply로 ECS task definition revision 22 생성 후 service를 revision 22로 업데이트, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, dashboard web HTTP 200, post-apply plan No changes. 추가로 Cloud infra collector 계획 ADR 0027/계약 문서 작성 완료(구현은 팀원/후속).
   - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `5d39c82`, web `e0d3fce`, frontend-reference `c555519`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-c555519` push 확인, Terraform apply로 ECS task definition revision 17 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, dashboard web HTTP 200, post-apply plan No changes.
   - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `aea41eb`, web `e0041cd`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-e0041cd` push 확인, Terraform apply로 ECS task definition revision 16 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, dashboard web HTTP 200, post-apply plan No changes.
   - 2026-05-29  역할별 커밋 후 push 및 backend 업데이트 완료. commits: backend `a8fb0de`, web `fde09fe`, docs `3c20ec3`. GitHub Actions dashboard-backend/dashboard-web 성공. ECR image `sha-3c20ec3` push 확인, Terraform apply로 ECS task definition revision 15 반영, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, post-apply plan No changes.
