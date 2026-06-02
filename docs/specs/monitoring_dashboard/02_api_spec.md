@@ -178,11 +178,11 @@ Risk Score 방향: **100 = 최안전, 0 = 최위험**
 
 ```text
 일반 상태 변화: 10~35초
-장애 판정: 40~60초
+infra_state 지연 표시: warning > 60초, critical > 120초
 DDB Streams -> WebSocket push: 1~2초
 ```
 
-(`docs/planning/07_dashboard_vpc_extension_plan.md` 기준 그대로)
+(`docs/planning/07_dashboard_vpc_extension_plan.md`의 준실시간 목표를 유지하되, dashboard stale 표시는 ADR 0028 기준)
 
 ### 명시적으로 다루지 않는 것
 

@@ -210,7 +210,7 @@ pipeline warning/critical should be highlighted
 | factory item 없음 | `등록된 공장이 없습니다` |
 | `risk` 없음 | Risk `미계산` |
 | `pipeline_status.status` 없음 | Pipeline `확인 필요` |
-| `updated_at` 오래됨 | `데이터 지연` badge |
+| `last_infra_state_at` 오래됨 | `데이터 지연` badge |
 
 ## 2. Factory Detail - Overview
 
@@ -940,5 +940,5 @@ stale 기본 기준:
 | 항목 | 기준 |
 | --- | --- |
 | `factory_state` | 최신값 age > 10초 |
-| `infra_state` | 최신값 age > 40초 warning, > 60초 critical |
+| `infra_state` | 최신값 age > 60초 warning, > 120초 critical |
 | `pipeline_status` | 저장된 `pipeline_status.status` 우선 |

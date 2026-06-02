@@ -1,7 +1,7 @@
 # Change Records
 
 상태: source of truth
-기준일: 2026-05-29
+기준일: 2026-06-02
 
 ## 목적
 
@@ -47,6 +47,7 @@
 | 0025 | Multi-resolution history storage: history_raw TTL 2h + GRAPH#5M 5분 집계 | accepted | 2026-05-29 | Phase 1 data pipeline, DynamoDB HISTORY/GRAPH#5M, Lambda Aggregator(팀원 배포), Dashboard Backend/Frontend |
 | 0026 | DynamoDB key model: FACTORY pk + LATEST/HISTORY#STATE/GRAPH#5M sk 운영 확인 | accepted | 2026-05-29 | AEGIS-DynamoDB-FactoryStatus, Dashboard Backend, data pipeline |
 | 0027 | Cloud infra metrics collector: Container Insights 상시 수집 대신 Fast(1m)/Slow(5m) collector read model | proposed | 2026-06-01 | M4/M6 데이터 플레인, Dashboard BE/FE, CLOUD#infra, EKS/ArgoCD 합류 지점, 비용 |
+| 0028 | Dashboard staleness threshold: infra 지연 표시와 pipeline_status 60/120초 통일 | accepted | 2026-06-02 | M4/M6, apps/data-processor, apps/dashboard-web, stale 표시 |
 
 ## 파일 형식
 

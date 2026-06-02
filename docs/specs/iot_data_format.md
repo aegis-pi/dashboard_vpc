@@ -334,11 +334,11 @@ Cloud-side Lambda data processor는 아래 입력을 바탕으로 `pipeline_stat
 
 | 상태 | 조건 |
 | --- | --- |
-| `normal` | latest `infra_state` age <= 20초 |
-| `warning` | latest `infra_state` age > 40초 |
-| `critical` | latest `infra_state` age > 60초 |
+| `normal` | latest `infra_state` age <= 60초 |
+| `warning` | latest `infra_state` age > 60초 |
+| `critical` | latest `infra_state` age > 120초 |
 
-이 기준은 20초 주기에서 1분 내 파이프라인 이상을 감지하기 위한 MVP 기준이다. M7 통합 검증에서 실제 지연과 누락률을 보고 보정한다.
+이 기준은 20초 주기의 `infra_state`가 3회 이상 누락될 때 dashboard에 지연을 표시하고, 그 2배인 120초 초과부터 critical로 올리기 위한 MVP 기준이다. M7 통합 검증에서 실제 지연과 누락률을 보고 보정한다.
 
 ## Payload Size and Traffic
 
