@@ -152,6 +152,17 @@ def patch_jwks(mock_jwks, monkeypatch):
     monkeypatch.setattr(auth_module, "_fetch_jwks", _stub)
 
 
+# ─── Cache reset ─────────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def reset_factories_cache():
+    """Clear in-process factory list cache before every test."""
+    import routers.factories as _f
+    _f._factories_cache = None
+    _f._factories_cache_at = 0.0
+    yield
+
+
 # ─── TestClient fixtures ──────────────────────────────────────────────────────
 
 @pytest.fixture

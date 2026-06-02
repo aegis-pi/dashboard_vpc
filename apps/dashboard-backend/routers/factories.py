@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from deps.auth import verify_cognito_token
@@ -5,19 +7,16 @@ from services import ddb
 
 router = APIRouter(prefix="/factories", tags=["factories"])
 
+_factories_cache: list | None = None
+_factories_cache_at: float = 0.0
+_FACTORIES_TTL = 10.0
+
 
 def _ddb_gateway_timeout() -> HTTPException:
     return HTTPException(status_code=504, detail="DynamoDB request timed out")
 
 
-@router.get("")
-async def list_factories(
-    _claims: dict = Depends(verify_cognito_token),
-):
-    try:
-        items = await ddb.list_factories()
-    except ddb.DynamoDBUnavailableError as exc:
-        raise _ddb_gateway_timeout() from exc
+def _normalize_factories(items: list) -> list:
     result = []
     for i in items:
         factory_id = i.get("factory_id") or i.get("pk", "").removeprefix("FACTORY#")
@@ -50,6 +49,23 @@ async def list_factories(
                 "workload_total": workload_total,
             }
         )
+    return result
+
+
+@router.get("")
+async def list_factories(
+    _claims: dict = Depends(verify_cognito_token),
+):
+    global _factories_cache, _factories_cache_at
+    if _factories_cache is not None and time.monotonic() - _factories_cache_at < _FACTORIES_TTL:
+        return _factories_cache
+    try:
+        items = await ddb.list_factories()
+    except ddb.DynamoDBUnavailableError as exc:
+        raise _ddb_gateway_timeout() from exc
+    result = _normalize_factories(items)
+    _factories_cache = result
+    _factories_cache_at = time.monotonic()
     return result
 
 
