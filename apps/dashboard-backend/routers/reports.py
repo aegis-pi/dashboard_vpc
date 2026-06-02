@@ -11,11 +11,11 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 async def list_reports(
     _claims: dict = Depends(verify_cognito_token),
 ):
-    """List daily report metadata from aegis-daily-report DDB table.
-
-    Skeleton — DDB query will be implemented after future lambda-report-generator work.
-    """
-    return []
+    """List daily Markdown reports from S3 reports/ prefix."""
+    try:
+        return await s3.list_daily_reports()
+    except s3.S3UnavailableError as exc:
+        raise HTTPException(status_code=504, detail="S3 request timed out") from exc
 
 
 @router.get("/{report_date}/{factory_id}", response_class=PlainTextResponse)
