@@ -34,10 +34,9 @@ describe('StaleBadge', () => {
     vi.useRealTimers()
   })
 
-  function renderBadge(secondsAgo: number) {
-    vi.setSystemTime(new Date('2026-06-02T12:00:00.000Z'))
-    const ts = new Date(Date.now() - secondsAgo * 1000).toISOString()
-    return renderToStaticMarkup(createElement(StaleBadge, { lastInfraStateAt: ts }))
+  function renderBadge(secondsAgo: number, snapshotReceivedAt = '2026-06-02T12:00:00.000Z') {
+    const ts = new Date(new Date(snapshotReceivedAt).getTime() - secondsAgo * 1000).toISOString()
+    return renderToStaticMarkup(createElement(StaleBadge, { lastInfraStateAt: ts, snapshotReceivedAt }))
   }
 
   it('does not render at 60 seconds or below', () => {
@@ -58,5 +57,13 @@ describe('StaleBadge', () => {
     const html = renderBadge(121)
     expect(html).toContain('crit')
     expect(html).toContain('infra 121s')
+  })
+
+  it('keeps the displayed age fixed until a new snapshot is received', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-02T12:05:00.000Z'))
+    const html = renderBadge(61, '2026-06-02T12:00:00.000Z')
+    expect(html).toContain('infra 61s')
+    expect(html).not.toContain('infra 361s')
   })
 })

@@ -42,17 +42,20 @@ export function PipelineBadge({ status }: { status?: PipelineStatus | string }) 
 }
 
 // ─── Staleness badge ──────────────────────────────────────────────────
-function ageSeconds(ts?: string): number {
+function ageSeconds(ts?: string, nowTs?: string): number {
   if (!ts) return 9999
-  return Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
+  const now = nowTs ? new Date(nowTs).getTime() : Date.now()
+  return Math.floor((now - new Date(ts).getTime()) / 1000)
 }
 
 export function StaleBadge({
   lastInfraStateAt,
+  snapshotReceivedAt,
 }: {
   lastInfraStateAt?: string
+  snapshotReceivedAt?: string
 }) {
-  const iAge = ageSeconds(lastInfraStateAt)
+  const iAge = ageSeconds(lastInfraStateAt, snapshotReceivedAt)
   if (iAge <= 60) return null
   const isCrit = iAge > 120
   return (

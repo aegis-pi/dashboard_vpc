@@ -16,7 +16,7 @@ ID:        0028
 - Dashboard `데이터 지연` 배지는 `last_infra_state_at` 기준 age > 60초일 때만 표시한다.
 - 배지 tone은 age > 60초 warning, age > 120초 critical이다.
 - `pipeline_status`도 `normal <= 60초`, `warning > 60초`, `critical > 120초`로 통일한다.
-- Dashboard Web stale 배지는 자체 ticker를 갖지 않고, refresh/WS로 받은 현재 화면 snapshot 기준으로만 다시 계산한다.
+- Dashboard Web stale 배지는 자체 ticker를 갖지 않고, refresh/WS로 받은 현재 화면 snapshot의 수신 시각 기준으로만 다시 계산한다.
 
 ## 변경 이유
 

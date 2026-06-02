@@ -57,18 +57,28 @@ export async function fetchHealthz(): Promise<{ status: string }> {
 
 export async function fetchFactories(): Promise<FleetResponse> {
   const raw = await apiFetch<unknown>('/factories')
+  const snapshotReceivedAt = new Date().toISOString()
+  const withSnapshotTime = (f: FactorySummary): FactorySummary => ({
+    ...f,
+    snapshot_received_at: snapshotReceivedAt,
+  })
 
   // Handle list or object response
   if (Array.isArray(raw)) {
-    return { factories: raw as FactorySummary[] }
+    return { factories: (raw as FactorySummary[]).map(withSnapshotTime) }
   }
   const obj = raw as Record<string, unknown>
-  if (obj.factories) return obj as unknown as FleetResponse
+  if (Array.isArray(obj.factories)) {
+    const res = obj as unknown as FleetResponse
+    return { ...res, factories: res.factories.map(withSnapshotTime) }
+  }
   return { factories: [] }
 }
 
 export async function fetchFactory(factoryId: string): Promise<FactoryDetail> {
-  return apiFetch<FactoryDetail>(`/factories/${factoryId}`)
+  const res = await apiFetch<FactoryDetail>(`/factories/${factoryId}`)
+  const snapshotReceivedAt = new Date().toISOString()
+  return { ...res, snapshot_received_at: snapshotReceivedAt }
 }
 
 export async function fetchFactoryHistory(

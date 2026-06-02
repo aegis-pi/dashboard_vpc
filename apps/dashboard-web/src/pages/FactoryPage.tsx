@@ -56,7 +56,7 @@ function FactoryHeader({
           )}
           <LevelBadge level={riskLevel} />
           <PipelineBadge status={f.pipeline_status?.status} />
-          <StaleBadge lastInfraStateAt={f.last_infra_state_at} />
+          <StaleBadge lastInfraStateAt={f.last_infra_state_at} snapshotReceivedAt={f.snapshot_received_at} />
         </div>
         <h1 className="factory-hero-title">{f.factory_id}</h1>
         <p className="factory-hero-summary">

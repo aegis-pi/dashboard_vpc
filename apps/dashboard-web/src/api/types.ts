@@ -27,6 +27,7 @@ export interface FactorySummary {
   updated_at?: string
   last_factory_state_at?: string
   last_infra_state_at?: string
+  snapshot_received_at?: string
   // nested variant (raw DDB item)
   risk?: {
     score?: number
@@ -144,6 +145,7 @@ export interface FactoryDetail {
   updated_at?: string
   last_factory_state_at?: string
   last_infra_state_at?: string
+  snapshot_received_at?: string
 }
 
 // ─── Node / workload status ──────────────────────────────────────────

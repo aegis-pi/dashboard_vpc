@@ -370,6 +370,7 @@ function FactoryCard({
         </span>
         <StaleBadge
           lastInfraStateAt={f.last_infra_state_at}
+          snapshotReceivedAt={f.snapshot_received_at}
         />
       </div>
     </div>
