@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-02
 수정 이력:
+  - 2026-06-02 v2.6  일간 보고서 목록 API가 S3 `ListObjectsV2`를 사용하지만 ECS task role에 `s3:ListBucket` 권한이 없어 목록 카드에 오류 문구가 남던 문제 수정. `reports/daily/*` prefix 한정 ListBucket 권한 추가, 공장 selector 알파벳 오름차순 정렬 반영. Dashboard web workflow 성공, Terraform post-apply plan No changes.
   - 2026-06-02 v2.5  S3 `reports/daily/yyyy=YYYY/mm=MM/dd=DD/{factory_id}/report.md` 기반 일간 보고서 목록/본문 표시 반영. Dashboard backend image `sha-055fb75` ECS task definition revision 27 적용, rollout completed, `/healthz`와 `/readyz` 정상.
   - 2026-06-01 v2.4  Factory Timeline `10m/1h/custom` 범위와 `top_causes` 기반 원인 표시 반영. Dashboard backend image `sha-311adc6` ECS task definition revision 23 적용, rollout completed, `/healthz`와 `/readyz` 정상.
   - 2026-06-01 v2.3  Environment History 환경 센서 기압 표시 범위를 950~1050hPa로 조정. 센서별 차트 헤더에 온도/습도/기압 이름, 단위, 표시 범위, max/avg/min 구분을 표시하도록 반영.
