@@ -367,11 +367,11 @@ export function ReportsPage() {
       {/* Selectors card */}
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-bd" style={{
-          display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-end',
+          display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center',
         }}>
           {/* Factory selector */}
           {factoryIds.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
               <span className="eyebrow">공장</span>
               <div className="seg">
                 {factoryIds.map((fid) => (
@@ -388,58 +388,54 @@ export function ReportsPage() {
           )}
 
           {/* Date selector */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
             <span className="eyebrow">날짜</span>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              {/* Calendar picker button */}
-              <label
-                onClick={openDatePicker}
+            {/* Calendar picker button */}
+            <label
+              onClick={openDatePicker}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                height: 28, padding: '0 10px',
+                border: '1px solid var(--line-3)', borderRadius: 7,
+                background: 'var(--surface)', cursor: 'pointer',
+                position: 'relative', transition: 'border-color .12s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--ink-4)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line-3)' }}
+            >
+              <Calendar size={13} style={{ color: 'var(--ink-3)' }} />
+              <span className="mono tnum" style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500 }}>
+                {date}
+              </span>
+              <ChevronDown size={10} style={{ color: 'var(--ink-4)' }} />
+              <input
+                ref={dateInputRef}
+                type="date" value={date} max={TODAY}
+                onChange={(e) => { if (e.target.value) setDate(e.target.value) }}
+                tabIndex={-1}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  height: 28, padding: '0 10px',
-                  border: '1px solid var(--line-3)', borderRadius: 7,
-                  background: 'var(--surface)', cursor: 'pointer',
-                  position: 'relative', transition: 'border-color .12s',
+                  position: 'absolute', inset: 0,
+                  opacity: 0, pointerEvents: 'none',
+                  border: 0, padding: 0, margin: 0, width: '100%', height: '100%',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--ink-4)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line-3)' }}
-              >
-                <Calendar size={13} style={{ color: 'var(--ink-3)' }} />
-                <span className="mono tnum" style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500 }}>
-                  {date}
-                </span>
-                <ChevronDown size={10} style={{ color: 'var(--ink-4)' }} />
-                <input
-                  ref={dateInputRef}
-                  type="date" value={date} max={TODAY}
-                  onChange={(e) => { if (e.target.value) setDate(e.target.value) }}
-                  tabIndex={-1}
-                  style={{
-                    position: 'absolute', inset: 0,
-                    opacity: 0, pointerEvents: 'none',
-                    border: 0, padding: 0, margin: 0, width: '100%', height: '100%',
-                  }}
-                />
-              </label>
+              />
+            </label>
+          </div>
 
-              <span style={{ width: 1, height: 18, background: 'var(--line-3)' }} />
-
-              {/* Quick date buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <span className="eyebrow">빠른 선택</span>
-                <div className="seg">
-                  {quickDates.map((d) => (
-                    <button key={d} aria-pressed={date === d} onClick={() => setDate(d)}>
-                      {d.slice(5)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          {/* Quick date buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
+            <span className="eyebrow">빠른 선택</span>
+            <div className="seg">
+              {quickDates.map((d) => (
+                <button key={d} aria-pressed={date === d} onClick={() => setDate(d)}>
+                  {d.slice(5)}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Export buttons */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               className="btn"
               onClick={() => doExport('pdf')}
