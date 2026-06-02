@@ -50,7 +50,7 @@ type BucketAxis = {
   windowStartMs: number
   windowEndMs: number
   firstDataMs: number
-  hasLeadingGap: boolean
+  bucketMs: number
   ticks: number[]
 }
 
@@ -99,7 +99,7 @@ function resolveBucketAxis(items: HistoryItem[], window?: HistoryWindow): Bucket
     windowStartMs,
     windowEndMs,
     firstDataMs,
-    hasLeadingGap: firstDataMs > windowStartMs + bucketMs / 2,
+    bucketMs,
     ticks,
   }
 }
@@ -135,22 +135,55 @@ function withBucketAxisAnchors<T extends BucketChartRow>(data: T[], axis: Bucket
   return [startAnchor, ...data, endAnchor]
 }
 
-function LeadingNoDataArea({ axis }: { axis: BucketAxis | null }) {
-  if (!axis?.hasLeadingGap) return null
+function resolveNoDataGaps(rows: BucketChartRow[], axis: BucketAxis | null): { start: number; end: number }[] {
+  if (!axis) return []
+  const realRows = rows
+    .map((row) => {
+      const start = row.x
+      const end = toTimeMs(row.bucket_end) ?? (start == null ? null : start + axis.bucketMs)
+      return start == null || end == null || end <= start ? null : { start, end }
+    })
+    .filter((row): row is { start: number; end: number } => row != null)
+    .sort((a, b) => a.start - b.start)
+
+  const threshold = axis.bucketMs / 2
+  const gaps: { start: number; end: number }[] = []
+  let cursor = axis.windowStartMs
+  realRows.forEach((row) => {
+    const start = Math.max(row.start, axis.windowStartMs)
+    const end = Math.min(row.end, axis.windowEndMs)
+    if (start > cursor + threshold) {
+      gaps.push({ start: cursor, end: start })
+    }
+    cursor = Math.max(cursor, end)
+  })
+  if (axis.windowEndMs > cursor + threshold) {
+    gaps.push({ start: cursor, end: axis.windowEndMs })
+  }
+  return gaps
+}
+
+function NoDataAreas({ rows, axis }: { rows: BucketChartRow[]; axis: BucketAxis | null }) {
   return (
-    <ReferenceArea
-      x1={axis.windowStartMs}
-      x2={axis.firstDataMs}
-      fill="var(--ink-5)"
-      fillOpacity={0.12}
-      strokeOpacity={0}
-      label={{
-        value: '데이터 없음',
-        position: 'insideTop',
-        fill: 'var(--ink-4)',
-        fontSize: 11,
-      }}
-    />
+    <>
+      {resolveNoDataGaps(rows, axis).map((gap, index) => (
+        <ReferenceArea
+          key={`${gap.start}-${gap.end}`}
+          x1={gap.start}
+          x2={gap.end}
+          fill="var(--ink-5)"
+          fillOpacity={0.12}
+          strokeOpacity={0}
+          label={{
+            value: '데이터 없음',
+            position: 'insideTop',
+            fill: 'var(--ink-4)',
+            fontSize: 11,
+            offset: index === 0 ? 8 : 2,
+          }}
+        />
+      ))}
+    </>
   )
 }
 
@@ -207,7 +240,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               <RiskBandTooltip {...props as any} />
             )} />
-            <LeadingNoDataArea axis={axis} />
+            <NoDataAreas rows={data} axis={axis} />
             <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
             <ReferenceLine y={50} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
             <Line
@@ -565,7 +598,7 @@ export function SensorChart({ items, field, label, unit, window }: {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 <SensorBandTooltip {...props as any} unit={unit} />
               )} />
-              <LeadingNoDataArea axis={axis} />
+              <NoDataAreas rows={data} axis={axis} />
               <Line
                 type="monotone" dataKey="max" name={`${label} 최대`}
                 stroke="var(--crit)" strokeWidth={1.5}
@@ -751,7 +784,7 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
               <AIScoreBucketTooltip {...props as any} />
             )} />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-            <LeadingNoDataArea axis={axis} />
+            <NoDataAreas rows={data} axis={axis} />
             <ReferenceLine y={0.8} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
             <ReferenceLine y={0.3} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
             {/* Mean lines */}
@@ -846,6 +879,8 @@ export function NodeResourceChart({ items, field, label, window }: {
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         value: (it[aggField] as number | null | undefined) ?? null,
+        bucket_start: it.bucket_start,
+        bucket_end: it.bucket_end,
       }))
       .filter((d) => (!isBucket || d.x != null) && d.value != null), axis)
 
@@ -867,7 +902,7 @@ export function NodeResourceChart({ items, field, label, window }: {
               contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
               formatter={(v: number) => [`${v?.toFixed(1)}%`, aggLabel]}
             />
-            {isBucket && <LeadingNoDataArea axis={axis} />}
+            {isBucket && <NoDataAreas rows={aggData} axis={axis} />}
             <Line
               type="monotone"
               dataKey="value"
@@ -891,6 +926,8 @@ export function NodeResourceChart({ items, field, label, window }: {
       const row: NodeChartRow = {
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
+        bucket_start: it.bucket_start,
+        bucket_end: it.bucket_end,
       }
       activeIds.forEach((nid) => {
         if (useMean) {
@@ -924,7 +961,7 @@ export function NodeResourceChart({ items, field, label, window }: {
             formatter={(v: number) => [`${v?.toFixed(1)}%`, label]}
           />
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-          {isBucket && <LeadingNoDataArea axis={axis} />}
+          {isBucket && <NoDataAreas rows={data} axis={axis} />}
           {[...activeIds].map((nid, i) => (
             <Line
               key={nid}
