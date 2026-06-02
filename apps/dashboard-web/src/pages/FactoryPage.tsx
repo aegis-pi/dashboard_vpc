@@ -550,7 +550,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
         <div className="card-bd">
           {loading
             ? <LoadingChart />
-            : isEmpty ? <EmptyNote /> : <RiskScoreChart items={history} />}
+            : isEmpty ? <EmptyNote /> : <RiskScoreChart items={history} window={win} />}
           {!loading && !isEmpty && <RiskThresholdLegend bucketed={isBucketedWindow} />}
         </div>
       </div>
@@ -569,9 +569,9 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
             : isEmpty ? <EmptyNote /> : isBucketedWindow ? (
               // 6h/12h/24h: bucketed sensor charts with risk-relevant extremes
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <SensorChart items={history} field="temperature_celsius_avg" label="온도" unit="°C" />
-                <SensorChart items={history} field="humidity_percent_avg" label="습도" unit="%" />
-                <SensorChart items={history} field="pressure_hpa_avg" label="기압" unit="hPa" />
+                <SensorChart items={history} field="temperature_celsius_avg" label="온도" unit="°C" window={win} />
+                <SensorChart items={history} field="humidity_percent_avg" label="습도" unit="%" window={win} />
+                <SensorChart items={history} field="pressure_hpa_avg" label="기압" unit="hPa" window={win} />
               </div>
             ) : (
               // 1h: compact mini panels (avg sparkline only)
@@ -602,7 +602,7 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
         <div className="card-bd">
           {loading
             ? <LoadingChart />
-            : isEmpty ? <EmptyNote /> : <AIScoreChart items={history} />}
+            : isEmpty ? <EmptyNote /> : <AIScoreChart items={history} window={win} />}
           {!loading && !isEmpty && <AIScoreThresholdLegend bucketed={isBucketedWindow} />}
         </div>
       </div>
@@ -997,15 +997,15 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
               <div className="grid row3">
                 <div style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 9, background: 'var(--surface-2)' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 6 }}>CPU%</div>
-                  <NodeResourceChart items={history} field="cpu_usage_percent" label="CPU" />
+                  <NodeResourceChart items={history} field="cpu_usage_percent" label="CPU" window={win} />
                 </div>
                 <div style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 9, background: 'var(--surface-2)' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 6 }}>Memory%</div>
-                  <NodeResourceChart items={history} field="memory_usage_percent" label="Memory" />
+                  <NodeResourceChart items={history} field="memory_usage_percent" label="Memory" window={win} />
                 </div>
                 <div style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 9, background: 'var(--surface-2)' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 6 }}>Disk%</div>
-                  <NodeResourceChart items={history} field="disk_usage_percent" label="Disk" />
+                  <NodeResourceChart items={history} field="disk_usage_percent" label="Disk" window={win} />
                 </div>
               </div>
             )}
