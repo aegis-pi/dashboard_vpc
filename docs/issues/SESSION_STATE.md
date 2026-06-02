@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-06-02
 수정 이력:
+  - 2026-06-02  일간 보고서 selector 정렬 보정 배포 완료. commit: frontend `4e2bb32`. 변경: 공장/날짜/빠른 선택 컨트롤을 같은 레벨 컬럼으로 재배치하고 중앙 정렬해 날짜 컨트롤만 위로 떠 보이던 레이아웃 문제 수정. 검증: web lint/build 통과, dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료.
   - 2026-06-02  일간 보고서 빠른 날짜 선택 라벨 추가 배포 완료. commit: frontend `beadc19`. 변경: 날짜 입력 오른쪽 최근 7일 quick date control 위에 `빠른 선택` 라벨 추가. 검증: web lint/build 통과, dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료.
   - 2026-06-02  일간 보고서 페이지 단순화 배포 완료. commit: frontend `6562da5`. 변경: 저장된 보고서 목록 카드 제거, 일간 보고서 sidebar/상단 공장 selector 알파벳 오름차순 정렬, 공장·날짜 직접 선택 기반 조회 유지. 검증: web lint/test 52 passed/build 통과, dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료.
   - 2026-06-02  일간 보고서 목록 오류 문구 원인 수정 완료. 원인: `/reports` 목록 API는 S3 ListObjectsV2를 사용하지만 ECS task role은 reports object GetObject만 허용해 S3 list가 실패했고, 본문 직접 조회는 GetObject라 정상 표시됨. 조치: infra `e4c0331`에서 `reports/daily/*` prefix 한정 `s3:ListBucket` 권한 추가 및 Terraform apply 완료, frontend `eda6f2a`에서 보고서 공장 selector 알파벳 오름차순 정렬 반영. 검증: IAM simulation allowed, Terraform validate/post-apply plan No changes, web lint/build 통과, dashboard-web workflow 성공.
