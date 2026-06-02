@@ -338,6 +338,9 @@ def _extract_graph_5m(item: dict) -> dict:
     risk_mean = risk_score.get("mean")
     risk_min = risk_score.get("min")
     risk_max = risk_score.get("max")
+    source_count = quality.get("source_count")
+    sample_count = source_count if source_count is not None else risk_score.get("count")
+    is_empty_bucket = sample_count == 0
 
     ai_fire = ai_by_type.get("fire_score") or {}
     ai_fall = ai_by_type.get("fall_score") or {}
@@ -349,12 +352,12 @@ def _extract_graph_5m(item: dict) -> dict:
         "bucket_end": item.get("bucket_end"),
         "bucket_minutes": 5,
         "is_bucket": True,
-        "sample_count": quality.get("source_count") or risk_score.get("count"),
+        "sample_count": sample_count,
         # risk
-        "risk_score": risk_mean,
-        "risk_score_avg": risk_mean,
-        "risk_score_min": risk_min,
-        "risk_score_max": risk_max,
+        "risk_score": None if is_empty_bucket else risk_mean,
+        "risk_score_avg": None if is_empty_bucket else risk_mean,
+        "risk_score_min": None if is_empty_bucket else risk_min,
+        "risk_score_max": None if is_empty_bucket else risk_max,
         # sensor avg
         "temperature_celsius_avg": temp.get("mean"),
         "humidity_percent_avg": humidity.get("mean"),
@@ -417,10 +420,15 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
     first, last = group[0], group[-1]
 
     def _wavg(field: str) -> float | None:
-        total = sum(g.get("sample_count") or 0 for g in group)
+        values = [
+            (g[field], g.get("sample_count") or 0)
+            for g in group
+            if g.get(field) is not None and (g.get("sample_count") or 0) > 0
+        ]
+        total = sum(sample_count for _, sample_count in values)
         if not total:
             return None
-        return sum((g.get(field) or 0) * (g.get("sample_count") or 0) for g in group) / total
+        return sum(value * sample_count for value, sample_count in values) / total
 
     def _fmax(field: str) -> float | None:
         vals = [g[field] for g in group if g.get(field) is not None]

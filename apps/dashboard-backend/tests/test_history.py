@@ -210,6 +210,56 @@ def test_graph_5m_items_have_sample_count(client, ddb_mock):
     assert counts == {97}
 
 
+def test_graph_5m_empty_source_count_stays_empty():
+    from services.ddb import _extract_graph_5m
+
+    item = {
+        "sk": "GRAPH#5M#2026-06-01T23:50:00Z",
+        "bucket_start": "2026-06-01T23:50:00Z",
+        "bucket_end": "2026-06-01T23:54:59.999Z",
+        "quality": {"source_count": 0, "is_empty": True},
+        "risk": {"score": {"mean": 0, "min": 0, "max": 0, "count": 5}},
+    }
+
+    result = _extract_graph_5m(item)
+
+    assert result["sample_count"] == 0
+    assert result["risk_score_avg"] is None
+    assert result["risk_score_min"] is None
+    assert result["risk_score_max"] is None
+
+
+def test_graph_reaggregate_does_not_average_missing_metric_as_zero():
+    from services.ddb import _merge_extracted_group
+
+    result = _merge_extracted_group([
+        {
+            "timestamp": "2026-06-01T23:50:00Z",
+            "bucket_start": "2026-06-01T23:50:00Z",
+            "bucket_end": "2026-06-01T23:54:59.999Z",
+            "sample_count": 0,
+            "risk_score_avg": None,
+            "risk_score_min": None,
+            "risk_score_max": None,
+            "temperature_celsius_avg": None,
+        },
+        {
+            "timestamp": "2026-06-01T23:55:00Z",
+            "bucket_start": "2026-06-01T23:55:00Z",
+            "bucket_end": "2026-06-01T23:59:59.999Z",
+            "sample_count": 75,
+            "risk_score_avg": 94.0,
+            "risk_score_min": 90.0,
+            "risk_score_max": 100.0,
+            "temperature_celsius_avg": 24.7,
+        },
+    ], 2)
+
+    assert result["sample_count"] == 75
+    assert result["risk_score_avg"] == 94.0
+    assert result["temperature_celsius_avg"] == 24.7
+
+
 def test_graph_6h_has_bucket_minutes_5(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=6h").json()
     for item in items:
