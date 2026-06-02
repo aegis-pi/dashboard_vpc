@@ -75,9 +75,9 @@ s3://aegis-bucket-data/processed/{factory_id}/state_snapshot/yyyy={YYYY}/mm={MM}
 
 | 상태 | 조건 |
 | --- | --- |
-| `healthy` | 마지막 `infra_state` 수신 후 60초 미만 |
-| `warning` | 60초 이상 120초 미만 |
-| `critical` | 120초 이상 |
+| `normal` | 마지막 `infra_state` 수신 후 60초 이하 |
+| `warning` | 60초 초과 120초 이하 |
+| `critical` | 120초 초과 |
 
 ## S3 processed 저장 경로
 

@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
-# Thresholds from docs/specs/data_storage_pipeline.md (M4 Issue 7 MVP criteria)
-_WARNING_SECONDS = 40
-_CRITICAL_SECONDS = 60
+# Thresholds align with the dashboard staleness contract:
+# warning after 60s, critical after 120s.
+_WARNING_SECONDS = 60
+_CRITICAL_SECONDS = 120
 
 
 def calculate(last_infra_state_at: str | None, now: datetime | None = None) -> dict:

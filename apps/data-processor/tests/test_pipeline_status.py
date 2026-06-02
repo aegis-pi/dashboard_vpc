@@ -19,17 +19,22 @@ def test_normal_fresh():
 
 
 def test_normal_boundary():
-    result = calculate(_ts(40), _now())
+    result = calculate(_ts(60), _now())
     assert result["status"] == "normal"
 
 
 def test_warning():
-    result = calculate(_ts(55), _now())
+    result = calculate(_ts(61), _now())
+    assert result["status"] == "warning"
+
+
+def test_warning_boundary():
+    result = calculate(_ts(120), _now())
     assert result["status"] == "warning"
 
 
 def test_critical():
-    result = calculate(_ts(90), _now())
+    result = calculate(_ts(121), _now())
     assert result["status"] == "critical"
 
 
