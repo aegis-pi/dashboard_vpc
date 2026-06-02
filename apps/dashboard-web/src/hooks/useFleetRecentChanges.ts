@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchFactoryHistory } from '../api/client'
 import { normalizeHistoryItem } from '../utils/normalize'
-import type { RiskLevel } from '../api/types'
+import type { HistoryItem, RiskLevel } from '../api/types'
 
 export interface RecentChange {
   factory_id: string
@@ -12,17 +12,17 @@ export interface RecentChange {
   top_cause_names?: string[]
 }
 
-const SELF_REFRESH_MS = 60_000
-
 const RECENT_WINDOW_MS = 10 * 60 * 1000
 
-// Fetches recent HISTORY#STATE for each factory, derives risk_level transitions.
-// Manages its own 60s refresh cycle — callers do not need to drive it.
+// Fetches HISTORY#STATE (1h) for all factories in one pass.
+// Returns both derived recent-change events and raw history keyed by factory_id
+// so callers can pass it down to cards without re-fetching.
 // Stale-while-revalidate: previous results stay visible during background refresh.
 export function useFleetRecentChanges(factoryIds: string[]) {
   const [events, setEvents] = useState<RecentChange[]>([])
-  const [loading, setLoading] = useState(false)      // first-load only (no prior data)
-  const [refreshing, setRefreshing] = useState(false) // background refresh with prior data
+  const [historyByFactory, setHistoryByFactory] = useState<Record<string, HistoryItem[]>>({})
+  const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const requestSeq = useRef(0)
   const mounted = useRef(true)
   const key = [...factoryIds].sort().join(',')
@@ -39,7 +39,12 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     requestSeq.current = seq
     const ids = key ? key.split(',') : []
     if (ids.length === 0) {
-      if (mounted.current) { setEvents([]); setLoading(false); setRefreshing(false) }
+      if (mounted.current) {
+        setEvents([])
+        setHistoryByFactory({})
+        setLoading(false)
+        setRefreshing(false)
+      }
       return
     }
 
@@ -49,14 +54,18 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     }
 
     try {
-      // Backend serves raw HISTORY#STATE for 1h; derive the 10m view client-side.
       const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '1h')))
       if (!mounted.current || requestSeq.current !== seq) return
 
+      const byFactory: Record<string, HistoryItem[]> = {}
       const all: RecentChange[] = []
       const cutoff = Date.now() - RECENT_WINDOW_MS
+
       ids.forEach((factoryId, idx) => {
-        const history = (results[idx] ?? []).map(normalizeHistoryItem)
+        const raw = results[idx] ?? []
+        const history = raw.map(normalizeHistoryItem)
+        byFactory[factoryId] = history
+
         for (let i = 1; i < history.length; i++) {
           const prev = history[i - 1]!
           const curr = history[i]!
@@ -74,10 +83,12 @@ export function useFleetRecentChanges(factoryIds: string[]) {
           }
         }
       })
+
       all.sort((a, b) => b.ts - a.ts)
       setEvents(all)
+      setHistoryByFactory(byFactory)
     } catch {
-      // Keep last known list on error.
+      // Keep last known data on error.
     } finally {
       if (mounted.current && requestSeq.current === seq) {
         setLoading(false)
@@ -86,16 +97,9 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     }
   }, [key])
 
-  // Initial load + re-run when factory list changes.
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  // Self-managed 60s background refresh — independent of parent refresh interval.
-  useEffect(() => {
-    const id = window.setInterval(() => { void refresh() }, SELF_REFRESH_MS)
-    return () => window.clearInterval(id)
-  }, [refresh])
-
-  return { events, loading, refreshing, refresh }
+  return { events, historyByFactory, loading, refreshing, refresh }
 }

@@ -8,10 +8,9 @@ import { CompactTrendChart } from '../components/RiskTrendChart'
 import { recentRiskScores } from '../utils/trend'
 
 import { useFactories } from '../hooks/useFactories'
-import { useFactoryHistory } from '../hooks/useFactoryHistory'
 import { useFleetRecentChanges, type RecentChange } from '../hooks/useFleetRecentChanges'
 import { AuthError } from '../api/client'
-import type { FactorySummary } from '../api/types'
+import type { FactorySummary, HistoryItem } from '../api/types'
 
 const SERIF = '"Instrument Serif", ui-serif, Georgia, serif'
 
@@ -277,23 +276,13 @@ function StatDivider() {
 
 // ─── Factory card ─────────────────────────────────────────────────────
 function FactoryCard({
-  f, onClick, refreshSignalKey,
-}: { f: ReturnType<typeof normalizeFactory>; onClick: () => void; refreshSignalKey: number }) {
+  f, onClick, history1h,
+}: { f: ReturnType<typeof normalizeFactory>; onClick: () => void; history1h: HistoryItem[] }) {
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
-  const { data: history1h, refresh: refreshHistory1h } = useFactoryHistory(f.factory_id, '1h')
-  const [sparkData, setSparkData] = useState<number[]>([])
+  const sparkData = recentRiskScores(history1h)
   const score = f.riskScore ?? null
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
-
-  useEffect(() => {
-    setSparkData(recentRiskScores(history1h))
-  }, [history1h])
-
-  useEffect(() => {
-    if (refreshSignalKey === 0) return
-    void refreshHistory1h()
-  }, [refreshHistory1h, refreshSignalKey])
 
   return (
     <div
@@ -551,7 +540,6 @@ function FilterPill({
 export function FleetPage() {
   const navigate = useNavigate()
   const [refreshInterval, setRefreshInterval] = useState(0)
-  const [refreshSignalKey, setRefreshSignalKey] = useState(0)
   const { data, loading, error, refresh } = useFactories()
   const hasFleetData = data !== null
 
@@ -567,23 +555,20 @@ export function FleetPage() {
   const factoryIds = sorted.map((f) => f.factory_id)
   const {
     events: recentChanges,
+    historyByFactory,
     loading: recentLoading,
     refreshing: recentRefreshing,
     refresh: refreshRecentChanges,
   } = useFleetRecentChanges(factoryIds)
 
-  // Auto-interval only refreshes factory cards (fast data).
-  // Recent changes has its own 60s internal cadence via useFleetRecentChanges.
   const handleAutoRefresh = useCallback(() => {
     void refresh()
-    setRefreshSignalKey((k) => k + 1)
-  }, [refresh])
+    void refreshRecentChanges()
+  }, [refresh, refreshRecentChanges])
 
-  // Manual refresh button refreshes both immediately.
   const handleManualRefresh = useCallback(() => {
     void refresh()
     void refreshRecentChanges()
-    setRefreshSignalKey((k) => k + 1)
   }, [refresh, refreshRecentChanges])
 
   useEffect(() => {
@@ -664,7 +649,7 @@ export function FleetPage() {
                   <FactoryCard
                     key={f.factory_id}
                     f={f}
-                    refreshSignalKey={refreshSignalKey}
+                    history1h={historyByFactory[f.factory_id] ?? []}
                     onClick={() => navigate(`/factory/${f.factory_id}`)}
                   />
                 ))}

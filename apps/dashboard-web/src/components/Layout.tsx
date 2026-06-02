@@ -153,6 +153,18 @@ export const REFRESH_INTERVAL_OPTIONS = [
 
 export type RefreshIntervalMs = (typeof REFRESH_INTERVAL_OPTIONS)[number]['value']
 
+function LiveClock() {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  return <span className="mono tnum">{hh}:{mm}:{ss}</span>
+}
+
 export function TopBar({
   crumbs,
   onBack,
@@ -162,16 +174,6 @@ export function TopBar({
   refreshInterval = 0,
   onIntervalChange,
 }: TopBarProps) {
-  const [now, setNow] = useState(new Date())
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const ss = String(now.getSeconds()).padStart(2, '0')
-
   return (
     <div className="topbar">
       {onBack && (
@@ -215,7 +217,6 @@ export function TopBar({
           </button>
         )}
 
-        {/* Live clock */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7,
           fontSize: 11.5, color: 'var(--ink-3)',
@@ -223,7 +224,7 @@ export function TopBar({
           borderLeft: '1px solid var(--line)',
           marginLeft: 4, paddingLeft: 12,
         }}>
-          <span className="mono tnum">{hh}:{mm}:{ss}</span>
+          <LiveClock />
         </div>
       </div>
     </div>
