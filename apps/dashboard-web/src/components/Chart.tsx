@@ -51,6 +51,7 @@ type BucketAxis = {
   windowEndMs: number
   firstDataMs: number
   hasLeadingGap: boolean
+  ticks: number[]
 }
 
 type BucketChartRow = {
@@ -84,12 +85,22 @@ function resolveBucketAxis(items: HistoryItem[], window?: HistoryWindow): Bucket
   const windowEndMs = Math.max(nowMs, lastBucketEndMs ?? nowMs)
   const windowStartMs = windowEndMs - durationMs
   const bucketMs = (items[0]?.bucket_minutes ?? 5) * 60 * 1000
+  const tickStepMs =
+    window === '24h' ? 4 * 60 * 60 * 1000 :
+    window === '12h' ? 2 * 60 * 60 * 1000 :
+    60 * 60 * 1000
+  const ticks = [windowStartMs]
+  for (let value = windowStartMs + tickStepMs; value < windowEndMs; value += tickStepMs) {
+    ticks.push(value)
+  }
+  ticks.push(windowEndMs)
 
   return {
     windowStartMs,
     windowEndMs,
     firstDataMs,
     hasLeadingGap: firstDataMs > windowStartMs + bucketMs / 2,
+    ticks,
   }
 }
 
@@ -99,6 +110,8 @@ function bucketXAxisProps(axis: BucketAxis | null) {
     type: 'number' as const,
     scale: 'time' as const,
     domain: axis ? [axis.windowStartMs, axis.windowEndMs] : ['dataMin', 'dataMax'],
+    ticks: axis?.ticks,
+    allowDataOverflow: true,
     tickFormatter: (value: number) => fmtTimeShort(new Date(value).toISOString()),
     tick: { fontSize: 10, fill: 'var(--ink-4)' },
     interval: 'preserveStartEnd' as const,
