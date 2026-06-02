@@ -17,7 +17,16 @@ import type { HistoryItem } from '../api/types'
 import type { HistoryWindow } from '../hooks/useFactoryHistory'
 import { subsampleData } from '../utils/subsample'
 
-const NODE_COLORS = ['var(--accent)', 'var(--warn)', 'var(--safe)', 'var(--crit)']
+const NODE_COLORS = [
+  'var(--accent)',
+  'var(--warn)',
+  'var(--safe)',
+  '#7C3AED',
+  '#0891B2',
+  '#CA8A04',
+  '#475569',
+  '#4F46E5',
+]
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function extractTimestamp(item: HistoryItem): string | undefined {
@@ -944,6 +953,7 @@ export function NodeResourceChart({ items, field, label, window }: {
 
   // Resolve active node set and data source
   const activeIds = nodeIds.size > 0 ? nodeIds : nodeIdsMean
+  const activeNodeIds = [...activeIds].sort((a, b) => a.localeCompare(b))
   const useMean = nodeIds.size === 0
 
   const rows = sampledItems
@@ -956,7 +966,7 @@ export function NodeResourceChart({ items, field, label, window }: {
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }
-      activeIds.forEach((nid) => {
+      activeNodeIds.forEach((nid) => {
         if (!hasSamples) {
           row[nid] = null
         } else if (useMean) {
@@ -976,7 +986,7 @@ export function NodeResourceChart({ items, field, label, window }: {
     .filter((row) => !isBucket || row.x != null)
   const data = isBucket ? withBucketAxisGaps(rows, axis) : rows
 
-  if (!rows.some((row) => (!isBucket || hasBucketSamples(row)) && [...activeIds].some((nid) => row[nid] != null))) {
+  if (!rows.some((row) => (!isBucket || hasBucketSamples(row)) && activeNodeIds.some((nid) => row[nid] != null))) {
     return <EmptyChart message={`${label} 데이터 없음`} />
   }
 
@@ -996,7 +1006,7 @@ export function NodeResourceChart({ items, field, label, window }: {
           />
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           {isBucket && <NoDataAreas rows={data} axis={axis} />}
-          {[...activeIds].map((nid, i) => (
+          {activeNodeIds.map((nid, i) => (
             <Line
               key={nid}
               type="monotone"
