@@ -120,7 +120,7 @@ function bucketXAxisProps(axis: BucketAxis | null) {
 }
 
 function hasBucketSamples(row: { sample_count?: number | null }): boolean {
-  return row.sample_count !== 0
+  return typeof row.sample_count === 'number' && row.sample_count > 0
 }
 
 function withBucketAxisAnchors<T extends BucketChartRow>(data: T[], axis: BucketAxis | null): T[] {
