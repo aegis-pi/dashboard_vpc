@@ -59,6 +59,7 @@ type BucketChartRow = {
   ts: string
   bucket_start?: string
   bucket_end?: string
+  sample_count?: number | null
 }
 type NodeChartRow = BucketChartRow & Record<string, string | number | null | undefined>
 
@@ -116,6 +117,10 @@ function bucketXAxisProps(axis: BucketAxis | null) {
     tick: { fontSize: 10, fill: 'var(--ink-4)' },
     interval: 'preserveStartEnd' as const,
   }
+}
+
+function hasBucketSamples(row: { sample_count?: number | null }): boolean {
+  return row.sample_count !== 0
 }
 
 function withBucketAxisAnchors<T extends BucketChartRow>(data: T[], axis: BucketAxis | null): T[] {
@@ -207,7 +212,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }))
-      .filter((d) => d.x != null && (d.avg != null || d.min != null)), axis)
+      .filter((d) => hasBucketSamples(d) && d.x != null && (d.avg != null || d.min != null)), axis)
 
     if (data.length === 0) {
       return <EmptyChart message="선택한 시간 범위에 Risk 데이터가 없습니다" />
@@ -526,7 +531,7 @@ export function SensorChart({ items, field, label, unit, window }: {
           bucket_end: it.bucket_end,
         }
       })
-      .filter((d) => d.x != null && (d.avg != null || d.max != null || d.min != null)), axis)
+      .filter((d) => hasBucketSamples(d) && d.x != null && (d.avg != null || d.max != null || d.min != null)), axis)
 
     if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
 
@@ -750,7 +755,7 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
           bucket_end: it.bucket_end,
         }
       })
-      .filter((d) => d.x != null && (d.fire != null || d.fall != null || d.bend != null)), axis)
+      .filter((d) => hasBucketSamples(d) && d.x != null && (d.fire != null || d.fall != null || d.bend != null)), axis)
 
     if (data.length === 0) {
       return <EmptyChart message="AI Score 데이터 없음" />
@@ -879,10 +884,11 @@ export function NodeResourceChart({ items, field, label, window }: {
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         value: (it[aggField] as number | null | undefined) ?? null,
+        sample_count: it.sample_count ?? null,
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }))
-      .filter((d) => (!isBucket || d.x != null) && d.value != null), axis)
+      .filter((d) => (!isBucket || (hasBucketSamples(d) && d.x != null)) && d.value != null), axis)
 
     if (aggData.length === 0) {
       return <EmptyChart message={`${label} 데이터 없음`} />
@@ -926,6 +932,7 @@ export function NodeResourceChart({ items, field, label, window }: {
       const row: NodeChartRow = {
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
+        sample_count: it.sample_count ?? null,
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }
@@ -944,7 +951,7 @@ export function NodeResourceChart({ items, field, label, window }: {
       })
       return row
     })
-    .filter((row) => !isBucket || row.x != null), axis)
+    .filter((row) => !isBucket || (hasBucketSamples(row) && row.x != null)), axis)
 
   return (
     <div className="chart-wrap">
