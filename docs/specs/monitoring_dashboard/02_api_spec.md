@@ -3,7 +3,7 @@
 상태: source of truth
 기준일: 2026-06-02
 수정 이력:
-  - 2026-06-02  `/reports` · `/reports/{date}/{factory_id}` endpoint를 skeleton/DDB 기준에서 S3 `reports/daily/` 기반 구현 완료로 현행화. 응답 필드/IAM/경로 note 추가(ADR 0029). `/cloud-infra` · `/cloud-infra/history`는 백엔드 read 구현(작업 트리, 미배포) 상태로 현행화.
+  - 2026-06-02  `/reports` · `/reports/{date}/{factory_id}` endpoint를 skeleton/DDB 기준에서 S3 `reports/daily/` 기반 구현 완료로 현행화. 응답 필드/IAM/경로 note 추가(ADR 0029). `/cloud-infra` · `/cloud-infra/history` Backend/Frontend read 화면 구현·배포 완료 상태로 현행화.
   - 2026-06-01  history endpoint의 `window<=1h` HISTORY#STATE 조회 기준과 Timeline `10m/custom` 사용 범위 반영.
   - 2026-06-01  Cloud Infra Status API(`/cloud-infra`, `/cloud-infra/history`) 추가. 데이터 계약은 `docs/planning/29` / ADR 0027, BE/FE 계약은 `06_cloud_infra_view.md`.
   - 2026-06-01  GRAPH#5M 응답 필드에 센서 min/max와 AI mean/max 분리 기준 추가.
@@ -115,12 +115,12 @@ Authorization: Bearer <Cognito Access Token>
 
 공장 상태와 분리된 Cloud infra 상태 화면용. Backend는 **기존 테이블의 `pk=CLOUD#infra` item만 read**하며 EKS/ArgoCD/CloudWatch에 직접 붙지 않는다(collector가 write, ADR 0027).
 
-현재 구현 상태: `apps/dashboard-backend/routers/cloud_infra.py` + `services/cloud_infra.py` + `services/ddb.py`(`get_cloud_infra_latest`/`get_cloud_infra_history`)로 **백엔드 read 경로가 구현됐다**. Frontend도 `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards까지 작업 트리에 구현됐다. 단, 아직 커밋·배포 전이고 collector(write)는 팀원/후속이다. staleness 임계값은 코드 기준 `fast 180초 / slow 900초`이며 응답에 `stale_threshold_seconds`로 동봉된다.
+현재 구현 상태: `apps/dashboard-backend/routers/cloud_infra.py` + `services/cloud_infra.py` + `services/ddb.py`(`get_cloud_infra_latest`/`get_cloud_infra_history`)로 **백엔드 read 경로가 구현·배포됐다**. Frontend도 `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards까지 구현·배포됐다. collector(write)는 팀원/후속이다. staleness 임계값은 코드 기준 `fast 180초 / slow 900초`이며 응답에 `stale_threshold_seconds`로 동봉된다.
 
 | Method | Path | 인증 | 동작 | 백엔드 조회 | 상태 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/cloud-infra` | Cognito JWT | 현재 Cloud infra 상태(LATEST) + staleness 플래그 | DDB GetItem (`pk=CLOUD#infra, sk=LATEST`) | **백엔드 read 구현**(작업 트리, 미배포) |
-| GET | `/cloud-infra/history?window=1h\|6h\|24h&track=fast\|slow` | Cognito JWT | 추이(reduced) | DDB Query (`pk=CLOUD#infra, begins_with(sk, HISTORY#FAST#\|HISTORY#SLOW#)`) | **백엔드 read 구현**(작업 트리, 미배포) |
+| GET | `/cloud-infra` | Cognito JWT | 현재 Cloud infra 상태(LATEST) + staleness 플래그 | DDB GetItem (`pk=CLOUD#infra, sk=LATEST`) | **구현·배포 완료** |
+| GET | `/cloud-infra/history?window=1h\|6h\|24h&track=fast\|slow` | Cognito JWT | 추이(reduced) | DDB Query (`pk=CLOUD#infra, begins_with(sk, HISTORY#FAST#\|HISTORY#SLOW#)`) | **구현·배포 완료** |
 
 **Note (Cloud Infra)**:
 - item이 없으면(collector write 전) HTTP 200 + `{ "available": false }` 반환(404 아님). FE는 "수집 대기" empty-state.

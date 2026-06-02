@@ -3,7 +3,8 @@
 상태: draft
 기준일: 2026-06-02 / 언어: 한국어 (개조식)
 수정 이력:
-  - 2026-06-02  단계 1 **Backend/Frontend read 화면 구현 완료**(작업 트리, 미커밋·미배포): Backend `routers/cloud_infra.py`, `services/cloud_infra.py`, `ddb.py`의 `get_cloud_infra_latest`/`get_cloud_infra_history`; Frontend `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards. 응답에 `stale_threshold_seconds` 동봉, stale 시 section `status=unknown` + `overall_status` warning 강등 반영. collector write는 팀원/후속.
+  - 2026-06-02  Backend/Frontend read 화면 배포 완료. Backend image `sha-26a0a27` ECS revision 28 적용, Dashboard web S3 sync + CloudFront invalidation 완료. collector write는 팀원/후속.
+  - 2026-06-02  단계 1 **Backend/Frontend read 화면 구현 완료**: Backend `routers/cloud_infra.py`, `services/cloud_infra.py`, `ddb.py`의 `get_cloud_infra_latest`/`get_cloud_infra_history`; Frontend `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards. 응답에 `stale_threshold_seconds` 동봉, stale 시 section `status=unknown` + `overall_status` warning 강등 반영.
   - 2026-06-01  초안. Cloud infra 상태를 관제 화면에 추가하기 위한 BE/FE 계약. 데이터 계약은 `docs/planning/29` / ADR 0027.
 
 ## 목적
@@ -141,8 +142,8 @@ staleness 기준(doc 29 / 코드): `fast` age > 180초, `slow` age > 900초 → 
 
 ## 구현 순서
 
-1. ✅ Backend `services/cloud_infra.py` + `routers/cloud_infra.py` + main router 등록. pytest(없을 때 `available:false`, 있을 때 staleness 계산). — **작업 트리 구현 완료**(`tests/test_cloud_infra.py`), 미커밋·미배포.
-2. ✅ Frontend 타입/adapter/client + 페이지 + sidebar 항목 + empty-state. vitest(정규화/배지 색/stale 표시). — **작업 트리 구현 완료**(`CloudInfraPage.tsx`, `adapters/cloudInfra.ts`, `tests/cloudInfra.test.ts`), 미커밋·미배포.
+1. ✅ Backend `services/cloud_infra.py` + `routers/cloud_infra.py` + main router 등록. pytest(없을 때 `available:false`, 있을 때 staleness 계산). — 구현/배포 완료(`tests/test_cloud_infra.py`, ECS revision 28).
+2. ✅ Frontend 타입/adapter/client + 페이지 + sidebar 항목 + empty-state. vitest(정규화/배지 색/stale 표시). — 구현/배포 완료(`CloudInfraPage.tsx`, `adapters/cloudInfra.ts`, `tests/cloudInfra.test.ts`).
 3. ⬜ doc 29 LATEST 예시로 end-to-end mock 확인.
 4. ⬜ (팀원 데이터 후) 실제 DDB 값으로 정합성 미세 조정.
 

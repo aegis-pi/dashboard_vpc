@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-06-02
 수정 이력:
+  - 2026-06-02  Cloud Infra dashboard read 화면 구현 및 역할별 커밋/푸시/backend 업데이트 완료. commits: backend `bf824ea`, frontend `8e7dcdd`, docs `26a0a27`. 변경: `/cloud-infra`, `/cloud-infra/history` DDB `CLOUD#infra` read API, sidebar `System / 클라우드 인프라`, overview/detail dashboard 화면 추가. 검증: backend pytest 76 passed, web lint/test 56 passed/build 통과, dashboard-backend/dashboard-web workflow 성공, ECR image `sha-26a0a27` push 확인, Terraform apply로 ECS task definition revision 28 생성 후 service를 revision 28로 업데이트, desired/running 1, rollout COMPLETED. `/healthz` 200, `/readyz` dynamodb:ok redis:ok, dashboard web HTTP 200, post-apply plan No changes.
   - 2026-06-02  일간 보고서 selector 라벨 정렬 재보정 배포 완료. commit: frontend `94c3d23`. 변경: 공장/날짜/빠른 선택 라벨은 각 컨트롤 시작점 기준 좌측 정렬, selector row와 PDF/Word/새로고침 버튼은 세로 중앙 정렬. 검증: web lint/build 통과, dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료.
   - 2026-06-02  일간 보고서 selector 정렬 보정 배포 완료. commit: frontend `4e2bb32`. 변경: 공장/날짜/빠른 선택 컨트롤을 같은 레벨 컬럼으로 재배치하고 중앙 정렬해 날짜 컨트롤만 위로 떠 보이던 레이아웃 문제 수정. 검증: web lint/build 통과, dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료.
   - 2026-06-02  일간 보고서 빠른 날짜 선택 라벨 추가 배포 완료. commit: frontend `beadc19`. 변경: 날짜 입력 오른쪽 최근 7일 quick date control 위에 `빠른 선택` 라벨 추가. 검증: web lint/build 통과, dashboard-web workflow 성공, S3 sync + CloudFront invalidation 완료.
