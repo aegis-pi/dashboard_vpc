@@ -425,12 +425,15 @@ export function ReportsPage() {
               <span style={{ width: 1, height: 18, background: 'var(--line-3)' }} />
 
               {/* Quick date buttons */}
-              <div className="seg">
-                {quickDates.map((d) => (
-                  <button key={d} aria-pressed={date === d} onClick={() => setDate(d)}>
-                    {d.slice(5)}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span className="eyebrow">빠른 선택</span>
+                <div className="seg">
+                  {quickDates.map((d) => (
+                    <button key={d} aria-pressed={date === d} onClick={() => setDate(d)}>
+                      {d.slice(5)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
