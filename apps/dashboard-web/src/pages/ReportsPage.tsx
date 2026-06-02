@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Calendar, ChevronDown, Download, FileText,
-  RefreshCw, Plus, AlertTriangle,
+  RefreshCw, Plus, AlertTriangle, Clock,
 } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
-import { fetchReport } from '../api/client'
+import { fetchReport, fetchReports } from '../api/client'
+import type { ReportItem } from '../api/types'
 import { recentDates, todayStr } from '../adapters/reports'
 import { adaptSidebarFactory } from '../adapters/factory'
 import { classifyReportError } from '../utils/reportError'
@@ -270,29 +271,73 @@ function ReportEmptyState({
 const REPORT_DATES = recentDates(7)
 const TODAY = todayStr()
 
+function formatBytes(bytes?: number | null): string {
+  if (bytes == null) return '-'
+  if (bytes < 1024) return `${bytes} B`
+  return `${(bytes / 1024).toFixed(1)} KiB`
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function unique<T>(items: T[]): T[] {
+  return Array.from(new Set(items))
+}
+
 export function ReportsPage() {
   const { data: fleetData } = useFactories()
   const factories = (fleetData?.factories ?? []).map(adaptSidebarFactory)
-  const factoryIds = factories.map((f) => f.factory_id)
+  const fleetFactoryIds = factories.map((f) => f.factory_id)
 
   const [selectedFactory, setSelectedFactory] = useState<string>('')
   const [date, setDate] = useState<string>(TODAY)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
-  const factoryIdsKey = factoryIds.join(',')
-  const activeFactory = selectedFactory || factoryIds[0] || ''
-
-  // Auto-select first factory when list loads
-  useEffect(() => {
-    if (!selectedFactory && factoryIdsKey) {
-      setSelectedFactory(factoryIdsKey.split(',')[0] ?? '')
-    }
-  }, [selectedFactory, factoryIdsKey])
-
   // Report fetch state
+  const [reportsLoading, setReportsLoading] = useState(true)
+  const [reports, setReports] = useState<ReportItem[]>([])
+  const [reportsError, setReportsError] = useState(false)
+  const initializedSelection = useRef(false)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportContent, setReportContent] = useState<string | null>(null)
   const [reportError, setReportError] = useState<'not_found' | 'error' | null>(null)
+
+  const reportFactoryIds = reports.map((r) => r.factory_id)
+  const factoryIds = unique([...reportFactoryIds, ...fleetFactoryIds])
+  const activeFactory = selectedFactory || reports[0]?.factory_id || factoryIds[0] || ''
+  const activeReport = reports.find((r) => r.factory_id === activeFactory && r.report_date === date)
+  const availableDatesForFactory = reports
+    .filter((r) => r.factory_id === activeFactory)
+    .map((r) => r.report_date)
+  const quickDates = unique([...availableDatesForFactory, ...REPORT_DATES]).slice(0, 10)
+
+  const fetchReportList = useCallback(async () => {
+    setReportsLoading(true)
+    setReportsError(false)
+    try {
+      const items = await fetchReports()
+      setReports(items)
+      if (!initializedSelection.current && items.length > 0) {
+        setSelectedFactory(items[0]!.factory_id)
+        setDate(items[0]!.report_date)
+        initializedSelection.current = true
+      }
+    } catch {
+      setReportsError(true)
+    } finally {
+      setReportsLoading(false)
+    }
+  }, [])
 
   const fetchReportData = useCallback(async (fid: string, d: string) => {
     if (!fid) return
@@ -311,7 +356,17 @@ export function ReportsPage() {
   }, [])
 
   useEffect(() => {
-    if (activeFactory) void fetchReportData(activeFactory, date)
+    void fetchReportList()
+  }, [fetchReportList])
+
+  useEffect(() => {
+    if (!reportsLoading && !selectedFactory && !reports.length && fleetFactoryIds.length > 0) {
+      setSelectedFactory(fleetFactoryIds[0]!)
+    }
+  }, [reportsLoading, selectedFactory, reports.length, fleetFactoryIds])
+
+  useEffect(() => {
+    if (activeFactory && date) void fetchReportData(activeFactory, date)
   }, [activeFactory, date, fetchReportData])
 
   const openDatePicker = () => {
@@ -340,7 +395,7 @@ export function ReportsPage() {
         <div className="eyebrow page-eyebrow">Risk Twin · Reports</div>
         <h1 className="page-title">일간 보고서</h1>
         <p className="page-desc">
-          공장·날짜를 선택해 Lambda가 생성한 일간 Markdown 보고서를 확인합니다.{' '}
+          S3 reports prefix에 저장된 Markdown 일간 보고서를 최신 항목부터 확인합니다.{' '}
           <span className="mono" style={{ whiteSpace: 'nowrap' }}>FR-DASH-06 · FR-DATA-07/08</span>
         </p>
       </div>
@@ -407,7 +462,7 @@ export function ReportsPage() {
 
               {/* Quick date buttons */}
               <div className="seg">
-                {REPORT_DATES.map((d) => (
+                {quickDates.map((d) => (
                   <button key={d} aria-pressed={date === d} onClick={() => setDate(d)}>
                     {d.slice(5)}
                   </button>
@@ -438,12 +493,82 @@ export function ReportsPage() {
             </button>
             <button
               className="btn"
-              onClick={() => { if (activeFactory) void fetchReportData(activeFactory, date) }}
+              onClick={() => {
+                void fetchReportList()
+                if (activeFactory) void fetchReportData(activeFactory, date)
+              }}
               title="새로고침"
             >
               <RefreshCw size={13} />새로고침
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Available reports */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="card-hd">
+          <h2 className="h2">저장된 보고서</h2>
+          <div className="micro" style={{ marginLeft: 'auto' }}>
+            {reportsLoading ? '목록 로드 중' : `${reports.length}개`}
+          </div>
+        </div>
+        <div className="card-bd" style={{ padding: reports.length ? 0 : 16 }}>
+          {reportsError && (
+            <div className="micro" style={{ color: 'var(--crit)' }}>
+              S3 보고서 목록을 불러오지 못했습니다. 공장·날짜를 직접 선택해 조회할 수 있습니다.
+            </div>
+          )}
+          {!reportsError && !reportsLoading && reports.length === 0 && (
+            <div className="micro">아직 S3에 저장된 일간 보고서가 없습니다.</div>
+          )}
+          {reports.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>보고서</th>
+                    <th>생성/수정</th>
+                    <th>크기</th>
+                    <th>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.slice(0, 8).map((r) => {
+                    const selected = r.factory_id === activeFactory && r.report_date === date
+                    return (
+                      <tr
+                        key={`${r.report_date}-${r.factory_id}`}
+                        onClick={() => { setSelectedFactory(r.factory_id); setDate(r.report_date) }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <strong style={{ color: 'var(--ink)' }}>{r.factory_id} · {r.report_date}</strong>
+                            <span className="mono" style={{ color: 'var(--ink-4)', fontSize: 11 }}>
+                              {r.s3_key ?? 'reports/daily/.../report.md'}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <Clock size={12} style={{ color: 'var(--ink-4)' }} />
+                            {formatDateTime(r.last_modified)}
+                          </span>
+                        </td>
+                        <td className="mono">{formatBytes(r.size_bytes)}</td>
+                        <td>
+                          <span className={`pill ${selected ? 'safe' : 'unk'}`}>
+                            {selected ? '표시 중' : 'ready'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -488,6 +613,9 @@ export function ReportsPage() {
           <div className="card-hd">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
               <h2 className="h2" style={{ whiteSpace: 'nowrap' }}>{activeFactory} · {date}</h2>
+              {activeReport?.last_modified && (
+                <span className="micro">S3 updated {formatDateTime(activeReport.last_modified)}</span>
+              )}
             </div>
           </div>
           <div className="card-bd">

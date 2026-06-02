@@ -229,4 +229,6 @@ export interface ReportItem {
   report_date: string
   factory_id: string
   s3_key?: string
+  last_modified?: string | null
+  size_bytes?: number | null
 }
