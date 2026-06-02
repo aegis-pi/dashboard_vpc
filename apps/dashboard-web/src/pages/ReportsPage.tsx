@@ -371,7 +371,7 @@ export function ReportsPage() {
         }}>
           {/* Factory selector */}
           {factoryIds.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
               <span className="eyebrow">공장</span>
               <div className="seg">
                 {factoryIds.map((fid) => (
@@ -388,7 +388,7 @@ export function ReportsPage() {
           )}
 
           {/* Date selector */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
             <span className="eyebrow">날짜</span>
             {/* Calendar picker button */}
             <label
@@ -423,7 +423,7 @@ export function ReportsPage() {
           </div>
 
           {/* Quick date buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
             <span className="eyebrow">빠른 선택</span>
             <div className="seg">
               {quickDates.map((d) => (
@@ -435,7 +435,7 @@ export function ReportsPage() {
           </div>
 
           {/* Export buttons */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', alignSelf: 'center' }}>
             <button
               className="btn"
               onClick={() => doExport('pdf')}
