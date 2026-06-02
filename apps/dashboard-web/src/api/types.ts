@@ -232,3 +232,152 @@ export interface ReportItem {
   last_modified?: string | null
   size_bytes?: number | null
 }
+
+// ─── Cloud infra status ───────────────────────────────────────────────
+export type CloudInfraStatusValue = 'normal' | 'warning' | 'critical' | 'unknown'
+
+export interface CloudInfraEcs {
+  cluster_name?: string
+  service_name?: string
+  status?: string
+  desired_count?: number | null
+  running_count?: number | null
+  pending_count?: number | null
+  cpu_utilization_avg?: number | null
+  cpu_utilization_max?: number | null
+  memory_utilization_avg?: number | null
+  memory_utilization_max?: number | null
+}
+
+export interface CloudInfraAlb {
+  target_group_name?: string
+  healthy_host_count?: number | null
+  unhealthy_host_count?: number | null
+  target_5xx_count_5m?: number | null
+  target_response_time_avg?: number | null
+  target_response_time_p95?: number | null
+}
+
+export interface CloudInfraLambda {
+  name?: string
+  invocations_5m?: number | null
+  errors_5m?: number | null
+  throttles_5m?: number | null
+  duration_p95_ms?: number | null
+}
+
+export interface CloudInfraFactoryFreshness {
+  factory_id?: string
+  pipeline_status?: PipelineStatus | string
+  latest_infra_state_age_seconds?: number | null
+  last_infra_state_at?: string | null
+  risk_score?: number | null
+  risk_level?: RiskLevel | string
+  top_causes?: (TopCause | string)[]
+}
+
+export interface CloudInfraFast {
+  status?: CloudInfraStatusValue
+  backend_runtime?: {
+    status?: CloudInfraStatusValue
+    ecs?: CloudInfraEcs
+    alb?: CloudInfraAlb
+  }
+  data_pipeline?: {
+    status?: CloudInfraStatusValue
+    lambdas?: CloudInfraLambda[]
+    dynamodb?: {
+      table_name?: string
+      read_throttle_events_5m?: number | null
+      write_throttle_events_5m?: number | null
+      system_errors_5m?: number | null
+    }
+    schedulers?: { name?: string; state?: string }[]
+  }
+  factory_freshness?: {
+    status?: CloudInfraStatusValue
+    factories?: CloudInfraFactoryFreshness[]
+  }
+  errors?: string[]
+}
+
+export interface CloudInfraSlow {
+  status?: CloudInfraStatusValue
+  eks_management?: {
+    status?: CloudInfraStatusValue
+    cluster?: { name?: string; status?: string; version?: string }
+    nodegroups?: {
+      name?: string
+      status?: string
+      desired_size?: number | null
+      min_size?: number | null
+      max_size?: number | null
+      health_issues?: unknown[]
+    }[]
+    autoscaling?: {
+      desired_capacity?: number | null
+      healthy_instances?: number | null
+      total_instances?: number | null
+    }
+    nodes?: {
+      status?: CloudInfraStatusValue
+      ready?: number | null
+      total?: number | null
+      items?: { name?: string; ready?: boolean; cpu_utilization_percent?: number | null; memory_utilization_percent?: number | null }[]
+    }
+    pods?: {
+      status?: CloudInfraStatusValue
+      running?: number | null
+      pending?: number | null
+      failed?: number | null
+      restart_count_total?: number | null
+      top_by_cpu?: { namespace?: string; pod?: string; cpu_millicores?: number | null; memory_mib?: number | null }[]
+      top_by_memory?: { namespace?: string; pod?: string; cpu_millicores?: number | null; memory_mib?: number | null }[]
+    }
+    argocd?: {
+      status?: CloudInfraStatusValue
+      applications_total?: number | null
+      synced?: number | null
+      out_of_sync?: number | null
+      healthy?: number | null
+      degraded?: number | null
+    }
+  }
+  storage_freshness?: {
+    status?: CloudInfraStatusValue
+    factories?: {
+      factory_id?: string
+      status?: CloudInfraStatusValue
+      latest_raw_at?: string | null
+      latest_processed_at?: string | null
+      latest_processed_agg_at?: string | null
+    }[]
+  }
+  errors?: string[]
+}
+
+export interface CloudInfraStatus {
+  available: boolean
+  schema_version?: string
+  updated_at?: string
+  fast_updated_at?: string
+  slow_updated_at?: string
+  fast_stale?: boolean
+  slow_stale?: boolean
+  fast_age_seconds?: number | null
+  slow_age_seconds?: number | null
+  overall_status?: CloudInfraStatusValue
+  fast?: CloudInfraFast
+  slow?: CloudInfraSlow
+  [key: string]: unknown
+}
+
+export interface CloudInfraHistoryItem {
+  sk?: string
+  updated_at?: string
+  overall_status?: CloudInfraStatusValue
+  snapshot_type?: 'fast' | 'slow' | string
+  fast?: CloudInfraFast
+  slow?: CloudInfraSlow
+  [key: string]: unknown
+}

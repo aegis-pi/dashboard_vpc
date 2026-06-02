@@ -6,9 +6,12 @@ import {
   LogOut,
   ChevronLeft,
   RefreshCw,
+  Server,
 } from 'lucide-react'
 import { logout } from '../auth/auth'
 import type { WsStatus } from '../hooks/useWebSocket'
+import { useCloudInfra } from '../hooks/useCloudInfra'
+import { cloudInfraDotColor } from '../adapters/cloudInfra'
 import { ConnStatus } from './ConnStatus'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────
@@ -19,9 +22,12 @@ interface SidebarProps {
 export function Sidebar({ factories = [] }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { data: cloudInfra } = useCloudInfra()
 
   const isFleet = location.pathname === '/'
   const isReports = location.pathname === '/reports'
+  const isCloudInfra = location.pathname === '/cloud-infra'
+  const cloudStatus = cloudInfra?.available ? cloudInfra.overall_status : undefined
 
   // Parse current factory ID from the URL so the Factories section never
   // disappears during loading — even on direct URL access or page refresh.
@@ -101,6 +107,19 @@ export function Sidebar({ factories = [] }: SidebarProps) {
             })}
           </>
         )}
+
+        <div className="sidebar-nav-label" style={{ marginTop: 8 }}>System</div>
+        <button
+          className={`nav-item ${isCloudInfra ? 'active' : ''}`}
+          onClick={() => navigate('/cloud-infra')}
+        >
+          <Server size={15} />
+          <span style={{ flex: 1 }}>클라우드 인프라</span>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: cloudInfraDotColor(cloudStatus), flexShrink: 0,
+          }} />
+        </button>
 
         <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Workspace</div>
         <button

@@ -5,6 +5,8 @@ import type {
   HistoryItem,
   ReportItem,
   FactorySummary,
+  CloudInfraStatus,
+  CloudInfraHistoryItem,
 } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -116,4 +118,19 @@ export async function fetchReport(
   if (res.status === 401) throw new AuthError('인증 만료')
   if (!res.ok) throw new ApiError(`API 오류 ${res.status}`, res.status)
   return res.text()
+}
+
+export async function fetchCloudInfra(): Promise<CloudInfraStatus> {
+  return apiFetch<CloudInfraStatus>('/cloud-infra')
+}
+
+export async function fetchCloudInfraHistory(
+  window: '1h' | '6h' | '24h' = '1h',
+  track: 'fast' | 'slow' = 'fast',
+  limit?: number,
+): Promise<CloudInfraHistoryItem[]> {
+  const params = new URLSearchParams({ window, track })
+  if (limit != null) params.set('limit', String(limit))
+  const raw = await apiFetch<unknown>(`/cloud-infra/history?${params.toString()}`)
+  return Array.isArray(raw) ? raw as CloudInfraHistoryItem[] : []
 }

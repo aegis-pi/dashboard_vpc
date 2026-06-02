@@ -4,6 +4,7 @@ import { getCurrentUser } from './auth/auth'
 import { FleetPage } from './pages/FleetPage'
 import { FactoryPage } from './pages/FactoryPage'
 import { ReportsPage } from './pages/ReportsPage'
+import { CloudInfraPage } from './pages/CloudInfraPage'
 import { LoginPage } from './pages/LoginPage'
 import { CallbackPage } from './pages/CallbackPage'
 
@@ -42,6 +43,7 @@ export function App() {
         <Route path="/callback" element={<CallbackPage />} />
         <Route path="/" element={<RequireAuth><FleetPage /></RequireAuth>} />
         <Route path="/factory/:factoryId" element={<RequireAuth><FactoryPage /></RequireAuth>} />
+        <Route path="/cloud-infra" element={<RequireAuth><CloudInfraPage /></RequireAuth>} />
         <Route path="/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
