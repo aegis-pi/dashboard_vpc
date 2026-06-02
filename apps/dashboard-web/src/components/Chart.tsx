@@ -19,7 +19,7 @@ import { subsampleData } from '../utils/subsample'
 
 const NODE_COLORS = [
   'var(--accent)',
-  'var(--warn)',
+  '#D6A100',
   'var(--safe)',
   '#7C3AED',
   '#0891B2',
@@ -27,6 +27,19 @@ const NODE_COLORS = [
   '#475569',
   '#4F46E5',
 ]
+
+function colorForNode(nodeId: string): string {
+  const normalized = nodeId.toLowerCase()
+  if (/\bmaster\b|(^|[-_])master($|[-_])/.test(normalized)) return NODE_COLORS[0]
+  if (/\bworker[-_]?1\b|(^|[-_])worker[-_]?1($|[-_])/.test(normalized)) return NODE_COLORS[1]
+  if (/\bworker[-_]?2\b|(^|[-_])worker[-_]?2($|[-_])/.test(normalized)) return NODE_COLORS[2]
+
+  let hash = 0
+  for (let i = 0; i < nodeId.length; i += 1) {
+    hash = (hash * 31 + nodeId.charCodeAt(i)) >>> 0
+  }
+  return NODE_COLORS[hash % NODE_COLORS.length]
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function extractTimestamp(item: HistoryItem): string | undefined {
@@ -1006,13 +1019,13 @@ export function NodeResourceChart({ items, field, label, window }: {
           />
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           {isBucket && <NoDataAreas rows={data} axis={axis} />}
-          {activeNodeIds.map((nid, i) => (
+          {activeNodeIds.map((nid) => (
             <Line
               key={nid}
               type="monotone"
               dataKey={nid}
               name={nid}
-              stroke={NODE_COLORS[i % NODE_COLORS.length]}
+              stroke={colorForNode(nid)}
               strokeWidth={1.6}
               dot={false}
             />
