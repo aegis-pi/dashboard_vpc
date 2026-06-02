@@ -48,16 +48,13 @@ function ageSeconds(ts?: string): number {
 }
 
 export function StaleBadge({
-  lastFactoryStateAt,
   lastInfraStateAt,
 }: {
-  lastFactoryStateAt?: string
   lastInfraStateAt?: string
 }) {
-  const fAge = ageSeconds(lastFactoryStateAt)
   const iAge = ageSeconds(lastInfraStateAt)
-  if (fAge <= 10 && iAge <= 40) return null
-  const isCrit = iAge > 60
+  if (iAge <= 60) return null
+  const isCrit = iAge > 120
   return (
     <span className={`pill ${isCrit ? 'crit' : 'warn'}`} style={{ padding: '3px 6px', fontSize: 10 }}>
       <span className="dot" />

@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { StaleBadge } from '../components/Badge'
 import { riskColor, relTime } from '../utils/format'
 
 describe('riskColor', () => {
@@ -23,5 +26,37 @@ describe('relTime', () => {
   it('returns 방금 for recent timestamp', () => {
     const now = new Date().toISOString()
     expect(relTime(now)).toBe('방금')
+  })
+})
+
+describe('StaleBadge', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function renderBadge(secondsAgo: number) {
+    vi.setSystemTime(new Date('2026-06-02T12:00:00.000Z'))
+    const ts = new Date(Date.now() - secondsAgo * 1000).toISOString()
+    return renderToStaticMarkup(createElement(StaleBadge, { lastInfraStateAt: ts }))
+  }
+
+  it('does not render at 60 seconds or below', () => {
+    vi.useFakeTimers()
+    expect(renderBadge(60)).toBe('')
+  })
+
+  it('renders warning after 60 seconds', () => {
+    vi.useFakeTimers()
+    const html = renderBadge(61)
+    expect(html).toContain('데이터 지연')
+    expect(html).toContain('warn')
+    expect(html).toContain('infra 61s')
+  })
+
+  it('renders critical after 120 seconds', () => {
+    vi.useFakeTimers()
+    const html = renderBadge(121)
+    expect(html).toContain('crit')
+    expect(html).toContain('infra 121s')
   })
 })

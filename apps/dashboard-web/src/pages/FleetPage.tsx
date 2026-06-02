@@ -369,7 +369,6 @@ function FactoryCard({
           updated <strong>{relTime(f.updated_at)}</strong>
         </span>
         <StaleBadge
-          lastFactoryStateAt={f.last_factory_state_at}
           lastInfraStateAt={f.last_infra_state_at}
         />
       </div>
