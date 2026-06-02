@@ -294,6 +294,13 @@ function unique<T>(items: T[]): T[] {
   return Array.from(new Set(items))
 }
 
+function sortIds(ids: string[]): string[] {
+  return [...ids].sort((a, b) => a.localeCompare(b, undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  }))
+}
+
 export function ReportsPage() {
   const { data: fleetData } = useFactories()
   const factories = (fleetData?.factories ?? []).map(adaptSidebarFactory)
@@ -313,7 +320,7 @@ export function ReportsPage() {
   const [reportError, setReportError] = useState<'not_found' | 'error' | null>(null)
 
   const reportFactoryIds = reports.map((r) => r.factory_id)
-  const factoryIds = unique([...reportFactoryIds, ...fleetFactoryIds])
+  const factoryIds = sortIds(unique([...reportFactoryIds, ...fleetFactoryIds]))
   const activeFactory = selectedFactory || reports[0]?.factory_id || factoryIds[0] || ''
   const activeReport = reports.find((r) => r.factory_id === activeFactory && r.report_date === date)
   const availableDatesForFactory = reports
