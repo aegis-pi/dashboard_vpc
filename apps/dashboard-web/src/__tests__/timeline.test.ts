@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildTimelineDateOptions,
+  buildTimelineTimeOptions,
   clampTimelineEndValue,
   clampTimelineStartValue,
   deriveTimelineEvents,
+  resolveTimelineSelectValue,
   resolveTimelineRange,
 } from '../utils/timeline'
 import type { HistoryItem } from '../api/types'
@@ -76,6 +79,57 @@ describe('timeline range helpers', () => {
       start: '2026-06-01T12:00',
       end: '2026-06-01T13:00',
     })
+  })
+})
+
+describe('timeline select options', () => {
+  it('only exposes dates inside the allowed range', () => {
+    const options = buildTimelineDateOptions('2026-06-01T12:00', '2026-06-02T12:00')
+
+    expect(options.map((o) => o.value)).toEqual(['2026-06-01', '2026-06-02'])
+  })
+
+  it('hides times outside the selected date bounds', () => {
+    const options = buildTimelineTimeOptions(
+      '2026-06-01',
+      '2026-06-01T12:00',
+      '2026-06-02T12:00',
+    )
+
+    expect(options[0]?.value).toBe('12:00')
+    expect(options.some((o) => o.value === '11:55')).toBe(false)
+    expect(options.some((o) => o.value === '23:55')).toBe(true)
+  })
+
+  it('hides end times that are not after the current start', () => {
+    const options = buildTimelineTimeOptions(
+      '2026-06-02',
+      '2026-06-02T10:01',
+      '2026-06-02T12:00',
+    )
+
+    expect(options[0]?.value).toBe('10:01')
+    expect(options.some((o) => o.value === '10:00')).toBe(false)
+  })
+
+  it('preserves a current value that is not on a 5-minute boundary', () => {
+    const options = buildTimelineTimeOptions(
+      '2026-06-02',
+      '2026-06-02T10:00',
+      '2026-06-02T12:00',
+      '2026-06-02T11:37',
+    )
+
+    expect(options.some((o) => o.value === '11:37')).toBe(true)
+  })
+
+  it('clamps a date/time pair to the date-specific bounds', () => {
+    expect(resolveTimelineSelectValue(
+      '2026-06-01',
+      '10:00',
+      '2026-06-01T12:00',
+      '2026-06-02T12:00',
+    )).toBe('2026-06-01T12:00')
   })
 })
 

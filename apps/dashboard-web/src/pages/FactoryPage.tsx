@@ -13,10 +13,13 @@ import {
   TIMELINE_MAX_RANGE_MS,
   TIMELINE_PRESETS,
   TIMELINE_RAW_LIMIT,
+  buildTimelineDateOptions,
+  buildTimelineTimeOptions,
   clampTimelineEndValue,
   clampTimelineStartValue,
   deriveTimelineEvents,
   filterTimelineHistory,
+  resolveTimelineSelectValue,
   resolveTimelineRange,
   toDatetimeLocalValue,
   type TimelineEvent,
@@ -1190,6 +1193,14 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
 
   const pickerMax = toDatetimeLocalValue(new Date(nowTick))
   const pickerMin = toDatetimeLocalValue(new Date(nowTick - TIMELINE_MAX_RANGE_MS))
+  const startPickerMax = toDatetimeLocalValue(new Date(Math.max(
+    new Date(customEnd).getTime() - 60_000,
+    nowTick - TIMELINE_MAX_RANGE_MS,
+  )))
+  const endPickerMin = toDatetimeLocalValue(new Date(Math.min(
+    new Date(customStart).getTime() + 60_000,
+    nowTick,
+  )))
 
   const handleStartChange = useCallback((val: string) => {
     const next = clampTimelineStartValue(val, customEnd, nowTick)
@@ -1276,9 +1287,9 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
         </div>
         {mode === 'custom' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <TimelineDateInput label="start" value={customStart} min={pickerMin} max={customEnd || pickerMax} onChange={handleStartChange} />
+            <TimelineDateInput label="start" value={customStart} min={pickerMin} max={startPickerMax} onChange={handleStartChange} />
             <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>~</span>
-            <TimelineDateInput label="end" value={customEnd} min={customStart || pickerMin} max={pickerMax} onChange={handleEndChange} />
+            <TimelineDateInput label="end" value={customEnd} min={endPickerMin} max={pickerMax} onChange={handleEndChange} />
           </div>
         )}
       </div>
@@ -1313,21 +1324,52 @@ function TimelineDateInput({ label, value, min, max, onChange }: {
   max: string
   onChange: (value: string) => void
 }) {
+  const selectedDate = value.slice(0, 10)
+  const selectedTime = value.slice(11, 16)
+  const dateOptions = buildTimelineDateOptions(min, max)
+  const activeDate = dateOptions.some((option) => option.value === selectedDate)
+    ? selectedDate
+    : dateOptions[0]?.value ?? selectedDate
+  const timeOptions = buildTimelineTimeOptions(activeDate, min, max, value)
+  const activeTime = timeOptions.some((option) => option.value === selectedTime)
+    ? selectedTime
+    : timeOptions[0]?.value ?? selectedTime
+
+  const handleDateChange = (dateValue: string) => {
+    const next = resolveTimelineSelectValue(dateValue, activeTime, min, max)
+    if (next) onChange(next)
+  }
+
+  const handleTimeChange = (timeValue: string) => {
+    const next = resolveTimelineSelectValue(activeDate, timeValue, min, max)
+    if (next) onChange(next)
+  }
+
+  const selectStyle = {
+    height: 30,
+    border: '1px solid var(--line-2)',
+    borderRadius: 6,
+    background: 'var(--surface)',
+    color: 'var(--ink)',
+    padding: '0 8px',
+    fontSize: 11.5,
+  } as const
+
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span className="eyebrow">{label}</span>
-      <input
-        type="datetime-local"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(ev) => onChange(ev.target.value)}
-        style={{
-          height: 30, border: '1px solid var(--line-2)', borderRadius: 6,
-          background: 'var(--surface)', color: 'var(--ink)', padding: '0 8px',
-          fontSize: 11.5,
-        }}
-      />
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <select value={activeDate} onChange={(ev) => handleDateChange(ev.target.value)} style={selectStyle}>
+          {dateOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <select value={activeTime} onChange={(ev) => handleTimeChange(ev.target.value)} style={selectStyle}>
+          {timeOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </span>
     </label>
   )
 }

@@ -6,6 +6,7 @@ export const TIMELINE_MAX_RANGE_MS = 24 * 60 * 60 * 1000
 const TIMELINE_RAW_RANGE_MS = 60 * 60 * 1000
 const TIMELINE_PICKER_GRACE_MS = 60 * 1000
 const TIMELINE_AUTO_RANGE_MS = 60 * 60 * 1000
+const TIMELINE_SELECT_STEP_MS = 5 * 60 * 1000
 export const TIMELINE_RAW_LIMIT = 2000
 
 export interface TimelineEvent {
@@ -14,6 +15,11 @@ export interface TimelineEvent {
   title: string
   detail: string
   ts: number
+}
+
+export interface TimelineSelectOption {
+  value: string
+  label: string
 }
 
 export function deriveTimelineEvents(history: HistoryItem[], prevContext?: HistoryItem): TimelineEvent[] {
@@ -100,6 +106,86 @@ export function deriveTimelineEvents(history: HistoryItem[], prevContext?: Histo
 export function toDatetimeLocalValue(date: Date) {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function buildTimelineDateOptions(minValue: string, maxValue: string): TimelineSelectOption[] {
+  const minMs = new Date(minValue).getTime()
+  const maxMs = new Date(maxValue).getTime()
+  if (!Number.isFinite(minMs) || !Number.isFinite(maxMs) || minMs > maxMs) return []
+
+  const options: TimelineSelectOption[] = []
+  let cursor = startOfLocalDay(minMs)
+  const endDay = startOfLocalDay(maxMs)
+
+  while (cursor <= endDay) {
+    const dayStart = cursor
+    const dayEnd = endOfLocalDay(cursor)
+    if (Math.max(minMs, dayStart) <= Math.min(maxMs, dayEnd)) {
+      const dateValue = toDateValue(new Date(cursor))
+      options.push({ value: dateValue, label: formatSelectDateLabel(cursor) })
+    }
+    cursor = addLocalDays(cursor, 1)
+  }
+
+  return options
+}
+
+export function buildTimelineTimeOptions(
+  dateValue: string,
+  minValue: string,
+  maxValue: string,
+  currentValue?: string,
+): TimelineSelectOption[] {
+  const minMs = new Date(minValue).getTime()
+  const maxMs = new Date(maxValue).getTime()
+  if (!dateValue || !Number.isFinite(minMs) || !Number.isFinite(maxMs) || minMs > maxMs) return []
+
+  const dayMs = new Date(`${dateValue}T00:00`).getTime()
+  if (!Number.isFinite(dayMs)) return []
+
+  const lowerMs = Math.max(minMs, dayMs)
+  const upperMs = Math.min(maxMs, endOfLocalDay(dayMs))
+  if (lowerMs > upperMs) return []
+
+  const values = new Set<number>()
+  values.add(floorToMinute(lowerMs))
+  values.add(floorToMinute(upperMs))
+
+  const firstStepMs = Math.ceil(lowerMs / TIMELINE_SELECT_STEP_MS) * TIMELINE_SELECT_STEP_MS
+  for (let ms = firstStepMs; ms <= upperMs; ms += TIMELINE_SELECT_STEP_MS) {
+    values.add(floorToMinute(ms))
+  }
+
+  if (currentValue?.startsWith(`${dateValue}T`)) {
+    const currentMs = new Date(currentValue).getTime()
+    if (Number.isFinite(currentMs) && currentMs >= lowerMs && currentMs <= upperMs) {
+      values.add(floorToMinute(currentMs))
+    }
+  }
+
+  return Array.from(values)
+    .sort((a, b) => a - b)
+    .map((ms) => ({ value: toTimeValue(new Date(ms)), label: toTimeValue(new Date(ms)) }))
+}
+
+export function resolveTimelineSelectValue(
+  dateValue: string,
+  timeValue: string,
+  minValue: string,
+  maxValue: string,
+) {
+  const minMs = new Date(minValue).getTime()
+  const maxMs = new Date(maxValue).getTime()
+  const candidateMs = new Date(`${dateValue}T${timeValue}`).getTime()
+  const dayMs = new Date(`${dateValue}T00:00`).getTime()
+  if (!Number.isFinite(minMs) || !Number.isFinite(maxMs) || !Number.isFinite(dayMs)) return null
+
+  const lowerMs = Math.max(minMs, dayMs)
+  const upperMs = Math.min(maxMs, endOfLocalDay(dayMs))
+  if (lowerMs > upperMs) return null
+
+  const nextMs = Number.isFinite(candidateMs) ? clampMs(candidateMs, lowerMs, upperMs) : lowerMs
+  return toDatetimeLocalValue(new Date(nextMs))
 }
 
 export function resolveTimelineRange(startValue: string, endValue: string, nowMs = Date.now()): {
@@ -219,4 +305,37 @@ function levelKr(l?: string) {
 
 function clampMs(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function toDateValue(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function toTimeValue(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function startOfLocalDay(ms: number) {
+  const d = new Date(ms)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+function endOfLocalDay(ms: number) {
+  const d = new Date(ms)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime()
+}
+
+function addLocalDays(ms: number, days: number) {
+  const d = new Date(ms)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days).getTime()
+}
+
+function floorToMinute(ms: number) {
+  return Math.floor(ms / 60_000) * 60_000
+}
+
+function formatSelectDateLabel(ms: number) {
+  return new Date(ms).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
 }
