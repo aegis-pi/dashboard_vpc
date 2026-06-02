@@ -53,6 +53,14 @@ type BucketAxis = {
   hasLeadingGap: boolean
 }
 
+type BucketChartRow = {
+  x: number | null
+  ts: string
+  bucket_start?: string
+  bucket_end?: string
+}
+type NodeChartRow = BucketChartRow & Record<string, string | number | null | undefined>
+
 function toTimeMs(ts?: string): number | null {
   if (!ts) return null
   const value = Date.parse(ts)
@@ -97,6 +105,23 @@ function bucketXAxisProps(axis: BucketAxis | null) {
   }
 }
 
+function withBucketAxisAnchors<T extends BucketChartRow>(data: T[], axis: BucketAxis | null): T[] {
+  if (!axis || data.length === 0) return data
+  const startAnchor = {
+    x: axis.windowStartMs,
+    ts: fmtTimeShort(new Date(axis.windowStartMs).toISOString()),
+    bucket_start: new Date(axis.windowStartMs).toISOString(),
+    bucket_end: new Date(axis.windowStartMs).toISOString(),
+  } as T
+  const endAnchor = {
+    x: axis.windowEndMs,
+    ts: fmtTimeShort(new Date(axis.windowEndMs).toISOString()),
+    bucket_start: new Date(axis.windowEndMs).toISOString(),
+    bucket_end: new Date(axis.windowEndMs).toISOString(),
+  } as T
+  return [startAnchor, ...data, endAnchor]
+}
+
 function LeadingNoDataArea({ axis }: { axis: BucketAxis | null }) {
   if (!axis?.hasLeadingGap) return null
   return (
@@ -125,7 +150,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
 
   if (isBucket) {
     const axis = resolveBucketAxis(items, window)
-    const data = sampledItems
+    const data = withBucketAxisAnchors(sampledItems
       .map((it) => ({
         x: toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)),
         ts: fmtTimeShort(it.bucket_start || it.timestamp),
@@ -136,7 +161,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }))
-      .filter((d) => d.x != null && (d.avg != null || d.min != null))
+      .filter((d) => d.x != null && (d.avg != null || d.min != null)), axis)
 
     if (data.length === 0) {
       return <EmptyChart message="선택한 시간 범위에 Risk 데이터가 없습니다" />
@@ -430,7 +455,7 @@ export function SensorChart({ items, field, label, unit, window }: {
 
   if (isBucket) {
     const axis = resolveBucketAxis(items, window)
-    const data = sampledItems
+    const data = withBucketAxisAnchors(sampledItems
       .map((it) => {
         const avgRaw = readBucketValue(it, field, 'mean')
         const minRaw = readBucketValue(it, minField, 'min')
@@ -455,7 +480,7 @@ export function SensorChart({ items, field, label, unit, window }: {
           bucket_end: it.bucket_end,
         }
       })
-      .filter((d) => d.x != null && (d.avg != null || d.max != null || d.min != null))
+      .filter((d) => d.x != null && (d.avg != null || d.max != null || d.min != null)), axis)
 
     if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
 
@@ -656,7 +681,7 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
 
   if (isBucket) {
     const axis = resolveBucketAxis(items, window)
-    const data = sampledItems
+    const data = withBucketAxisAnchors(sampledItems
       .map((it) => {
         const fireMax = (it.fire_score_max as number | null | undefined) ?? null
         const fallMax = (it.fall_score_max as number | null | undefined) ?? null
@@ -679,7 +704,7 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
           bucket_end: it.bucket_end,
         }
       })
-      .filter((d) => d.x != null && (d.fire != null || d.fall != null || d.bend != null))
+      .filter((d) => d.x != null && (d.fire != null || d.fall != null || d.bend != null)), axis)
 
     if (data.length === 0) {
       return <EmptyChart message="AI Score 데이터 없음" />
@@ -803,13 +828,13 @@ export function NodeResourceChart({ items, field, label, window }: {
       'disk_usage_percent_last'
     const aggLabel = field === 'disk_usage_percent' ? `${label} (last)` : `${label} (평균)`
 
-    const aggData = sampledItems
+    const aggData = withBucketAxisAnchors(sampledItems
       .map((it) => ({
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         value: (it[aggField] as number | null | undefined) ?? null,
       }))
-      .filter((d) => (!isBucket || d.x != null) && d.value != null)
+      .filter((d) => (!isBucket || d.x != null) && d.value != null), axis)
 
     if (aggData.length === 0) {
       return <EmptyChart message={`${label} 데이터 없음`} />
@@ -848,9 +873,9 @@ export function NodeResourceChart({ items, field, label, window }: {
   const activeIds = nodeIds.size > 0 ? nodeIds : nodeIdsMean
   const useMean = nodeIds.size === 0
 
-  const data = sampledItems
+  const data = withBucketAxisAnchors(sampledItems
     .map((it) => {
-      const row: Record<string, string | number | null> = {
+      const row: NodeChartRow = {
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
       }
@@ -869,7 +894,7 @@ export function NodeResourceChart({ items, field, label, window }: {
       })
       return row
     })
-    .filter((row) => !isBucket || row.x != null)
+    .filter((row) => !isBucket || row.x != null), axis)
 
   return (
     <div className="chart-wrap">
