@@ -25,6 +25,11 @@ from config import get_settings
 LATEST_SK = "LATEST"
 HISTORY_STATE_PREFIX = "HISTORY#STATE#"
 GRAPH_5M_PREFIX = "GRAPH#5M#"
+CLOUD_INFRA_PK = "CLOUD#infra"
+CLOUD_INFRA_HISTORY_PREFIXES = {
+    "fast": "HISTORY#FAST#",
+    "slow": "HISTORY#SLOW#",
+}
 MAX_BATCH_GET_KEYS = 100
 _ddb_semaphore: asyncio.Semaphore | None = None
 _ddb_semaphore_limit: int | None = None
@@ -117,6 +122,13 @@ def _get_latest_sync(table_name: str, factory_id: str) -> dict | None:
     return _from_ddb(item) if item else None
 
 
+def _get_cloud_infra_latest_sync(table_name: str) -> dict | None:
+    table = _ddb().Table(table_name)
+    resp = table.get_item(Key={"pk": CLOUD_INFRA_PK, "sk": LATEST_SK})
+    item = resp.get("Item")
+    return _from_ddb(item) if item else None
+
+
 def _list_factories_sync(table_name: str, factory_ids: list[str]) -> list[dict]:
     if not factory_ids:
         return []
@@ -205,11 +217,44 @@ def _get_history_sync(
     return [_from_ddb(i) for i in reversed(items[:max_items])]
 
 
+def _get_cloud_infra_history_sync(
+    table_name: str,
+    track: str,
+    since_sk: str,
+    max_items: int = 500,
+) -> list[dict]:
+    prefix = CLOUD_INFRA_HISTORY_PREFIXES[track]
+    page_size = min(300, max_items)
+    table = _ddb().Table(table_name)
+    kwargs: dict = dict(
+        KeyConditionExpression=(
+            Key("pk").eq(CLOUD_INFRA_PK)
+            & Key("sk").between(since_sk, f"{prefix}~")
+        ),
+        ScanIndexForward=False,
+        Limit=page_size,
+    )
+    items: list = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if len(items) >= max_items or "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+    return [_from_ddb(i) for i in reversed(items[:max_items])]
+
+
 # ─── Public async interface ───────────────────────────────────────────────────
 
 async def get_factory_latest(factory_id: str) -> dict | None:
     table_name = get_settings().ddb_table_status
     return await _run_ddb(_get_latest_sync, table_name, factory_id)
+
+
+async def get_cloud_infra_latest() -> dict | None:
+    table_name = get_settings().ddb_table_status
+    return await _run_ddb(_get_cloud_infra_latest_sync, table_name)
 
 
 async def list_factories() -> list[dict]:
@@ -247,6 +292,23 @@ async def get_factory_history(
     extracted = [_extract_graph_5m(i) for i in raw]
     n = _bucket_size_for_window(window)
     return _reaggregate_extracted(extracted, n) if n > 1 else extracted
+
+
+async def get_cloud_infra_history(
+    window: str = "1h",
+    track: str = "fast",
+    max_items: int = 500,
+) -> list[dict]:
+    table_name = get_settings().ddb_table_status
+    prefix = CLOUD_INFRA_HISTORY_PREFIXES[track]
+    since_sk = f"{prefix}{_since_iso(window)}"
+    return await _run_ddb(
+        _get_cloud_infra_history_sync,
+        table_name,
+        track,
+        since_sk,
+        max_items,
+    )
 
 
 # ─── Private utilities ────────────────────────────────────────────────────────
