@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: source of truth
-기준일: 2026-06-01
+기준일: 2026-06-02
 수정 이력:
+  - 2026-06-02  `/reports` · `/reports/{date}/{factory_id}` endpoint를 skeleton/DDB 기준에서 S3 `reports/daily/` 기반 구현 완료로 현행화. 응답 필드/IAM/경로 note 추가(ADR 0029). `/cloud-infra` · `/cloud-infra/history`는 백엔드 read 구현(작업 트리, 미배포) 상태로 현행화.
   - 2026-06-01  history endpoint의 `window<=1h` HISTORY#STATE 조회 기준과 Timeline `10m/custom` 사용 범위 반영.
   - 2026-06-01  Cloud Infra Status API(`/cloud-infra`, `/cloud-infra/history`) 추가. 데이터 계약은 `docs/planning/29` / ADR 0027, BE/FE 계약은 `06_cloud_infra_view.md`.
   - 2026-06-01  GRAPH#5M 응답 필드에 센서 min/max와 AI mean/max 분리 기준 추가.
@@ -90,17 +91,36 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/factories/{factory_id}` | Cognito JWT | 단일 공장 latest 전체 | DDB GetItem | 구현 완료 |
 | GET | `/factories/{factory_id}/history?window=10m\|1h` | Cognito JWT | 원시 시계열 (risk/factory_state/infra_state 통합, Timeline 원인 표시 포함) | DDB Query (`sk BETWEEN HISTORY#STATE#`, `limit` cap) | 구현 완료 |
 | GET | `/factories/{factory_id}/history?window=>1h` (`6h\|12h\|24h` 등) | Cognito JWT | 5분 avg/min/max 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 24h 기준 최대 288 items) | **구현 완료** (ADR 0025) |
-| GET | `/reports` | Cognito JWT | 보고서 목록 (skeleton) | DDB Query `aegis-daily-report` — LLM report-generator 후속 작업 이후 | skeleton |
-| GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 (skeleton) | DDB GetItem + S3 GetObject (reports/) — LLM report-generator 후속 작업 이후 | skeleton |
+| GET | `/reports` | Cognito JWT | 일간 Markdown 보고서 목록 | S3 ListObjectsV2 (`reports/daily/` prefix) | 구현 완료 |
+| GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 본문 (`text/markdown`) | S3 GetObject (`reports/daily/yyyy=…/{factory_id}/report.md`) | 구현 완료 |
+
+**Note (Reports)**: 보고서 **조회 경로는 S3 기반으로 구현 완료**다. 보고서 본문을 생성하는 lambda-report-generator(ADR 0016, Bedrock)는 팀원/후속 작업이라 현재 S3에 객체가 없을 수 있고, 그 경우 `/reports`는 빈 배열, `/reports/{date}/{factory_id}`는 HTTP 404를 반환한다.
+
+- 백엔드는 `aegis-daily-report` DynamoDB table이 아니라 `aegis-bucket-data` S3의 `reports/daily/` prefix를 read한다. (ECS task role: `reports/daily/*` 한정 `s3:ListBucket` + `reports/*` `s3:GetObject`)
+- S3 객체 경로: `reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md` (`docs/specs/data_storage_pipeline.md` § S3 Reports Path)
+- `GET /reports` 응답: 객체 배열, `report_date`(`YYYY-MM-DD`) 내림차순 정렬
+
+  | 필드 | 설명 |
+  | --- | --- |
+  | `report_date` | `YYYY-MM-DD` (key의 `yyyy/mm/dd`에서 추출) |
+  | `factory_id` | 보고서 대상 공장 |
+  | `s3_key` | 원본 S3 object key |
+  | `last_modified` | object LastModified (ISO-8601) |
+  | `size_bytes` | object size |
+
+- `GET /reports/{report_date}/{factory_id}` 응답: `text/markdown` 본문(plain text). Frontend ReportsPage가 자체 Markdown 파서로 렌더링하고 PDF(인쇄)/Word(.doc) 내보내기를 제공한다.
+- ADR 0029 참조. 근거 요구사항: FR-DASH-06, FR-DATA-07/08.
 
 ### Cloud Infra Status API (계획 — BE/FE 계약은 `06_cloud_infra_view.md`)
 
 공장 상태와 분리된 Cloud infra 상태 화면용. Backend는 **기존 테이블의 `pk=CLOUD#infra` item만 read**하며 EKS/ArgoCD/CloudWatch에 직접 붙지 않는다(collector가 write, ADR 0027).
 
+현재 구현 상태: `apps/dashboard-backend/routers/cloud_infra.py` + `services/cloud_infra.py` + `services/ddb.py`(`get_cloud_infra_latest`/`get_cloud_infra_history`)로 **백엔드 read 경로가 구현됐다**. Frontend도 `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards까지 작업 트리에 구현됐다. 단, 아직 커밋·배포 전이고 collector(write)는 팀원/후속이다. staleness 임계값은 코드 기준 `fast 180초 / slow 900초`이며 응답에 `stale_threshold_seconds`로 동봉된다.
+
 | Method | Path | 인증 | 동작 | 백엔드 조회 | 상태 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/cloud-infra` | Cognito JWT | 현재 Cloud infra 상태(LATEST) + staleness 플래그 | DDB GetItem (`pk=CLOUD#infra, sk=LATEST`) | 계획 |
-| GET | `/cloud-infra/history?window=1h\|6h\|24h&track=fast\|slow` | Cognito JWT | 추이(reduced) | DDB Query (`pk=CLOUD#infra, begins_with(sk, HISTORY#FAST#\|HISTORY#SLOW#)`) | 계획 |
+| GET | `/cloud-infra` | Cognito JWT | 현재 Cloud infra 상태(LATEST) + staleness 플래그 | DDB GetItem (`pk=CLOUD#infra, sk=LATEST`) | **백엔드 read 구현**(작업 트리, 미배포) |
+| GET | `/cloud-infra/history?window=1h\|6h\|24h&track=fast\|slow` | Cognito JWT | 추이(reduced) | DDB Query (`pk=CLOUD#infra, begins_with(sk, HISTORY#FAST#\|HISTORY#SLOW#)`) | **백엔드 read 구현**(작업 트리, 미배포) |
 
 **Note (Cloud Infra)**:
 - item이 없으면(collector write 전) HTTP 200 + `{ "available": false }` 반환(404 아님). FE는 "수집 대기" empty-state.

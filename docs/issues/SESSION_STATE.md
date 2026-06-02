@@ -365,7 +365,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent resource split migration과 post-migration permanent diff 정리 완료 후, 사용자 요청으로 infra/data-dashboard 일시 root를 재기동한 상태. infra/data-dashboard/ apply 73 added, post-apply plan No changes. ECS desired/running 1, rollout completed, target healthy. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. 다음: 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비.
+현재 단계: Phase 1 Step 9.5 permanent split 이후 infra/data-dashboard 일시 root 재기동 상태에서 Dashboard 운영 기능을 반복 배포 중. 최근 배포: Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시(ADR 0027 계열), GRAPH#5M multi-resolution history(ADR 0025), dashboard staleness 60/120초 통일(ADR 0028), S3 `reports/daily/` 기반 일간 보고서 조회 UI(ADR 0029). ECS desired/running 1, rollout completed, target healthy. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. 다음: 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비, Cloud infra collector(ADR 0027) 및 LLM report-generator(ADR 0016)는 팀원/후속.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`

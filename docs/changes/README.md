@@ -48,6 +48,7 @@
 | 0026 | DynamoDB key model: FACTORY pk + LATEST/HISTORY#STATE/GRAPH#5M sk 운영 확인 | accepted | 2026-05-29 | AEGIS-DynamoDB-FactoryStatus, Dashboard Backend, data pipeline |
 | 0027 | Cloud infra metrics collector: Container Insights 상시 수집 대신 Fast(1m)/Slow(5m) collector read model | proposed | 2026-06-01 | M4/M6 데이터 플레인, Dashboard BE/FE, CLOUD#infra, EKS/ArgoCD 합류 지점, 비용 |
 | 0028 | Dashboard staleness threshold: infra 지연 표시와 pipeline_status 60/120초 통일 | accepted | 2026-06-02 | M4/M6, apps/data-processor, apps/dashboard-web, stale 표시 |
+| 0029 | Dashboard 보고서 조회: DynamoDB `aegis-daily-report` 대신 S3 `reports/daily/` Markdown read | accepted | 2026-06-02 | M6, apps/dashboard-backend/web, S3 reports prefix, ECS IAM |
 
 ## 파일 형식
 

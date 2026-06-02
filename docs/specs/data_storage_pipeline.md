@@ -1,8 +1,9 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-06-01
+기준일: 2026-06-02
 수정 이력:
+  - 2026-06-02  S3 Reports Path 섹션 추가. `reports/daily/yyyy=…/{factory_id}/report.md` 경로와 Dashboard Backend S3 조회 기준(ADR 0029) 반영.
   - 2026-06-01  GRAPH#5M Dashboard 응답에 센서 min 필드와 AI mean/max 분리 기준 추가. Environment History 6h/12h/24h 렌더링 기준 현행화.
   - 2026-05-29  안전 점수 그래프용 `risk_score_max` 추출/응답 기준 추가.
   - 2026-05-29  ADR 0025 구현 완료 반영. GRAPH#5M 계층 추가, 데이터 흐름 갱신, Dashboard 조회 기준 window 분기 현행화.
@@ -12,12 +13,13 @@
 
 이 문서는 AWS IoT Core 수신 이후 데이터를 어디에 어떤 형태로 저장하는지 정의한다.
 
-범위는 아래 다섯 가지 저장 계층이다.
+범위는 아래 저장 계층이다.
 
 ```text
 S3 raw
 S3 processed
 S3 processed_agg (GRAPH#5M 보조 복사본)
+S3 reports/daily (일간 Markdown 보고서, Dashboard read-only)
 DynamoDB LATEST
 DynamoDB HISTORY#STATE  (short-term 실시간 buffer, TTL 2h 목표)
 DynamoDB GRAPH#5M       (5분 집계 버킷, TTL 48h)
@@ -159,6 +161,27 @@ Processed object body 기준:
 - `processed/{factory_id}/infra_state/`는 인프라 상태와 pipeline status 계산 결과를 담는다.
 - `processed/{factory_id}/state_snapshot/`은 DynamoDB `HISTORY#STATE`와 같은 전체 상태 snapshot을 담되, DynamoDB TTL 정책 필드인 `ttl`은 저장하지 않는다.
 - S3 processed는 장기 이력과 재처리 비교용이며, Dashboard current state의 1차 조회 대상은 아니다.
+
+## S3 Reports Path
+
+일간 Markdown 보고서는 `processed/`와 별도 prefix인 `reports/daily/`에 저장한다.
+
+경로:
+
+```text
+reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md
+```
+
+예시:
+
+```text
+reports/daily/yyyy=2026/mm=06/dd=01/factory-a/report.md
+```
+
+- 보고서 본문 생성은 lambda-report-generator(ADR 0016, Bedrock)의 팀원/후속 작업이다. 현재 객체가 없을 수 있다.
+- Dashboard Backend는 이 경로를 read-only로 조회한다(ADR 0029). `GET /reports`는 `reports/daily/` prefix를 `ListObjectsV2`로 나열하고, `GET /reports/{date}/{factory_id}`는 위 key를 `GetObject`로 읽어 `text/markdown`으로 반환한다.
+- ECS task role IAM: `reports/daily/*` 한정 `s3:ListBucket` + `reports/*` `s3:GetObject` (`docs/changes/0028`/`0029`, `infra/data-dashboard/ecs.tf`).
+- 보고서는 `aegis-daily-report` DynamoDB table이 아니라 S3가 1차 조회 대상이다. DDB `aegis-daily-report` table은 잔존하나 Dashboard 조회 경로에서 사용하지 않는다.
 
 ## DynamoDB Table
 

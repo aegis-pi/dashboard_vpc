@@ -1,8 +1,9 @@
 # 목표 확장 아키텍처
 
 상태: draft
-기준일: 2026-05-26
+기준일: 2026-06-02
 수정 이력:
+  - 2026-06-02 v0.9  LLM 보고서 섹션 현행화. Dashboard 보고서 조회 경로(`/reports`, S3 `reports/daily/`)는 구현 완료(ADR 0029), 생성기는 팀원/후속으로 구분.
   - 2026-05-26 v0.8  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 목표로 분리.
   - 2026-05-26 v0.7  Step 6 완료 반영. Dashboard Backend 구현 완료/미배포 상태 명시. frontend/ prototype/reference와 apps/dashboard-web/ 운영 SPA 경로 구분 추가.
   - 2026-05-21 v0.6  VPC 1 Terraform 구현 가드 추가. 신규 Data/Dashboard 리소스는 `KJW-AEGIS-Data-*` prefix를 사용하고, `infra/data-dashboard/` root에서 목표 아키텍처 기준으로만 생성하도록 명시.
@@ -122,20 +123,23 @@ Dashboard Web (SPA, CloudFront + S3)
     <- WebSocket (factory-update push)
 ```
 
-### LLM 보고서 (스케줄, 팀원/후속 목표)
+### LLM 보고서 (생성기는 팀원/후속 목표, Dashboard 조회 경로는 구현 완료)
 
 ```text
-EventBridge schedule (매일 09:00 KST)
+EventBridge schedule (매일 09:00 KST)            ← 생성기 미구현 (팀원/후속)
     -> Lambda report-generator
         -> DynamoDB HISTORY + S3 processed (read, 지난 24h)
         -> Bedrock Claude 3 Haiku (invoke)
-        -> S3 reports/<YYYY-MM-DD>/<factory_id>.md (write)
-        -> DynamoDB aegis-daily-report (메타 write)
-Dashboard Web
+        -> S3 reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md (write)
+Dashboard Web                                    ← 조회 경로 구현 완료 (ADR 0029)
     -> ALB -> ECS Backend
-        -> S3 reports/ (read)
-        -> Markdown 렌더링
+        -> GET /reports         → S3 ListObjectsV2 (reports/daily/)
+        -> GET /reports/{date}/{factory_id} → S3 GetObject (report.md)
+        -> Markdown 렌더링 + PDF/Word 내보내기
 ```
+
+- Dashboard Backend 조회 경로(`/reports`, `/reports/{date}/{factory_id}`)와 S3 `reports/daily/` object key 계약은 ADR 0029로 확정·구현됐다. 생성기가 동일 경로에 `report.md`를 쓰면 추가 배포 없이 표시된다.
+- Dashboard 조회는 DynamoDB `aegis-daily-report`가 아니라 S3를 1차 대상으로 한다(메타 table은 잔존하나 조회 경로에서 미사용).
 
 ### 합류 지점 / 팀 합의 영역
 
