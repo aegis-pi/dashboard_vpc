@@ -4,6 +4,8 @@
 기준일: 2026-06-04
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-06-04 v3.4  ADR 0030 **apply + 롤아웃 완료**. `terraform apply`(autoscaling target/policy 2 + task def revision 31), `update-service --task-definition kjw-aegis-data-backend:31 --force-new-deployment` → `services-stable` STABLE. 검증: 서비스 desired/running 2, rolloutState COMPLETED, task 2개 cpu 1024/memory 2048/HEALTHY, AZ 1a+1c 분산, scalable target min 2/max 2. 고정 비용 ~$178.35/월(상시) · 데모 ~$7.73/월(16h) 적용 시작. 리소스 상태 표 active 갱신.
+  - 2026-06-04 v3.3  ADR 0030 ECS backend right-sizing + Application Auto Scaling 반영(Terraform 구현 + plan 검증 완료, apply 대기 / `terraform plan` = 4 add·0 change·1 destroy). ① task 사양 0.5 vCPU/1 GB → **1 vCPU/2 GB**(512/1024 → 1024/2048): `uvicorn --workers 2`가 0.5 코어를 두고 경쟁하던 oversubscription 해소, GIL-bound history 파싱 가속. 메모리는 1 vCPU의 Fargate 최소치(2 GB)일 뿐 사용량은 ~40%. ② 상시 task 1→**min 2 / max 2 핀**(데모 프로파일: 짧은 버스트엔 반응형 scale 무의미 → 2개 warm 고정, churn 차단), target tracking 2 policy(ALBRequestCountPerTarget 40 + CPU 50%)는 작성하되 min==max 동안 inert(프로덕션 전환 시 max 3~4로 활성). apply 후 고정 비용 상시 가동 ~$123.90→**~$178.35/월**(ECS $18.05→$72.08 = 2×$36.04, + alarm 4개 ~$0.40). 데모 운영(16h/월) ~$6.55→~$7.73/월. max 비용 영향 없음(고정 비용=min 2). 근거: 2026-06-04 incident — 단일 0.5 vCPU task 102 req/min에서 CPU 100%/응답 16s/5xx, 메모리 40%. ※ 서비스 `ignore_changes=[task_definition]` 때문에 apply만으로는 새 사양이 롤아웃되지 않음 → apply 후 `aws ecs update-service --task-definition <family>:<new> --force-new-deployment` 필요.
   - 2026-06-04 v3.2  CloudInfraFastCollector/SlowCollector 실제 배포 반영. 기존 Lambda/Scheduler를 사용해 코드 업데이트, FastCollector IAM에 ElastiCache/RDS read 권한 추가. 신규 고정 시간 비용 없음. 사용량 비용은 v3.1 추정치($0.3~1.0/월, 주로 CloudWatch GetMetricData API) 유지.
   - 2026-06-01 v3.1  ADR 0027 / `docs/planning/29` Cloud Infra Metrics Pipeline 계획 반영. CloudInfraFastCollector(1m)/SlowCollector(5m) Lambda + EventBridge schedule 2개를 `not deployed — 계획`으로 리소스 상태 표에 추가. 배포 시 사용량 ~$0.3~1.0/월(주로 CloudWatch GetMetricData API), 고정 시간 비용 없음(무료 티어 내). CloudWatch Container Insights는 기본 OFF 유지(상시 켜면 ~$65~75/월).
   - 2026-05-29 v3.0  Dashboard backend image `sha-3c20ec3` ECS revision 15 적용 완료. desired/running 1, rollout completed, `/healthz`와 `/readyz` 정상. 신규 AWS 리소스/고정 비용 변화 없음.
@@ -91,7 +93,8 @@
 | Data/Dashboard VPC | DDB Streams ESM (AEGIS-DynamoDB-FactoryStatus → Lambda notifier) | 1 | active |
 | Data/Dashboard VPC | Dashboard Backend 코드 (`apps/dashboard-backend/`) | 로컬 구현 완료 | Step 6 완료. 2026-05-27 UI/data shape 정합성 수정 후 pytest 25 passed |
 | Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-3c20ec3` push 확인 |
-| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 1 running task | active, desired/running 1, target healthy |
+| Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 2 running task | active, desired/running 2, task def **revision 31** (1 vCPU/2 GB), AZ 1a+1c 분산, HEALTHY (ADR 0030, 2026-06-04 apply+롤아웃 완료) |
+| Data/Dashboard VPC | ECS backend Application Auto Scaling (target + 2 policy) | target min 2/max 2 핀, policy 2 (inert) | active (ADR 0030). min==max=2 라 현재 inert. 프로덕션 전환 시 max 3~4 로 활성 |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 | active |
 | Data/Dashboard VPC | IAM OIDC roles (ECR push + web deploy) | 2 roles | active, permanent root. IAM: 무료 |
@@ -181,14 +184,15 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | ALB (HTTPS) | 1 | `$0.0225 / hour` | `$0.0225` | `$16.43` |
 | ALB LCU (최소 1 LCU 가정) | 1 | `$0.0080 / LCU-hour` | `$0.0080` | `$5.84` |
 | Public IPv4 for internet-facing ALB | 2 | `$0.0050 / IP-hour` | `$0.0100` | `$7.30` |
-| ECS Fargate (0.5 vCPU / 1 GB, 1 task 상시) | 1 | `$0.04048/vCPU-h + $0.004445/GB-h` | `$0.0247` | `$18.05` |
+| ECS Fargate (1 vCPU / 2 GB, min 2 task 상시) | 2 | `$0.04048/vCPU-h + $0.004445/GB-h` | `$0.0987` | `$72.08` |
+| CloudWatch alarms (target tracking 2 policy × 2 alarm) | 4 | `$0.10 / alarm-month` | `~$0.0005` | `~$0.40` (free-tier 10개 내 가능) |
 | RDS PostgreSQL `db.t4g.micro` Single-AZ | 1 | `$0.021 / hour` | `$0.0210` | `$15.33` |
 | RDS PostgreSQL gp3 storage (20GiB) | 20 GiB | `$0.131 / GB-month` | `$0.0036` | `$2.62` |
 | ElastiCache Redis (cache.t4g.micro) | 1 | `$0.016 / hour` | `$0.0160` | `$11.68` |
 | Secrets Manager (RDS + Redis AUTH + DATABASE_URL + REDIS_URL) | 4 | `$0.40 / secret-month` | `$0.0022` | `$1.60` |
 | ECR `aegis/dashboard-backend` 이미지 스토리지 | ~0.5 GB 추정 | `$0.10 / GB-month` | `~$0.0001` | `~$0.05` |
 | CloudWatch Logs ECS ingest (usage) | usage-based | `$0.76 / GB` | usage | usage |
-| **고정 합계 (상시 가동)** | | | `~$0.1699 / hour` | **`~$123.90 / month`** |
+| **고정 합계 (상시 가동)** | | | `~$0.2444 / hour` | **`~$178.35 / month`** |
 
 > 상시 가동은 ~$125/월이지만, **데모 운영 패턴(build/destroy 사이클)** 으로 실비를 ~$8~10/월 수준으로 낮출 수 있다.
 
@@ -198,13 +202,13 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | --- | ---: | ---: |
 | NAT Gateway + EIP | `$0.0610` | `$0.98` |
 | ALB + LCU + Public IPv4 | `$0.0405` | `$0.65` |
-| ECS Fargate (1 task) | `$0.0247` | `$0.40` |
+| ECS Fargate (1 vCPU / 2 GB, min 2 task) | `$0.0987` | `$1.58` |
 | RDS PostgreSQL `db.t4g.micro` compute | `$0.0210` | `$0.34` |
 | RDS PostgreSQL gp3 storage (20GiB) | (월정액) | `$2.62` |
 | ElastiCache Redis | `$0.0160` | `$0.26` |
 | Secrets Manager (월정액, destroy로 삭제) | (월정액) | `$0.80` (켜진 동안만 비례) |
 | Route53 + Cognito + ACM | `$0.0007` | `$0.50` |
-| **고정 합계 (데모 운영)** | | **`~$6.55 / month`** |
+| **고정 합계 (데모 운영)** | | **`~$7.73 / month`** |
 
 ### 사용량 기반 비용 (관제 트래픽 규모 가정)
 

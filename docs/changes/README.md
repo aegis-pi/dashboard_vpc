@@ -49,6 +49,7 @@
 | 0027 | Cloud infra metrics collector: Container Insights 상시 수집 대신 Fast(1m)/Slow(5m) collector read model | proposed | 2026-06-01 | M4/M6 데이터 플레인, Dashboard BE/FE, CLOUD#infra, EKS/ArgoCD 합류 지점, 비용 |
 | 0028 | Dashboard staleness threshold: infra 지연 표시와 pipeline_status 60/120초 통일 | accepted | 2026-06-02 | M4/M6, apps/data-processor, apps/dashboard-web, stale 표시 |
 | 0029 | Dashboard 보고서 조회: DynamoDB `aegis-daily-report` 대신 S3 `reports/daily/` Markdown read | accepted | 2026-06-02 | M6, apps/dashboard-backend/web, S3 reports prefix, ECS IAM |
+| 0030 | ECS backend right-sizing(0.5→1 vCPU) + Application Auto Scaling(min 2, ALBRequestCountPerTarget 40 + CPU 50%) | accepted | 2026-06-04 | M6, infra/data-dashboard ECS, 비용 baseline |
 
 ## 파일 형식
 
