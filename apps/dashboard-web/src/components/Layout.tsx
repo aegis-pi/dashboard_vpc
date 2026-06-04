@@ -146,12 +146,18 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
                 aria-label="클라우드 인프라"
                 title="클라우드 인프라"
               >
-                <Server size={15} />
+                <span className="nav-status-icon">
+                  <Server size={15} />
+                  <span
+                    className="nav-status-dot"
+                    style={{ background: cloudInfraDotColor(cloudStatus) }}
+                  />
+                </span>
                 <span className="nav-item-label" style={{ flex: 1 }}>클라우드 인프라</span>
-                <span style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: cloudInfraDotColor(cloudStatus), flexShrink: 0,
-                }} />
+                <span
+                  className="nav-item-count nav-expanded-dot"
+                  style={{ background: cloudInfraDotColor(cloudStatus) }}
+                />
               </button>
             )}
             {canManageUsers && (
