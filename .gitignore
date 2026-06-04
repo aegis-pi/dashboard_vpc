@@ -2,6 +2,7 @@
 
 # OS files
 .DS_Store
+*:Zone.Identifier
 
 # Python
 __pycache__/
