@@ -90,6 +90,13 @@ def test_cloud_infra_marks_stale_latest_as_warning(client, ddb_mock):
     assert data["slow_stale"] is True
     assert data["fast"]["status"] == "unknown"
     assert data["slow"]["status"] == "unknown"
+    # staleness must propagate into each section so frontend cards (which read
+    # section-level status) gray out instead of showing the last green value.
+    assert data["fast"]["backend_runtime"]["status"] == "unknown"
+    assert data["fast"]["data_pipeline"]["status"] == "unknown"
+    assert data["fast"]["factory_freshness"]["status"] == "unknown"
+    assert data["slow"]["eks_management"]["status"] == "unknown"
+    assert data["slow"]["storage_freshness"]["status"] == "unknown"
 
 
 def test_cloud_infra_staleness_does_not_mutate_source_item():

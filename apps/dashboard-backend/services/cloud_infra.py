@@ -23,6 +23,23 @@ def _age_seconds(value: str | None, now: datetime) -> int | None:
     return max(0, int((now - parsed.astimezone(timezone.utc)).total_seconds()))
 
 
+def _mark_stale(container: dict) -> None:
+    """Downgrade a stale fast/slow container and all its section objects to unknown.
+
+    The collector cannot mark itself stale once it dies, so the backend forces
+    unknown at read time.  Frontend cards read the *section-level* status
+    (e.g. ``fast.backend_runtime.status``), not the container-level one, so the
+    downgrade must propagate into each section object — otherwise a dead
+    collector's last values keep rendering green.
+    """
+    if not isinstance(container, dict):
+        return
+    container["status"] = "unknown"
+    for value in container.values():
+        if isinstance(value, dict) and "status" in value:
+            value["status"] = "unknown"
+
+
 def _status_with_staleness(item: dict, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     result = deepcopy(item)
@@ -43,9 +60,9 @@ def _status_with_staleness(item: dict, now: datetime | None = None) -> dict:
     }
 
     if fast_stale and isinstance(result.get("fast"), dict):
-        result["fast"]["status"] = "unknown"
+        _mark_stale(result["fast"])
     if slow_stale and isinstance(result.get("slow"), dict):
-        result["slow"]["status"] = "unknown"
+        _mark_stale(result["slow"])
     if (fast_stale or slow_stale) and result.get("overall_status") == "normal":
         result["overall_status"] = "warning"
 
