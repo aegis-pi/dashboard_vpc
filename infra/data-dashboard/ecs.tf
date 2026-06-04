@@ -218,7 +218,7 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     actions = [
       "cognito-idp:AdminCreateUser",
       "cognito-idp:AdminGetUser",
-      "cognito-idp:AdminDisableUser",
+      "cognito-idp:AdminDeleteUser",
     ]
     resources = [
       data.terraform_remote_state.permanent.outputs.cognito_user_pool_arn,

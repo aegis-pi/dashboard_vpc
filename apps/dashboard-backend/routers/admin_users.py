@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import case, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AppUser, AuditLog, Factory, FactoryRole, GlobalRole, UserFactoryAccess, UserStatus
@@ -116,7 +116,17 @@ async def list_users(
     session: AsyncSession = Depends(get_db),
 ):
     require_user_admin(principal)
-    result = await session.execute(select(AppUser).order_by(AppUser.email))
+    role_rank = case(
+        (AppUser.global_role == GlobalRole.SUPER_ADMIN.value, 0),
+        (AppUser.global_role == GlobalRole.ORG_ADMIN.value, 1),
+        (AppUser.global_role == GlobalRole.FACTORY_ADMIN.value, 2),
+        else_=3,
+    )
+    result = await session.execute(
+        select(AppUser)
+        .where(AppUser.status == UserStatus.ACTIVE.value)
+        .order_by(role_rank, AppUser.display_name, AppUser.email)
+    )
     users = result.scalars().all()
     access = await _access_by_user(session, [user.id for user in users])
     return [_serialize_user(user, access.get(user.id, [])) for user in users]
@@ -231,20 +241,20 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     try:
-        cognito_admin.disable_user(user.email)
+        cognito_admin.delete_user(user.email)
     except cognito_admin.CognitoAdminError as exc:
-        raise HTTPException(status_code=502, detail="Cognito user disable failed") from exc
+        raise HTTPException(status_code=502, detail="Cognito user deletion failed") from exc
 
-    user.status = UserStatus.DISABLED.value
     await session.execute(delete(UserFactoryAccess).where(UserFactoryAccess.user_id == user.id))
+    await session.delete(user)
     session.add(
         AuditLog(
             actor_user_id=principal.user_id,
-            action="user.disable",
+            action="user.delete",
             target_type="app_user",
             target_id=user.id,
         )
     )
     await session.commit()
 
-    return {"status": "disabled", "id": user.id}
+    return {"status": "deleted", "id": user.id}

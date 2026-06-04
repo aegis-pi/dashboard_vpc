@@ -58,6 +58,15 @@ async def _reset_admin_db():
                     can_view_system=False,
                     status="active",
                 ),
+                AppUser(
+                    id="user-disabled",
+                    cognito_sub="disabled-sub",
+                    email="disabled@example.com",
+                    display_name="Disabled User",
+                    global_role="factory_admin",
+                    can_view_system=False,
+                    status="disabled",
+                ),
                 UserFactoryAccess(user_id="user-existing", factory_id="factory-a", role="admin"),
             ]
         )
@@ -85,6 +94,7 @@ def test_admin_list_users_returns_factory_access(client):
 
     assert r.status_code == 200
     users = {user["id"]: user for user in r.json()}
+    assert "user-disabled" not in users
     assert users["user-existing"] == {
         "id": "user-existing",
         "cognito_sub": "existing-sub",
@@ -97,6 +107,15 @@ def test_admin_list_users_returns_factory_access(client):
     }
     assert users["cognito-test-user"]["global_role"] == "super_admin"
     assert users["cognito-test-user-sub"]["global_role"] == "super_admin"
+
+
+def test_admin_list_users_orders_global_admins_first(client):
+    r = client.get("/admin/users")
+
+    assert r.status_code == 200
+    roles = [user["global_role"] for user in r.json()]
+    assert roles[:2] == ["super_admin", "super_admin"]
+    assert roles[-1] == "factory_admin"
 
 
 def test_admin_create_user_calls_cognito_and_stores_access(client, monkeypatch):
@@ -210,16 +229,20 @@ def test_admin_create_user_rejects_unknown_factory(client, monkeypatch):
     assert r.json()["detail"] == "Unknown factories: factory-z"
 
 
-def test_admin_delete_user_disables_cognito_and_rds_user(client, monkeypatch):
+def test_admin_delete_user_removes_cognito_and_rds_user(client, monkeypatch):
     calls = []
 
-    def _disable_user(email):
+    def _delete_user(email):
         calls.append(email)
 
-    monkeypatch.setattr(cognito_admin, "disable_user", _disable_user)
+    monkeypatch.setattr(cognito_admin, "delete_user", _delete_user)
 
     r = client.delete("/admin/users/user-existing")
 
     assert r.status_code == 200
-    assert r.json() == {"status": "disabled", "id": "user-existing"}
+    assert r.json() == {"status": "deleted", "id": "user-existing"}
     assert calls == ["existing@example.com"]
+
+    list_response = client.get("/admin/users")
+    assert list_response.status_code == 200
+    assert "user-existing" not in {user["id"] for user in list_response.json()}

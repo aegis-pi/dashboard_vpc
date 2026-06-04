@@ -73,12 +73,12 @@ def create_user(email: str, display_name: str) -> str:
     return _attr(user.get("UserAttributes", []), "sub") or user.get("Username") or email
 
 
-def disable_user(email: str) -> None:
+def delete_user(email: str) -> None:
     settings = get_settings()
     try:
-        _cognito().admin_disable_user(
+        _cognito().admin_delete_user(
             UserPoolId=settings.cognito_user_pool_id,
             Username=email,
         )
     except (BotoCoreError, ClientError) as exc:
-        raise CognitoAdminError("Cognito user disable failed") from exc
+        raise CognitoAdminError("Cognito user deletion failed") from exc
