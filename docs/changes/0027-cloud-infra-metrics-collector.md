@@ -1,6 +1,6 @@
 ID:        0027
 제목:      cloud-infra-metrics-collector
-상태:      proposed
+상태:      accepted
 결정일:    2026-06-01
 영향 범위: M4/M6 데이터 플레인, Dashboard Backend/Frontend, DynamoDB `AEGIS-DynamoDB-FactoryStatus`, SQS DLQ, RDS/Redis, EKS/ArgoCD(워크스트림 A 합류 지점)
 
@@ -26,6 +26,15 @@ CloudWatch Container Insights 상시 수집을 채택하지 않는다.
 
 설계/스키마 상세는 `docs/planning/29`. 본 ADR은 결정과 합류 지점 영향만 기록한다.
 
+2026-06-04 구현 상태:
+
+- `apps/cloud-infra-collector/` 소스를 저장소에 반영했다.
+- `AEGIS-Lambda-CloudInfraFastCollector`/`AEGIS-Lambda-CloudInfraSlowCollector`는 기존 Lambda를 삭제하지 않고 코드 업데이트로 배포했다.
+- FastCollector는 Redis/RDS/CloudFront/DLQ와 section `reasons[]`/`errors[]`를 `CLOUD#infra`/`LATEST.fast`에 기록한다.
+- FastCollector IAM role에는 ElastiCache/RDS read 권한을 추가했다.
+- DDB `LATEST`에서 Redis/RDS/CloudFront/DLQ 필드가 저장되는 것을 확인했다.
+- 남은 known issue: SlowCollector의 Kubernetes API 접근이 401로 실패해 `overall_status=unknown`이 될 수 있다. 이는 EKS/Kubernetes 권한 합류 지점이며 Redis/RDS 수집과 별도다.
+
 ## 변경 이유
 
 - CloudWatch Container Insights 상시 수집은 2-node Hub 기준 월 ~$65~75. MVP/개발 단계에 과하다.
@@ -39,21 +48,21 @@ CloudWatch Container Insights 상시 수집을 채택하지 않는다.
 - **EKS/ArgoCD read 접근은 워크스트림 A 자산**(`AEGIS-EKS`, ArgoCD)이다. SlowCollector가 Hub EKS API / Kubernetes Metrics API / ArgoCD CRD를 read하므로, 접근 경로 결정(아래 Open) 시 워크스트림 A와 영향이 겹친다. 워크스트림 A 금지 영역(infra/hub, charts/aegis-hub 등)은 수정하지 않는다.
 - Backend는 LATEST를 읽는 시점에 `fast_updated_at`/`slow_updated_at`로 staleness를 판정한다(죽은 collector는 스스로 stale을 기록할 수 없음). 이는 사실상 "LATEST 원본 그대로 노출"이 아니라 backend 최소 변환을 의미한다.
 - Frontend는 sidebar에 Cloud infra 항목을 추가해 공장 화면과 분리 표시한다(Backend/Frontend = 본 환경 담당).
-- 비용: `docs/ops/15_aws_cost_baseline.md`에 `not deployed — 계획`으로 반영(v3.1).
+- 비용: `docs/ops/15_aws_cost_baseline.md`에 active 상태로 반영(v3.2). 고정 비용 변화는 없고 사용량 기반 비용만 발생한다.
 
-## 미결정 (구현 전 확정 필요)
+## 미결정 / 후속
 
-1. Kubernetes/ArgoCD 접근을 Lambda(VPC 배치 → NAT 비용)에서 할지, EKS 내부 CronJob collector로 분리할지. NAT Gateway 비용이 collector 헤드라인($1~3/월)을 초과할 수 있어 경로 결정이 비용을 좌우한다.
+1. SlowCollector의 Kubernetes/ArgoCD 접근 권한. 현재 Lambda가 Kubernetes API 401을 받는다.
 2. `HISTORY#FAST` TTL 6h vs 12h.
 3. S3 `processed/cloud_infra` snapshot lifecycle 30일 삭제 vs Glacier 전환.
-4. Cloud infra dashboard API 응답 모델 — staleness 판정을 backend가 하므로 "최소 변환" 방향이 사실상 정해짐. 확정 시 본 ADR과 `docs/planning/29` Open Questions 동기화.
+4. Cloud infra dashboard API 응답 모델 — staleness 판정은 backend 최소 변환으로 유지한다.
 
 ## 업데이트 필요한 문서
 
 - `docs/planning/29_cloud_infra_metrics_pipeline_plan.md` (source of truth, 이미 반영)
-- `docs/ops/15_aws_cost_baseline.md` (v3.1 반영 완료)
+- `docs/ops/15_aws_cost_baseline.md` (v3.2 반영 완료)
 - `docs/changes/README.md` (목록 갱신 완료)
-- (구현 착수 시) `docs/specs/data_storage_pipeline.md`, `docs/architecture/01_target_architecture.md`, `docs/issues/SESSION_STATE.md`
+- `docs/issues/SESSION_STATE.md`
 
 ## 검증
 
