@@ -1459,6 +1459,12 @@ input { font-family: inherit; }
   color: var(--crit);
   background: var(--crit-tint-2);
 }
+.admin-users-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
 .status-chip {
   display: inline-flex;
   align-items: center;

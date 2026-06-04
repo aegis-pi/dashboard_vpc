@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Save, Trash2, UserCog } from 'lucide-react'
+import { Pencil, Plus, Save, Trash2, UserCog } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { createAdminUser, deleteAdminUser, updateAdminUser } from '../api/client'
 import type { AdminUser, GlobalRole, UserFactoryAccess } from '../api/types'
@@ -23,9 +23,16 @@ type UserRoleFilter = 'all' | 'factory_admin' | 'super_admin'
 
 const USER_ROLE_FILTERS: { value: UserRoleFilter; label: string }[] = [
   { value: 'all', label: '전체' },
-  { value: 'factory_admin', label: '공장 관리자' },
   { value: 'super_admin', label: '본사 관리자' },
+  { value: 'factory_admin', label: '공장 관리자' },
 ]
+
+const ROLE_ORDER: Record<GlobalRole, number> = {
+  super_admin: 0,
+  org_admin: 1,
+  factory_admin: 2,
+  viewer: 3,
+}
 
 interface FormState {
   id?: string
@@ -68,6 +75,14 @@ function accessSummary(user: AdminUser): string {
   return user.factories.map((item) => `${item.factory_id}:${item.role}`).join(', ')
 }
 
+function sortUsers(users: AdminUser[]): AdminUser[] {
+  return [...users].sort((a, b) => (
+    ROLE_ORDER[a.global_role] - ROLE_ORDER[b.global_role]
+    || a.display_name.localeCompare(b.display_name)
+    || a.email.localeCompare(b.email)
+  ))
+}
+
 function upsertAccess(
   access: UserFactoryAccess[],
   factoryId: string,
@@ -106,7 +121,11 @@ export function AdminUsersPage() {
 
   const selectedAccess = new Map(form.factories.map((item) => [item.factory_id, item.role]))
   const isGlobal = form.global_role === 'super_admin'
-  const filteredUsers = users.data.filter((user) => roleFilter === 'all' || user.global_role === roleFilter)
+  const visibleUsers = useMemo(
+    () => sortUsers(users.data.filter((user) => user.status === 'active')),
+    [users.data],
+  )
+  const filteredUsers = visibleUsers.filter((user) => roleFilter === 'all' || user.global_role === roleFilter)
 
   async function submit() {
     setSaving(true)
@@ -122,12 +141,12 @@ export function AdminUsersPage() {
       }
       if (form.id) {
         const updated = await updateAdminUser(form.id, payload)
-        users.setData((current) => current.map((item) => item.id === updated.id ? updated : item))
+        users.setData((current) => sortUsers(current.map((item) => item.id === updated.id ? updated : item)))
         setForm(formFromUser(updated))
         setMessage('수정 완료')
       } else {
         const created = await createAdminUser(payload)
-        users.setData((current) => [created, ...current].sort((a, b) => a.email.localeCompare(b.email)))
+        users.setData((current) => sortUsers([created, ...current]))
         setForm(formFromUser(created))
         setMessage('생성 완료')
       }
@@ -145,9 +164,7 @@ export function AdminUsersPage() {
     setMessage(null)
     try {
       await deleteAdminUser(user.id)
-      users.setData((current) => current.map((item) => (
-        item.id === user.id ? { ...item, status: 'disabled', factories: [] } : item
-      )))
+      users.setData((current) => current.filter((item) => item.id !== user.id))
       if (form.id === user.id) setForm(emptyForm())
       setMessage('삭제 완료')
     } catch (e) {
@@ -198,7 +215,7 @@ export function AdminUsersPage() {
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
-                <span className="mono tnum">{filteredUsers.length}/{users.data.length}</span>
+                <span className="mono tnum">{filteredUsers.length}/{visibleUsers.length}</span>
               </div>
             </div>
             <div className="table-wrap">
@@ -209,7 +226,7 @@ export function AdminUsersPage() {
                     <th>역할</th>
                     <th>공장 권한</th>
                     <th>상태</th>
-                    <th />
+                    <th>작업</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -230,9 +247,26 @@ export function AdminUsersPage() {
                         <span className={`status-chip ${user.status}`}>{user.status}</span>
                       </td>
                       <td>
-                        <button className="icon-btn danger" onClick={() => { void remove(user) }} disabled={saving}>
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="admin-users-row-actions">
+                          <button
+                            className="icon-btn"
+                            onClick={() => setForm(formFromUser(user))}
+                            disabled={saving}
+                            aria-label={`${user.display_name} 수정`}
+                            title="수정"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            className="icon-btn danger"
+                            onClick={() => { void remove(user) }}
+                            disabled={saving}
+                            aria-label={`${user.display_name} 삭제`}
+                            title="삭제"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -245,7 +279,7 @@ export function AdminUsersPage() {
             <div className="card-hd">
               <div>
                 <div className="eyebrow">Editor</div>
-                <h2>{form.id ? '권한 수정' : '사용자 생성'}</h2>
+                <h2>{form.id ? '사용자 수정' : '사용자 생성'}</h2>
               </div>
               <UserCog size={18} />
             </div>
