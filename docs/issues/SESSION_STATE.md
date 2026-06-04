@@ -94,8 +94,18 @@
 | M2 | Issue 5 - ArgoCD factory-a cluster 등록 | 완료 | `docs/issues/M2_mesh-vpn-hub-spoke.md` |
 | M2 | Issue 6 - Hub -> factory-a Sync 확인 | 완료 | `docs/issues/M2_mesh-vpn-hub-spoke.md` |
 | M3 | Issue 1 - 배포/Helm GitOps 저장소 구조 | 완료 | `docs/issues/M3_deploy-pipeline.md` |
-| M3 | Issue 2 - 배포/ECR 저장소 구성 및 이미지 태그 전략 | 진행 중 | `docs/issues/M3_deploy-pipeline.md` |
+| M3 | Issue 2 - 배포/ECR 저장소 구성 및 이미지 태그 전략 | 진행 중 (워크스트림 A) | `docs/issues/M3_deploy-pipeline.md` |
 | M3 | Issue 4 - 배포/ArgoCD ApplicationSet 구성 | 완료 | `docs/issues/M3_deploy-pipeline.md` |
+| Phase 1 | Step 0~9.5 (도메인·Frontend·VPC·데이터저장소·협의·notifier·Backend·ECS·배포 CI/CD·e2e·permanent split) | 완료 | `docs/planning/16_data_dashboard_vpc_workplan.md` |
+| Phase 1 | Step 10 운영 자동화/데모 | 진행 중 | `docs/planning/16_data_dashboard_vpc_workplan.md` |
+| M4 | Issue 6/7 - Lambda data processor / pipeline_status | 완료 | `docs/issues/M4_data-plane.md` |
+| M4 | Issue 8 - 데이터 플레인 e2e | 부분 완료 (cloud-side 검증, 실시간 edge 경로 후속) | `docs/issues/M4_data-plane.md` |
+| M4 | Issue 1~5 - Edge Agent/IoT/S3 | 워크스트림 A · 팀 합의 | `docs/issues/M4_data-plane.md` |
+| M6 | Issue 1/4 - Risk 계산 / Twin 출력 구조 | 완료 | `docs/issues/M6_risk-twin-dashboard.md` |
+| M6 | Issue 5/6/7 - Dashboard 카드/센서/타임라인 | 완료 | `docs/issues/M6_risk-twin-dashboard.md` |
+| M6 | Issue 8 - 시나리오별 Risk 변화 검증 | 부분 완료 (후속) | `docs/issues/M6_risk-twin-dashboard.md` |
+| M6 | Phase 1 추가 - RBAC 사용자 관리 / Cloud Infra / 보고서 조회 | 완료 | `docs/issues/M6_risk-twin-dashboard.md` |
+| M6 | Phase 1 추가 - LLM 보고서 생성기 (Bedrock) | 후속 (팀원) | ADR 0016 |
 
 ## 2026-05-15 워크스트림 분리
 
@@ -150,7 +160,7 @@ Phase 1 (확정 배포 목표)
 - `docs/report/03_요구사항정의서.md` (SRS v1.7)
 - `docs/product/02_requirements_definition.md` (요구사항 추적 기준)
 
-과거 Step 0~3 스냅샷 (보존용, 현재 다음 작업은 Step 9 end-to-end 검증):
+과거 Step 0~5 스냅샷 (보존용. 현재는 Step 0~9.5 완료 후 Step 10 운영 자동화/데모 진행 단계 — 최신 상태는 본 문서 상단 수정 이력과 "현재 큰 상태" 참조):
 
 ```text
 Step 0 - 외부 사전 작업 (병행 가능)
@@ -377,7 +387,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent split 이후 infra/data-dashboard 일시 root 재기동 상태에서 Dashboard 운영 기능을 반복 배포 중. 최근 배포: Dashboard RBAC 사용자 관리(Cognito 로그인 + RDS app_user/factory/user_factory_access 권한 + `/admin/users` UI), Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시(ADR 0027 계열), GRAPH#5M multi-resolution history(ADR 0025), dashboard staleness 60/120초 통일(ADR 0028), S3 `reports/daily/` 기반 일간 보고서 조회 UI(ADR 0029). ECS desired/running 2, rollout completed, target healthy, backend image `sha-abb81ed`. https://dashboard.aegis-pi.cloud/admin/users HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. https://api.aegis-pi.cloud/readyz dynamodb/redis/rds_metadata ok. 다음: Cognito super_admin bootstrap 후 관리자 화면에서 실제 사용자 권한 생성/수정 수기 확인, 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비, Cloud infra collector(ADR 0027) 및 LLM report-generator(ADR 0016)는 팀원/후속.
+현재 단계: Phase 1 Step 9.5 permanent split 이후 infra/data-dashboard 일시 root 재기동 상태에서 Dashboard 운영 기능을 반복 배포 중. 코드는 UI 마무리 보정만 남기고 구현 완료 단계. 최근 배포: Dashboard RBAC 사용자 관리(Cognito 로그인 + RDS app_user/factory/user_factory_access 권한 + `/admin/users` UI, ADR 0031) 및 삭제/정렬/수정 UX·stale disabled 사용자 재생성 보정, Cloud Infra 상태 화면 + Fast/Slow collector 배포(ADR 0027, `apps/cloud-infra-collector/`), ECS backend right-sizing + Auto Scaling(ADR 0030), Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시, GRAPH#5M multi-resolution history(ADR 0025/0026), dashboard staleness 60/120초 통일(ADR 0028), S3 `reports/daily/` 기반 일간 보고서 조회 UI(ADR 0029). ECS desired/running 2, rollout completed, target healthy, backend image `sha-e96bf81`(ECS task def revision 37). https://dashboard.aegis-pi.cloud/admin/users HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. https://api.aegis-pi.cloud/readyz dynamodb/redis/rds_metadata ok. 다음: UI 마무리 보정, Cognito super_admin bootstrap 후 관리자 화면에서 실제 사용자 권한 생성/수정 수기 확인, 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비. LLM report-generator(ADR 0016, Bedrock 생성기)만 팀원/후속.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`

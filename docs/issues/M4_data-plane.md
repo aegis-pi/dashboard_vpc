@@ -1,5 +1,8 @@
 # M4. 데이터 플레인 - `factory-a` 단일 Spoke 기준
 
+수정 이력:
+- 2026-06-04 v0.2  cloud-side 소비 경로(Lambda data processor / pipeline_status / DDB·S3 저장 계약) 구현·검증 완료 반영. GitHub Issue Comment Draft 추가. Issue 1~5(Edge Agent→IoT→S3)는 워크스트림 A 팀 합의 영역으로 유지, Issue 8 실시간 edge 경로는 factory-a Edge Agent 비활성으로 후속.
+
 > **마일스톤 목표**: `factory-a` Spoke의 센서/상태 데이터가 Edge Agent → IoT Core → S3까지 실제로 흐르는 것을 검증한다.
 > M2(Hub-Spoke 연결) 완료 후 M3(배포 파이프라인)과 병렬로 진행 가능하다.  
 > 이 마일스톤이 완료되어야 M6(Risk Twin)에서 실데이터 기반 Risk Score 계산이 가능해진다.
@@ -325,3 +328,11 @@ Edge Agent
 ```
 
 M4의 cloud-side 구현 대상은 Lambda data processor와 DynamoDB/S3 저장 계약 검증으로 정리한다.
+
+## GitHub Issue Comment Draft
+
+- 상태: 부분 완료 (cloud-side 완료, factory-a 실시간 edge 경로 후속)
+- 진행 요약: 본 환경(워크스트림 B)의 소비측 데이터 플레인을 구현·검증 완료했다. IoT Rule → Lambda data processor → DynamoDB(LATEST/HISTORY) + S3 processed, 그리고 DDB Streams → notifier → Redis PUBLISH 경로가 동작한다. Issue 1~5(Edge Agent → IoT Core → S3 raw)는 워크스트림 A 팀 합의 영역으로 본 환경에서 직접 검증하지 않는다.
+- 변경/확인: `apps/data-processor/`(envelope·normalizer·risk·pipeline_status·dynamo·s3_writer), `apps/lambda-notifier/`, `infra/data-dashboard/`(lambda_data_processor.tf·iot_rule.tf·lambda_notifier.tf·iam), 공식 hot store `AEGIS-DynamoDB-FactoryStatus`(ADR 0022), S3 processed 경로 스펙(ADR 0020), staleness 60/120초(ADR 0028).
+- 검증: data-processor pytest 통과, IoT Rule 2개 active, 직접 invoke 및 IoT Rule 경유 DDB LATEST/HISTORY + S3 processed 생성 확인, DDB write → Redis PUBLISH ~0.45초(ADR 0021/Step 5), notifier DLQ=0.
+- 후속: factory-a Edge Agent 재활성 후 Edge → IoT Core → DDB 실시간 경로(Issue 8) end-to-end 검증.
