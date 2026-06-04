@@ -1186,6 +1186,151 @@ input { font-family: inherit; }
 .tbl tr:last-child td { border-bottom: 0; }
 .tbl tr:hover td { background: var(--surface-2); }
 
+/* ─── Cloud infra overview ──────────────────────────────────────── */
+.cloud-health-strip {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(130px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--line);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 14px;
+}
+.cloud-health-main,
+.cloud-health-stat {
+  background: var(--surface);
+  min-width: 0;
+}
+.cloud-health-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.cloud-health-icon {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-2);
+  color: var(--ink-3);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+.cloud-health-strip.safe .cloud-health-icon { color: var(--safe); background: var(--safe-tint-2); }
+.cloud-health-strip.warn .cloud-health-icon { color: var(--warn); background: var(--warn-tint-2); }
+.cloud-health-strip.crit .cloud-health-icon { color: var(--crit); background: var(--crit-tint-2); }
+.cloud-health-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 4px;
+}
+.cloud-health-title {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cloud-health-stat {
+  padding: 14px 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+.cloud-health-stat .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.cloud-health-stat .value {
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.cloud-matrix-card { margin-bottom: 14px; }
+.cloud-matrix td { vertical-align: middle; }
+.cloud-matrix .strong {
+  font-weight: 650;
+  color: var(--ink);
+}
+.cloud-row-warn td { background: var(--warn-tint-2); }
+.cloud-row-crit td { background: var(--crit-tint-2); }
+.cloud-row-unk td { background: var(--unk-tint); }
+.cloud-row-warn:hover td { background: var(--warn-tint); }
+.cloud-row-crit:hover td { background: var(--crit-tint); }
+.cloud-rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.cloud-rail-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rail-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--unk);
+  box-shadow: 0 0 0 3px var(--unk-tint);
+  flex-shrink: 0;
+}
+.cloud-rail-step.safe .rail-dot { background: var(--safe); box-shadow: 0 0 0 3px var(--safe-tint); }
+.cloud-rail-step.warn .rail-dot { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-tint); }
+.cloud-rail-step.crit .rail-dot { background: var(--crit); box-shadow: 0 0 0 3px var(--crit-tint); }
+.rail-line {
+  width: 32px;
+  height: 1px;
+  background: var(--line-3);
+  margin-left: 4px;
+}
+.status-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4px, 1fr));
+  gap: 2px;
+  min-height: 30px;
+  align-items: stretch;
+}
+.status-seg {
+  display: block;
+  min-width: 4px;
+  border-radius: 2px;
+  background: var(--unk);
+}
+.status-seg.safe { background: var(--safe); }
+.status-seg.warn { background: var(--warn); }
+.status-seg.crit { background: var(--crit); }
+.status-seg.unk  { background: var(--ink-5); }
+@media (max-width: 1100px) {
+  .cloud-health-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cloud-health-main { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .cloud-health-strip { grid-template-columns: 1fr; }
+  .cloud-health-main { grid-column: auto; }
+  .cloud-health-title { font-size: 21px; }
+}
+
 /* ─── liveBlink animation ───────────────────────────────────────── */
 @keyframes liveBlink {
   0%, 100% { opacity: 1; }

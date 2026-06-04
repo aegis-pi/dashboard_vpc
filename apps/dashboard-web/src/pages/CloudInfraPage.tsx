@@ -1,20 +1,17 @@
-import { AlertTriangle, Database, HardDrive, RefreshCw, Server, Workflow } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, RefreshCw, Server } from 'lucide-react'
 import { Shell } from '../components/Layout'
-import { Sparkline } from '../components/Sparkline'
 import { useFactories } from '../hooks/useFactories'
 import { useCloudInfra } from '../hooks/useCloudInfra'
 import { useCloudInfraHistory } from '../hooks/useCloudInfraHistory'
 import { adaptSidebarFactory } from '../adapters/factory'
 import {
-  buildOverviewCards,
   cloudInfraStatusLabel,
   cloudInfraTone,
-  historyStatusSeries,
   numberLabel,
   secondsLabel,
 } from '../adapters/cloudInfra'
 import { relTime } from '../utils/format'
-import type { CloudInfraError, CloudInfraStatusValue } from '../api/types'
+import type { CloudInfraError, CloudInfraHistoryItem, CloudInfraStatus, CloudInfraStatusValue } from '../api/types'
 
 function StatusPill({ status }: { status?: CloudInfraStatusValue | string }) {
   const tone = cloudInfraTone(status)
@@ -80,6 +77,146 @@ function valueWithUnit(value: number | null | undefined, unit: string, digits = 
   return `${numberLabel(value, digits)}${unit}`
 }
 
+function errorCount(errors?: CloudInfraError[]): number {
+  return errors?.length ?? 0
+}
+
+function totalErrorCount(data: CloudInfraStatus): number {
+  const fast = data.fast
+  const slow = data.slow
+  return [
+    fast?.errors,
+    fast?.backend_runtime?.errors,
+    fast?.datastores?.errors,
+    fast?.data_pipeline?.errors,
+    fast?.factory_freshness?.errors,
+    slow?.errors,
+    slow?.eks_management?.errors,
+    slow?.storage_freshness?.errors,
+  ].reduce((sum, errors) => sum + errorCount(errors), 0)
+}
+
+function topIssueLabel(data: CloudInfraStatus): string {
+  const rows = [
+    { label: '데이터 파이프라인', status: data.fast?.data_pipeline?.status, errors: data.fast?.data_pipeline?.errors },
+    { label: 'Dashboard Runtime', status: data.fast?.backend_runtime?.status, errors: data.fast?.backend_runtime?.errors },
+    { label: 'Datastores', status: data.fast?.datastores?.status, errors: data.fast?.datastores?.errors },
+    { label: 'Factory Freshness', status: data.fast?.factory_freshness?.status, errors: data.fast?.factory_freshness?.errors },
+    { label: 'Management Plane', status: data.slow?.eks_management?.status, errors: data.slow?.eks_management?.errors },
+    { label: 'Storage Freshness', status: data.slow?.storage_freshness?.status, errors: data.slow?.storage_freshness?.errors },
+  ]
+  const issue = rows.find((row) => row.status && row.status !== 'normal') ?? rows.find((row) => errorCount(row.errors) > 0)
+  return issue ? issue.label : 'No active issue'
+}
+
+function HealthStrip({ data }: { data: CloudInfraStatus }) {
+  const factories = data.fast?.factory_freshness?.factories ?? []
+  const staleFactories = factories.filter((f) => (f.latest_infra_state_age_seconds ?? 0) > 120).length
+  const enabledSchedulers = (data.fast?.data_pipeline?.schedulers ?? []).filter((s) => s.state === 'ENABLED').length
+  const lambdaErrors = (data.fast?.data_pipeline?.lambdas ?? []).reduce((sum, fn) => sum + (fn.errors_5m ?? 0), 0)
+  const totalErrors = totalErrorCount(data)
+
+  return (
+    <div className={`cloud-health-strip ${cloudInfraTone(data.overall_status)}`}>
+      <div className="cloud-health-main">
+        <div className="cloud-health-icon">
+          {data.overall_status === 'normal' ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
+        </div>
+        <div>
+          <div className="cloud-health-label">Overall Status</div>
+          <div className="cloud-health-title">{cloudInfraStatusLabel(data.overall_status)}</div>
+        </div>
+      </div>
+      <div className="cloud-health-stat">
+        <span className="label">Top signal</span>
+        <span className="value">{topIssueLabel(data)}</span>
+      </div>
+      <div className="cloud-health-stat">
+        <span className="label">Collector age</span>
+        <span className="value">fast {secondsLabel(data.fast_age_seconds)} · slow {secondsLabel(data.slow_age_seconds)}</span>
+      </div>
+      <div className="cloud-health-stat">
+        <span className="label">Errors</span>
+        <span className="value">{totalErrors} collector · {lambdaErrors} lambda</span>
+      </div>
+      <div className="cloud-health-stat">
+        <span className="label">Fresh factories</span>
+        <span className="value">{factories.length - staleFactories}/{factories.length} · sched {enabledSchedulers}</span>
+      </div>
+    </div>
+  )
+}
+
+interface ComponentRow {
+  id: string
+  name: string
+  group: string
+  status?: CloudInfraStatusValue | string
+  signal: string
+  detail: string
+  errors?: CloudInfraError[]
+}
+
+function ComponentMatrix({ rows }: { rows: ComponentRow[] }) {
+  return (
+    <div className="card cloud-matrix-card">
+      <div className="card-hd">
+        <div>
+          <div className="h2">Component Health</div>
+          <div className="micro" style={{ marginTop: 3 }}>section rollup 기준. 문제가 있는 행을 먼저 스캔합니다.</div>
+        </div>
+      </div>
+      <div className="table-scroll">
+        <table className="tbl cloud-matrix">
+          <thead><tr><th>Component</th><th>Group</th><th>Status</th><th>Signal</th><th>Detail</th><th>Errors</th></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className={`cloud-row-${cloudInfraTone(row.status)}`}>
+                <td className="strong">{row.name}</td>
+                <td>{row.group}</td>
+                <td><StatusPill status={row.status} /></td>
+                <td>{row.signal}</td>
+                <td className="micro">{row.detail}</td>
+                <td className="tnum">{errorCount(row.errors)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function DependencyRail({ rows }: { rows: ComponentRow[] }) {
+  return (
+    <div className="cloud-rail">
+      {rows.map((row, index) => (
+        <div className={`cloud-rail-step ${cloudInfraTone(row.status)}`} key={row.id}>
+          <span className="rail-dot" />
+          <span className="rail-name">{row.name}</span>
+          {index < rows.length - 1 && <span className="rail-line" />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StatusHistoryBar({ items }: { items: CloudInfraHistoryItem[] }) {
+  const latest = items.slice(0, 60).reverse()
+  if (latest.length === 0) return <div className="micro">history 수집 대기</div>
+  return (
+    <div className="status-bar" aria-label="최근 상태 흐름">
+      {latest.map((item, index) => (
+        <span
+          key={item.sk ?? `${item.updated_at ?? 'item'}-${index}`}
+          className={`status-seg ${cloudInfraTone(item.overall_status)}`}
+          title={`${item.updated_at ?? item.sk ?? ''} · ${cloudInfraStatusLabel(item.overall_status)}`}
+        />
+      ))}
+    </div>
+  )
+}
+
 function SectionCard({
   title, status, reasons, errors, children,
 }: {
@@ -106,42 +243,6 @@ function SectionCard({
         <SectionMeta status={status} reasons={reasons} errors={errors} />
         {children}
       </div>
-    </div>
-  )
-}
-
-function Overview({ data }: { data: ReturnType<typeof buildOverviewCards> }) {
-  const icons = [Workflow, Server, Database, HardDrive]
-  return (
-    <div className="grid-4" style={{ marginBottom: 18 }}>
-      {data.map((card, index) => {
-        const Icon = icons[index] ?? Server
-        return (
-          <div className="card" key={card.id}>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 13, minHeight: 146 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 8,
-                  background: 'var(--surface-2)', border: '1px solid var(--line-2)',
-                  color: 'var(--ink-3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Icon size={17} />
-                </div>
-                <StatusPill status={card.status} />
-              </div>
-              <div>
-                <div className="eyebrow" style={{ marginBottom: 6 }}>{card.title}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <div className="metric-value">{card.primary}</div>
-                  <div className="micro">{card.secondary}</div>
-                </div>
-              </div>
-              <div className="micro" style={{ marginTop: 'auto' }}>{card.detail}</div>
-            </div>
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -200,7 +301,6 @@ export function CloudInfraPage() {
     )
   }
 
-  const overviewCards = buildOverviewCards(data)
   const fast = data.fast
   const slow = data.slow
   const runtime = fast?.backend_runtime
@@ -209,7 +309,69 @@ export function CloudInfraPage() {
   const freshness = fast?.factory_freshness
   const eks = slow?.eks_management
   const storage = slow?.storage_freshness
-  const historySeries = historyStatusSeries(history.data)
+  const componentRows: ComponentRow[] = [
+    {
+      id: 'pipeline',
+      name: 'Data Pipeline',
+      group: 'Ingestion',
+      status: pipeline?.status,
+      signal: `${(pipeline?.lambdas ?? []).reduce((sum, fn) => sum + (fn.errors_5m ?? 0), 0)} lambda errors`,
+      detail: `DDB throttle ${(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} · DLQ ${pipeline?.dlq?.messages_visible ?? 0}`,
+      errors: pipeline?.errors,
+    },
+    {
+      id: 'runtime',
+      name: 'Dashboard Runtime',
+      group: 'Serving',
+      status: runtime?.status,
+      signal: `ECS ${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`,
+      detail: `ALB healthy ${runtime?.alb?.healthy_host_count ?? 0} · 5xx ${runtime?.alb?.target_5xx_count_5m ?? 0}`,
+      errors: runtime?.errors,
+    },
+    {
+      id: 'datastores',
+      name: 'Datastores',
+      group: 'State',
+      status: datastores?.status,
+      signal: `Redis ${datastores?.redis?.status ?? '-'} · RDS ${datastores?.rds?.status ?? '-'}`,
+      detail: `Redis CPU ${numberLabel(datastores?.redis?.cpu_utilization_avg, 1)}% · RDS CPU ${numberLabel(datastores?.rds?.cpu_utilization_avg, 1)}%`,
+      errors: datastores?.errors,
+    },
+    {
+      id: 'freshness',
+      name: 'Factory Freshness',
+      group: 'Factories',
+      status: freshness?.status,
+      signal: `${freshness?.factories?.length ?? 0} factories`,
+      detail: `max infra age ${secondsLabel(Math.max(0, ...(freshness?.factories ?? []).map((f) => f.latest_infra_state_age_seconds ?? 0)))}`,
+      errors: freshness?.errors,
+    },
+    {
+      id: 'management',
+      name: 'Management Plane',
+      group: 'Control',
+      status: eks?.status,
+      signal: `Nodes ${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`,
+      detail: `Pods ${eks?.pods?.running ?? 0} running · ArgoCD ${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`,
+      errors: eks?.errors,
+    },
+    {
+      id: 'storage',
+      name: 'Storage Freshness',
+      group: 'Durable data',
+      status: storage?.status,
+      signal: `${storage?.factories?.length ?? 0} factories`,
+      detail: `raw / processed / aggregate freshness`,
+      errors: storage?.errors,
+    },
+  ]
+  const railRows = [
+    componentRows[0],
+    componentRows[1],
+    componentRows[2],
+    componentRows[5],
+    componentRows[4],
+  ]
 
   return (
     <Shell
@@ -217,7 +379,7 @@ export function CloudInfraPage() {
       crumbs={[{ label: 'System' }, { label: '클라우드 인프라' }]}
       onRefresh={() => { void cloud.refresh(); void history.refresh() }}
     >
-      <div style={{
+      <div className="cloud-page-head" style={{
         marginBottom: 18,
         display: 'flex',
         justifyContent: 'space-between',
@@ -229,7 +391,7 @@ export function CloudInfraPage() {
           <div className="eyebrow" style={{ marginBottom: 8 }}>Cloud Infra</div>
           <h1 className="h1">클라우드 인프라 상태</h1>
           <div className="sub" style={{ marginTop: 6 }}>
-            Dashboard Runtime, 데이터 파이프라인, Management Plane, Storage freshness를 read model 기준으로 확인합니다.
+            수집 상태와 장애 신호를 먼저 보고, 아래에서 컴포넌트별 원인을 확인합니다.
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -243,7 +405,9 @@ export function CloudInfraPage() {
         </div>
       </div>
 
-      <Overview data={overviewCards} />
+      <HealthStrip data={data} />
+      <ComponentMatrix rows={componentRows} />
+      <DependencyRail rows={railRows} />
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
@@ -354,12 +518,12 @@ export function CloudInfraPage() {
       </div>
 
       <div className="card">
-        <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
+        <div style={{ padding: 16 }}>
           <div>
             <div className="h2">최근 1시간 상태 흐름</div>
-            <div className="micro" style={{ marginTop: 4 }}>normal=1, warning=2, critical=3 기준의 간단한 상태선입니다.</div>
+            <div className="micro" style={{ marginTop: 4, marginBottom: 12 }}>최근 fast history를 시간순 segment로 표시합니다.</div>
           </div>
-          <Sparkline data={historySeries} width={160} height={34} color="var(--accent)" />
+          <StatusHistoryBar items={history.data} />
         </div>
       </div>
     </Shell>
