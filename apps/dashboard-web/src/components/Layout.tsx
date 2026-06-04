@@ -32,6 +32,11 @@ function riskDotColor(level?: string): string {
   return 'var(--unk)'
 }
 
+function factoryShortLabel(factoryId: string): string {
+  const lastSegment = factoryId.split(/[-_]/).filter(Boolean).pop() ?? factoryId
+  return lastSegment.slice(0, 2).toUpperCase()
+}
+
 export function Sidebar({ factories = [], collapsed = false, onNavigate }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -115,10 +120,10 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
                   aria-label={`${f.factory_id} 공장 상세`}
                   title={`${f.factory_id} · ${f.risk_score ?? '미수신'}`}
                 >
-                  <span style={{
-                    width: 7, height: 7, borderRadius: '50%',
-                    background: dotColor, flexShrink: 0,
-                  }} />
+                  <span className="nav-factory-mark">
+                    <span className="nav-risk-dot" style={{ background: dotColor }} />
+                    <span className="nav-factory-short">{factoryShortLabel(f.factory_id)}</span>
+                  </span>
                   <span className="nav-item-label" style={{ flex: 1 }}>{f.factory_id}</span>
                   {f.risk_score != null && (
                     <span className="mono tnum nav-item-count" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
