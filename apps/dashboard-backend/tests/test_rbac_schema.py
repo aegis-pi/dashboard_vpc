@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from config import get_settings
 from db.models import AppUser, Factory, UserFactoryAccess
 from db.session import Base, _engine
+from services.metadata import ensure_metadata_schema
 from services.rbac_seed import seed_rbac_reference_data
 
 
@@ -47,4 +48,42 @@ async def _assert_rbac_schema_and_seed_data_are_idempotent():
         ("user-factory-ac-admin", "factory-a", "admin"),
         ("user-factory-ac-admin", "factory-c", "admin"),
         ("user-factory-c-admin", "factory-c", "admin"),
+    }
+
+
+def test_metadata_sync_persists_bootstrap_super_admins(monkeypatch):
+    def _profile(sub: str) -> dict:
+        return {
+            "email": f"{sub}@example.com",
+            "display_name": f"Admin {sub}",
+        }
+
+    monkeypatch.setattr("services.metadata.get_user_profile", _profile)
+
+    asyncio.run(_assert_metadata_sync_persists_bootstrap_super_admins())
+
+
+async def _assert_metadata_sync_persists_bootstrap_super_admins():
+    settings = get_settings()
+    engine = _engine(settings.database_url)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await ensure_metadata_schema(settings)
+    await ensure_metadata_schema(settings)
+
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as session:
+        users = (
+            await session.execute(
+                select(AppUser).where(AppUser.cognito_sub.in_(["test-user", "test-user-sub"]))
+            )
+        ).scalars().all()
+
+    assert {
+        (user.cognito_sub, user.email, user.display_name, user.global_role, user.status)
+        for user in users
+    } == {
+        ("test-user", "test-user@example.com", "Admin test-user", "super_admin", "active"),
+        ("test-user-sub", "test-user-sub@example.com", "Admin test-user-sub", "super_admin", "active"),
     }

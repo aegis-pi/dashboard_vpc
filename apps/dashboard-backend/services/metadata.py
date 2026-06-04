@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from config import Settings, get_settings
-from db.models import Factory
+from db.models import AppUser, Factory, GlobalRole, UserStatus
 from db.session import Base, _engine, _factory
+from services.cognito_admin import CognitoAdminError, get_user_profile
 
 
 def _configured_factory_ids(settings: Settings) -> list[str]:
@@ -13,6 +14,22 @@ def _configured_factory_ids(settings: Settings) -> list[str]:
         for factory_id in settings.dashboard_factory_ids.split(",")
         if factory_id.strip()
     ]
+
+
+def _bootstrap_super_admin_subs(settings: Settings) -> list[str]:
+    return [
+        sub.strip()
+        for sub in settings.rbac_bootstrap_super_admin_subs.split(",")
+        if sub.strip()
+    ]
+
+
+def _fallback_bootstrap_email(sub: str) -> str:
+    return f"{sub}@bootstrap.local"
+
+
+def _bootstrap_user_id(sub: str) -> str:
+    return f"cognito-{sub}"
 
 
 async def ensure_metadata_schema(settings: Settings | None = None) -> None:
@@ -34,6 +51,34 @@ async def ensure_metadata_schema(settings: Settings | None = None) -> None:
             else:
                 factory.display_name = factory.display_name or display_name
                 factory.is_active = True
+
+        for sub in _bootstrap_super_admin_subs(settings):
+            try:
+                profile = get_user_profile(sub)
+                email = profile.get("email") or _fallback_bootstrap_email(sub)
+                display_name = profile.get("display_name") or email
+            except CognitoAdminError:
+                email = _fallback_bootstrap_email(sub)
+                display_name = email
+
+            result = await session.execute(select(AppUser).where(AppUser.cognito_sub == sub))
+            user = result.scalar_one_or_none()
+            if user is None:
+                user = AppUser(
+                    id=_bootstrap_user_id(sub),
+                    cognito_sub=sub,
+                    email=email,
+                    display_name=display_name,
+                    global_role=GlobalRole.SUPER_ADMIN.value,
+                    status=UserStatus.ACTIVE.value,
+                )
+                session.add(user)
+            else:
+                user.email = email
+                user.display_name = display_name
+                user.global_role = GlobalRole.SUPER_ADMIN.value
+                user.status = UserStatus.ACTIVE.value
+
         await session.commit()
 
 

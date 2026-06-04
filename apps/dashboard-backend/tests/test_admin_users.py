@@ -81,17 +81,18 @@ def test_admin_list_users_returns_factory_access(client):
     r = client.get("/admin/users")
 
     assert r.status_code == 200
-    assert r.json() == [
-        {
-            "id": "user-existing",
-            "cognito_sub": "existing-sub",
-            "email": "existing@example.com",
-            "display_name": "Existing User",
-            "global_role": "factory_admin",
-            "status": "active",
-            "factories": [{"factory_id": "factory-a", "role": "admin"}],
-        }
-    ]
+    users = {user["id"]: user for user in r.json()}
+    assert users["user-existing"] == {
+        "id": "user-existing",
+        "cognito_sub": "existing-sub",
+        "email": "existing@example.com",
+        "display_name": "Existing User",
+        "global_role": "factory_admin",
+        "status": "active",
+        "factories": [{"factory_id": "factory-a", "role": "admin"}],
+    }
+    assert users["cognito-test-user"]["global_role"] == "super_admin"
+    assert users["cognito-test-user-sub"]["global_role"] == "super_admin"
 
 
 def test_admin_create_user_calls_cognito_and_stores_access(client, monkeypatch):
