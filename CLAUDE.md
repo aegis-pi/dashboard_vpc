@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 > Aegis-Pi Risk Twin 작업 시 Claude Code가 따라야 할 핵심 가이드.
-> 기준일: 2026-05-19 / 문서 언어: 한국어 (개조식 우선)
+> 기준일: 2026-06-04 / 문서 언어: 한국어 (개조식 우선)
 > **AI 코딩 에이전트 harness 단일 진입점**: `docs/AI_AGENT_HARNESS.md` (phase별 DoD · 허용/금지 파일 · 검증 명령 · 프롬프트 가이드 포함)
 
 ## 정체성
@@ -12,11 +12,12 @@
 
 ## 현재 상태
 
-- 본 환경(워크스트림 B) 현재 단계: **Phase 1 Step 0~3 진입 준비** — 1번 Data / Dashboard VPC 통합 구현 (`docs/planning/16_data_dashboard_vpc_workplan.md`)
-- 워크스트림 A(팀, 다른 환경) 진행 중: M3 Issue 2 — ECR push/pull 검증, Spoke imagePullSecret. **본 환경에서는 수정/실행하지 않는다**
-- 완료: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
+- 본 환경(워크스트림 B) 현재 단계: **Phase 1 Step 0~9.5 완료 + Step 10(운영 자동화/데모) 진행** — 1번 Data / Dashboard VPC 통합 구현/운영 배포 단계 (`docs/planning/16_data_dashboard_vpc_workplan.md`)
+- 코드 기준 구현 완료: data-processor / lambda-notifier / cloud-infra-collector / Dashboard Backend(FastAPI: factories·reports·ws·cloud_infra·admin_users·auth_me) / Dashboard Web(Vite+React SPA: Fleet·Factory·Reports·CloudInfra·AdminUsers·Login·Callback). 남은 작업은 UI 마무리 보정과 LLM 일간 보고서 생성기(ADR 0016, 팀원/후속)
+- 워크스트림 A(팀, 다른 환경): M3 Issue 2 — ECR push/pull 검증, Spoke imagePullSecret. **본 환경에서는 수정/실행하지 않는다**
+- 완료: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4, M4(소비측 Lambda/검증), M6(Dashboard 화면·RBAC·Cloud Infra·보고서 조회)
 - 보류: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- AWS: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 VPC 는 아직 미배포. 비용 기준은 `docs/ops/15_aws_cost_baseline.md`
+- AWS: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. 1번 VPC는 Step 9.5 permanent split 이후 `infra/data-dashboard` 일시 root에서 build/destroy 사이클로 운영(영구 자원은 `infra/data-dashboard-permanent` / `infra/data-dashboard-dns`). 운영 배포: backend image `sha-abb81ed` 계열, ECS desired/running 2, https://dashboard.aegis-pi.cloud / https://api.aegis-pi.cloud 활성. 비용 기준은 `docs/ops/15_aws_cost_baseline.md` (v3.4)
 - 시점별 정확한 스냅샷은 항상 `docs/issues/SESSION_STATE.md` 가 우선
 
 ## 디렉터리

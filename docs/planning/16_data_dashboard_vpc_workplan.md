@@ -1,8 +1,9 @@
 # Data / Dashboard VPC Workplan (이 작업 환경)
 
 상태: source of truth
-기준일: 2026-05-27
+기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04 v1.8  Step 0~9.5 완료 후 Step 10 진행 단계 반영. 일시 root 재기동 상태에서 Dashboard 운영 기능 반복 배포 완료: Cloud Infra 화면 + Fast/Slow collector(ADR 0027), Factory Timeline/top_causes, GRAPH#5M(ADR 0025/0026), staleness 통일(ADR 0028), S3 보고서 조회(ADR 0029), ECS Auto Scaling(ADR 0030), RBAC 사용자 관리(ADR 0031). 운영 backend image `sha-e96bf81`(ECS revision 37), desired/running 2. Step 10은 runbook `ops/22`·비용 baseline v3.4 갱신 완료, build/destroy 스크립트와 drawio 갱신 잔여. LLM 보고서 생성기(ADR 0016)만 팀원/후속.
   - 2026-05-27 v1.7  post-migration permanent diff 정리 완료 반영. infra/data-dashboard-permanent apply 0 add, 3 change, 0 destroy 후 permanent/dns plan No changes. state count 0/25/1 확인.
   - 2026-05-26 v1.6  Step 9.5 permanent resource split migration 완료 반영. infra/data-dashboard-permanent/ 신설, 25 resources import, data-dashboard state rm 20개, 엔드포인트 HTTP 200 확인.
   - 2026-05-26 v1.5  Step 9.5 permanent resource split 설계 완료 반영. ADR 0024 작성. Step 9.5 추가. 다음: Step 9.5 migration 실행 세션.
@@ -487,18 +488,19 @@ RDS 미영구화 결정:
   3. Step 10 build/destroy 자동화에 permanent/dns root 순서 반영
 ```
 
-### Step 10 — 운영 문서화 + 자동화 스크립트
+### Step 10 — 운영 문서화 + 자동화 스크립트 (진행 중)
 
 ```text
-- scripts/build/build-data-dashboard.sh (Terraform apply 순서 자동화)
-- scripts/destroy/destroy-data-dashboard.sh (RDS PostgreSQL snapshot → destroy 순서)
-- scripts/ops/data-dashboard-port-forward.sh (필요 시 로컬 fallback)
-- docs/architecture/drawio/ 신규 다이어그램 (03_re6 갱신)
-- docs/architecture/01_target_architecture.md 갱신 (완료)
-- docs/ops/2N_dashboard_domain_runbook.md 신규 (도메인/ACM/Cognito UI 절차)
-- docs/ops/2N_data_dashboard_runbook.md 신규 (build/destroy 사이클 + 트러블슈팅)
-- docs/ops/15_aws_cost_baseline.md 실측 후 재갱신
+- scripts/build/build-data-dashboard.sh (Terraform apply 순서 자동화) ✅ 구현 완료
+- scripts/destroy/destroy-data-dashboard.sh (RDS PostgreSQL snapshot → destroy 순서) ✅ 구현 완료
+- scripts/ops/data-dashboard-port-forward.sh (필요 시 로컬 fallback) — 미작성 (필요 시 추가)
+- docs/architecture/drawio/ 신규 다이어그램 (03_re6 갱신) — agiespi_architecture_overview_final.drawio 존재, Phase 1 운영 반영 갱신 잔여
+- docs/architecture/01_target_architecture.md 갱신 ✅ 완료
+- docs/ops/22_data_dashboard_vpc_runbook.md (build/destroy 사이클 + 도메인/ACM/Cognito + 트러블슈팅) ✅ 작성 완료
+- docs/ops/15_aws_cost_baseline.md 실측 후 재갱신 ✅ v3.4까지 갱신 완료
 ```
+
+남은 Step 10 작업: drawio 다이어그램 Phase 1 운영 상태 반영 갱신, (필요 시) port-forward 스크립트, 데모 시나리오/리허설 최종 정리.
 
 ## 합류 지점 운영 규칙
 

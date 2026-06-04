@@ -1,11 +1,15 @@
 # 데모 시나리오
 
 상태: source of truth
-기준일: 2026-05-08
+기준일: 2026-06-04
+
+수정 이력:
+- 2026-06-04 v0.3  AWS 상태 정정(2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성). 1번 Data/Dashboard VPC Phase 1 운영 배포에 따른 Dashboard 데모 섹션 추가.
+- 2026-05-08 v0.2  destroy-all 이후 비용 정리 상태 반영.
 
 ## 목적
 
-현재 구현된 `factory-a` Safe-Edge 기준선으로 시연 가능한 데모 흐름을 정리한다.
+현재 구현된 `factory-a` Safe-Edge 기준선과 1번 Data/Dashboard VPC(워크스트림 B) Phase 1 관제 화면으로 시연 가능한 데모 흐름을 정리한다.
 
 ## 현재 가능한 데모
 
@@ -17,7 +21,32 @@ Longhorn storage 확인
 worker2 장애 -> worker1 failover -> worker2 failback 확인
 ```
 
-AWS Hub EKS/VPC/namespace/ArgoCD bootstrap 기준선, Hub Prometheus Agent, Grafana/AMP datasource, AWS Load Balancer Controller, Admin UI HTTPS Ingress, Foundation S3 bucket, AMP Workspace, IoT Rule -> S3 raw 적재, `factory-a` IoT Thing/Policy/K3s Secret, Hub IRSA S3/AMP 권한은 2026-05-06~2026-05-07 기준 `build-all --admin-ui`와 `build-hub`로 재생성/검증했고, 2026-05-08 비용 정리를 위해 destroy 완료 상태다. AWS Hub 데모는 rebuild 후 진행한다. `factory-b`, `factory-c`, Risk Twin 통합 화면은 후속 데모다.
+AWS Hub EKS/VPC/namespace/ArgoCD bootstrap 기준선, Hub Prometheus Agent, Grafana/AMP datasource, AWS Load Balancer Controller, Admin UI HTTPS Ingress, Foundation S3 bucket, AMP Workspace, IoT Rule -> S3 raw 적재, `factory-a` IoT Thing/Policy/K3s Secret, Hub IRSA S3/AMP 권한은 2026-05-15 rebuild 후 활성 상태다(`build-all --admin-ui` / `build-hub`). `factory-b`, `factory-c`는 후속 데모다.
+
+## Phase 1 Dashboard 데모 (1번 Data/Dashboard VPC, 운영 배포)
+
+1번 Data/Dashboard VPC는 build/destroy 사이클로 운영한다(`scripts/build/build-data-dashboard.sh` / `scripts/destroy/destroy-data-dashboard.sh`). 일시 root가 build된 상태에서 아래 관제 화면을 시연한다. 영구 자원(CloudFront/Cognito/S3 web/도메인)은 상시 유지된다.
+
+```text
+Dashboard Web : https://dashboard.aegis-pi.cloud  (Cognito 로그인)
+Dashboard API : https://api.aegis-pi.cloud/healthz
+```
+
+보여줄 것:
+
+```text
+Login         Cognito Hosted UI 로그인 → 권한(RBAC)에 따른 공장 노출
+Fleet         공장별 위험도(안전점수) 카드, 자동 refresh interval
+Factory       센서 현황 + 이상 항목 + Timeline(10m/1h/custom) + top_causes 원인, WebSocket 실시간 갱신
+Cloud Infra   backend/datastores/data_pipeline/factory_freshness 등 인프라 상태(Fast/Slow collector)
+Reports       S3 reports/daily/ 기반 일간 보고서 조회 (PDF/Word 내보내기)
+Admin Users   /admin/users 관리자 사용자 생성·수정·삭제 및 공장 권한 편집 (super_admin/org_admin)
+```
+
+전달 메시지:
+- 단일 공장 엣지(factory-a) 데이터가 IoT Core → Lambda data processor → DynamoDB로 적재되고, ECS Dashboard Backend가 이를 REST/WebSocket으로 본사 관제 화면에 제공한다.
+- 실시간 갱신은 준실시간(1~수 초) 기준이며, factory-a Edge Agent 재활성 시 실제 센서 변화가 대시보드에 반영된다(현재 Edge Agent 비활성으로 주입/저장 데이터 기반 시연).
+- LLM 일간 보고서 생성기(Bedrock)는 팀원/후속이며, 본 데모는 S3에 적재된 보고서 조회 화면까지 보여준다.
 
 ## 데모 순서
 

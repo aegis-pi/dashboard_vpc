@@ -1,9 +1,10 @@
 # 프로젝트 개요
 
 상태: source of truth
-기준일: 2026-05-22
+기준일: 2026-06-04
 
 수정 이력:
+- 2026-06-04 v0.6  워크스트림 B Phase 1 Step 0~9.5 완료 + Step 10 진행 반영. Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회 운영 배포, 코드 UI 마무리 보정만 잔여. "Risk Twin / Dashboard VPC 진입 준비" 표 항목을 운영 배포 상태로 정정.
 - 2026-05-22 v0.5  워크스트림 B Phase 1 Step 2~5.5 완료 및 Data/Dashboard VPC destroy 상태, Step 6 진입 준비 반영.
 - 2026-05-20 v0.4  2026-05-15 rebuild, 워크스트림 B Phase 1 통합 목표, M3 Issue 1/4 완료 상태 반영.
 
@@ -27,8 +28,8 @@ Aegis-Pi 프로젝트의 문제 정의, 목표, 사용자, 핵심 기능, 현재
 - M1 Issue 12에서 `configs/runtime/runtime-config.yaml`과 VM dummy data 추천값을 작성했다.
 - M2 Issue 1~6에서 Tailnet/tag/Auth Key 정책 수립, `factory-a-master` Tailscale 참여, EKS Hub Tailscale Operator/egress 구성, `factory-a` kubeconfig/ArgoCD cluster 등록, `factory-a-podinfo-smoke` Sync/Healthy, Tailscale egress 장애/복구 검증을 완료했다.
 - 워크스트림 A는 M3 Issue 2 ECR image push/pull 검증과 Spoke imagePullSecret 방식을 진행 중이다. 본 환경에서는 워크스트림 A 자산을 수정/실행하지 않는다.
-- 본 환경의 다음 작업은 1번 Data/Dashboard VPC Phase 1 Step 6 Dashboard Backend FastAPI 구현 준비다.
-- `factory-b`, `factory-c`, Edge Agent 송신 측, 일부 CI/CD 마무리는 워크스트림 A 또는 후속 확장 단계다.
+- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~9.5를 구현 완료하고 운영 배포(Backend/Web/Cloud Infra/RBAC/보고서 조회)까지 마쳤다. 현재는 Step 10 운영 자동화/데모 진행 단계이며, 코드는 UI 마무리 보정만 남았다. 상세는 `docs/planning/16_data_dashboard_vpc_workplan.md`와 `docs/issues/SESSION_STATE.md`.
+- LLM 일간 보고서 생성기(Bedrock, ADR 0016), `factory-b`/`factory-c`, factory-a Edge Agent 실시간 송신 측, 일부 CI/CD 마무리는 워크스트림 A 또는 후속 확장 단계다.
 
 ## 프로젝트명
 
@@ -106,7 +107,9 @@ Aegis-Pi는 아래 방향으로 Safe-Edge를 확장한다.
 | AWS 비용 기준 | 완료 | `docs/ops/15_aws_cost_baseline.md`, destroy 이후 `$0.0000/hour` |
 | ECR `aegis/edge-agent` | 진행 중 | repository 활성, push/pull 검증은 워크스트림 A |
 | `factory-b`, `factory-c` | 후속 | 테스트베드형 Spoke |
-| Risk Twin / Dashboard VPC | 진입 준비 | Phase 1 Step 0~3, 본 환경 워크스트림 B |
+| Risk Twin / Dashboard VPC | 완료/운영 배포 | Phase 1 Step 0~9.5 완료, Step 10 진행. Dashboard Backend(ECS)/Web(CloudFront)/Cloud Infra/RBAC/보고서 조회 활성, 본 환경 워크스트림 B |
+| Lambda data processor / notifier / cloud-infra-collector | 완료 | `apps/data-processor`·`apps/lambda-notifier`·`apps/cloud-infra-collector`, IoT Rule/DDB Streams/EventBridge 연동 |
+| LLM 일간 보고서 생성기 | 후속 | Bedrock 생성기 팀원/후속(ADR 0016). Dashboard 조회 경로는 S3 read로 완료(ADR 0029) |
 
 ## 현재 freeze 범위
 

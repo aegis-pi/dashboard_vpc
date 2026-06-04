@@ -27,8 +27,11 @@
 ## 현재 진행 기준
 
 - 완료: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
-- 진행 중: **M3 Issue 2** — ECR 저장소 + 이미지 태그 전략
+- 완료(워크스트림 B): Phase 1 Step 0~9.5, M4 소비측(Issue 6/7 Lambda data processor·pipeline_status, Issue 8 주입 기반 e2e), M6 Dashboard 화면/RBAC/Cloud Infra/보고서 조회
+- 진행 중: **Phase 1 Step 10** — 운영 자동화 스크립트·데모 준비. UI 마무리 보정 잔여
+- 진행 중(워크스트림 A): **M3 Issue 2** — ECR 저장소 + 이미지 태그 전략 (본 환경 미수정)
 - 보류: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화)
+- 후속: LLM 일간 보고서 생성기(ADR 0016, 팀원/후속), factory-a Edge Agent 재활성 후 IoT→DDB 실시간 경로 검증
 - 다음 세션 시작 시 `SESSION_STATE.md` 우선 확인
 
 ## 작성 규칙

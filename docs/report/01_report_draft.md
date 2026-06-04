@@ -78,7 +78,8 @@ AI snapshot: 24시간 초과 자동 삭제
 
 - failover 시 전원 장애 기준 약 65-75초의 데이터 공백이 있었다.
 - failback 전환 구간에서 중복 write 후보가 있다.
-- AWS Hub EKS/VPC/namespace/ArgoCD bootstrap, Hub Prometheus Agent, Grafana/AMP datasource, AWS Load Balancer Controller, Admin UI HTTPS Ingress, foundation S3/AMP/IoT Rule, IRSA S3/AMP 권한은 2026-05-06~2026-05-07 기준 `build-all --admin-ui`와 `build-hub`로 재생성/검증했고, 2026-05-08 비용 정리를 위해 destroy 완료 상태다. Dashboard VPC/Risk Twin 구조는 아직 후속 단계다.
+- AWS Hub EKS/VPC/namespace/ArgoCD bootstrap, Hub Prometheus Agent, Grafana/AMP datasource, AWS Load Balancer Controller, Admin UI HTTPS Ingress, foundation S3/AMP/IoT Rule, IRSA S3/AMP 권한은 `build-all --admin-ui`와 `build-hub`로 재생성/검증했고 2026-05-15 rebuild 후 활성 상태다.
+- 1번 Data/Dashboard VPC(워크스트림 B)의 Risk Twin 구조는 Phase 1 Step 0~9.5 구현 완료 후 운영 배포 단계다(2026-06-04 기준). IoT Core → Lambda data processor → DynamoDB/S3, DDB Streams → notifier → Redis, ECS Fargate Dashboard Backend(FastAPI) + ALB, CloudFront/S3 SPA, Cognito + RDS 기반 공장별 RBAC, Cloud Infra 상태 화면(Fast/Slow collector), S3 기반 일간 보고서 조회까지 구현·배포했다. LLM 보고서 생성기(Bedrock)와 factory-a Edge Agent 실시간 송신 검증은 후속이다. 상세는 `docs/issues/SESSION_STATE.md`와 `docs/planning/16_data_dashboard_vpc_workplan.md`.
 - NFS Cold Storage와 Ansible tiering은 보류했다.
 
 ## 7. 다음 단계

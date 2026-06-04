@@ -1,9 +1,10 @@
 # 구현 전략 및 단계 계획
 
 상태: source of truth
-기준일: 2026-05-22
+기준일: 2026-06-04
 
 수정 이력:
+- 2026-06-04 v0.6  워크스트림 B Phase 1 Step 0~9.5 완료 + Step 10 진행 반영. Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회 운영 배포 완료, "다음 단계 Step 6" 서술 정정.
 - 2026-05-22 v0.5  워크스트림 B Phase 1 Step 2~5.5 완료 및 Data/Dashboard VPC destroy 상태, Step 6 진입 준비 반영.
 - 2026-05-20 v0.4  2026-05-15 rebuild, M3 Issue 1/4 완료, 워크스트림 B Phase 1 Step 0~3 진입 준비 상태 반영.
 
@@ -20,7 +21,7 @@
 - M1 Issue 12에서 `configs/runtime/runtime-config.yaml`과 VM dummy data 추천값을 작성했다.
 - M2 Issue 1~6에서 Tailnet/tag/Auth Key 정책 수립, `factory-a-master` Tailscale 참여, EKS Hub Tailscale Operator/egress 구성, `factory-a` kubeconfig/ArgoCD cluster 등록, `factory-a-podinfo-smoke` Sync/Healthy, Tailscale egress 장애/복구 검증을 완료했다.
 - 워크스트림 A의 현재 다음 단계는 M3 Issue 2 ECR image push/pull 검증과 Spoke imagePullSecret 방식 확정이다. 본 환경에서는 워크스트림 A 자산을 수정/실행하지 않는다.
-- 본 환경의 현재 다음 단계는 1번 Data/Dashboard VPC Phase 1 Step 6 Dashboard Backend FastAPI 구현 준비다.
+- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~9.5를 구현 완료하고 Dashboard Backend(ECS)/Web(CloudFront)/Cloud Infra 화면/RBAC 사용자 관리/보고서 조회까지 운영 배포했다. 현재 다음 단계는 Step 10 운영 자동화/데모와 UI 마무리 보정이다(`docs/planning/16_data_dashboard_vpc_workplan.md`).
 - `docs/issues/` 하위 마일스톤 문서를 기준으로 구현 순서를 M0~M7로 관리한다.
 - 구현 책임 경계는 `docs/planning/11_delivery_ownership_flow.md`를 source of truth로 삼는다.
 - 사용자 대시보드는 Tailscale 의존을 줄이기 위해 `docs/planning/16_data_dashboard_vpc_workplan.md`와 `docs/planning/17_expansion_roadmap.md`의 Phase 1 통합 목표를 따른다.

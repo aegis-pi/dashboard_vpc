@@ -1,7 +1,7 @@
 # Aegis-Pi Docs
 
 상태: source of truth
-기준일: 2026-05-22
+기준일: 2026-06-04
 
 ## 목적
 
@@ -13,7 +13,8 @@
 - `factory-a`는 Raspberry Pi 3-node K3s 기반 운영형 Spoke다.
 - 2026-04-30 기준 AI snapshot은 node-local hostPath를 사용하며, AI 추론 결과는 InfluxDB PVC를 통해 Longhorn에 저장한다.
 - 2026-04-30 기준 LAN 제거 및 `k3s-agent` 중지 failover/failback 재검증을 완료했다.
-- 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI가 활성 상태다. 1번 Data/Dashboard VPC는 2026-05-22 destroy 완료 상태이며 Terraform backend S3 bucket과 RDS final snapshot만 잔존한다.
+- 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI가 활성 상태다.
+- **1번 Data/Dashboard VPC(워크스트림 B)는 Phase 1 Step 0~9.5 구현 완료 후 운영 배포 단계다(Step 10 운영 자동화/데모 진행 중).** Step 9.5 permanent split 이후 `infra/data-dashboard` 일시 root를 build/destroy 사이클로 운영하며, 영구 자원(CloudFront/Cognito/S3 web/ECR/도메인)은 `infra/data-dashboard-permanent`/`infra/data-dashboard-dns`에 상시 유지된다. 운영 backend image `sha-e96bf81`(ECS revision 37), https://dashboard.aegis-pi.cloud / https://api.aegis-pi.cloud 활성. destroy 사이클 시 Terraform backend S3 bucket·RDS final snapshot·permanent/dns 자원만 잔존. 코드는 UI 마무리 보정만 남기고 구현 완료.
 - `build-hub`는 AWS Hub EKS/VPC/NAT/EIP, ArgoCD, Prometheus Agent, Grafana, AWS Load Balancer Controller, Admin UI, Hub Tailscale Operator/egress/UI/cluster Secret 복구를 자동화한다.
 - M1 Issue 5에서 IoT Rule -> S3 raw 적재와 M1 검증용 `risk/risk-normalizer` IRSA S3 권한 검증을 완료했다. 최신 데이터 처리 방향은 Lambda data processor와 DynamoDB/S3 processed다.
 - M1 Issue 6에서 AMP Workspace와 `observability/prometheus-agent` IRSA remote_write 권한 검증을 완료했다.
@@ -29,7 +30,7 @@
 - M2 Issue 6에서 `factory-a-podinfo-smoke` Application을 `factory-a`에 Sync해 `Synced` + `Healthy`, Pod 2개 `Running`을 확인했고, Tailscale egress Service 삭제 시 sync failure 및 재생성 후 복구를 검증했다.
 - M3 Issue 1에서 `aegis-pi-gitops` GitOps 저장소 구조, `aegis-spoke` Helm chart, 공장별 values, ApplicationSet skeleton, manifest validation workflow를 완료했다.
 - 워크스트림 A는 M3 Issue 2 ECR push/pull 검증을 진행 중이며, 본 환경에서는 수정/실행하지 않는다.
-- 본 환경의 기본 작업 범위는 1번 Data/Dashboard VPC Phase 1 Step 6 진입 준비다.
+- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~9.5를 구현 완료하고 Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회를 운영 배포했다. 현재는 Step 10 운영 자동화/데모와 UI 마무리 보정 단계다.
 - `factory-b`, `factory-c`, GitHub Actions build/deploy CI는 워크스트림 A/후속 단계다.
 - 현재 운영 source of truth는 `docs/ops/` 문서다.
 - 마일스톤 추적은 `docs/issues/` 문서를 따른다.
