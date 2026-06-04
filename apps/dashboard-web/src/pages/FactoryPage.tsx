@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { LevelBadge, PipelineBadge, StaleBadge } from '../components/Badge'
@@ -1478,7 +1478,6 @@ function LoadingChart() {
 // ─── Main factory page ────────────────────────────────────────────────
 export function FactoryPage() {
   const { factoryId = '' } = useParams<{ factoryId: string }>()
-  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [refreshSignalKey, setRefreshSignalKey] = useState(0)
   const [refreshInterval, setRefreshInterval] = useState(0)
@@ -1542,7 +1541,6 @@ export function FactoryPage() {
         { label: 'Fleet', href: '/' },
         { label: factoryId },
       ]}
-      onBack={() => navigate('/')}
       wsStatus={wsStatus}
       wsMessage={lastMessage}
       onRefresh={refreshPageData}
