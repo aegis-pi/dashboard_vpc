@@ -58,6 +58,32 @@ export interface FleetResponse {
   factories: FactorySummary[]
 }
 
+export type GlobalRole = 'super_admin' | 'org_admin' | 'factory_admin' | 'viewer'
+export type UserStatus = 'active' | 'disabled'
+export type FactoryAccessRole = 'admin' | 'viewer'
+
+export interface UserFactoryAccess {
+  factory_id: string
+  role: FactoryAccessRole
+}
+
+export interface AdminUser {
+  id: string
+  cognito_sub: string
+  email: string
+  display_name: string
+  global_role: GlobalRole
+  status: UserStatus
+  factories: UserFactoryAccess[]
+}
+
+export interface AdminUserPayload {
+  email?: string
+  display_name: string
+  global_role: GlobalRole
+  factories: UserFactoryAccess[]
+}
+
 // ─── Device entry (nested format from infra_state.devices) ──────────
 export interface DeviceEntry {
   available?: boolean | null

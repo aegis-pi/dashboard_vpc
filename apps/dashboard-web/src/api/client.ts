@@ -7,12 +7,26 @@ import type {
   FactorySummary,
   CloudInfraStatus,
   CloudInfraHistoryItem,
+  AdminUser,
+  AdminUserPayload,
 } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 
 // ─── HTTP helper ─────────────────────────────────────────────────────
-async function apiFetch<T>(path: string, requiresAuth = true): Promise<T> {
+interface ApiFetchOptions {
+  requiresAuth?: boolean
+  method?: string
+  body?: unknown
+}
+
+async function apiFetch<T>(
+  path: string,
+  options: ApiFetchOptions | boolean = {},
+): Promise<T> {
+  const requiresAuth = typeof options === 'boolean' ? options : options.requiresAuth ?? true
+  const method = typeof options === 'boolean' ? 'GET' : options.method ?? 'GET'
+  const body = typeof options === 'boolean' ? undefined : options.body
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -25,7 +39,11 @@ async function apiFetch<T>(path: string, requiresAuth = true): Promise<T> {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${BASE}${path}`, { headers })
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: body == null ? undefined : JSON.stringify(body),
+  })
 
   if (res.status === 401) {
     throw new AuthError('인증이 만료됐거나 유효하지 않습니다.')
@@ -35,6 +53,7 @@ async function apiFetch<T>(path: string, requiresAuth = true): Promise<T> {
     throw new ApiError(`API 오류 ${res.status}: ${body}`, res.status)
   }
 
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
@@ -133,4 +152,26 @@ export async function fetchCloudInfraHistory(
   if (limit != null) params.set('limit', String(limit))
   const raw = await apiFetch<unknown>(`/cloud-infra/history?${params.toString()}`)
   return Array.isArray(raw) ? raw as CloudInfraHistoryItem[] : []
+}
+
+export async function fetchAdminUsers(): Promise<AdminUser[]> {
+  const raw = await apiFetch<unknown>('/admin/users')
+  return Array.isArray(raw) ? raw as AdminUser[] : []
+}
+
+export async function createAdminUser(payload: AdminUserPayload): Promise<AdminUser> {
+  return apiFetch<AdminUser>('/admin/users', { method: 'POST', body: payload })
+}
+
+export async function updateAdminUser(userId: string, payload: AdminUserPayload): Promise<AdminUser> {
+  const body = {
+    display_name: payload.display_name,
+    global_role: payload.global_role,
+    factories: payload.factories,
+  }
+  return apiFetch<AdminUser>(`/admin/users/${userId}`, { method: 'PATCH', body })
+}
+
+export async function deleteAdminUser(userId: string): Promise<{ status: string; id: string }> {
+  return apiFetch<{ status: string; id: string }>(`/admin/users/${userId}`, { method: 'DELETE' })
 }

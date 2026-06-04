@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   RefreshCw,
   Server,
+  Users,
 } from 'lucide-react'
 import { logout } from '../auth/auth'
 import type { WsStatus } from '../hooks/useWebSocket'
@@ -27,6 +28,7 @@ export function Sidebar({ factories = [] }: SidebarProps) {
   const isFleet = location.pathname === '/'
   const isReports = location.pathname === '/reports'
   const isCloudInfra = location.pathname === '/cloud-infra'
+  const isAdminUsers = location.pathname === '/admin/users'
   const cloudStatus = cloudInfra?.available ? cloudInfra.overall_status : undefined
 
   // Parse current factory ID from the URL so the Factories section never
@@ -119,6 +121,13 @@ export function Sidebar({ factories = [] }: SidebarProps) {
             width: 7, height: 7, borderRadius: '50%',
             background: cloudInfraDotColor(cloudStatus), flexShrink: 0,
           }} />
+        </button>
+        <button
+          className={`nav-item ${isAdminUsers ? 'active' : ''}`}
+          onClick={() => navigate('/admin/users')}
+        >
+          <Users size={15} />
+          <span style={{ flex: 1 }}>사용자 관리</span>
         </button>
 
         <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Workspace</div>

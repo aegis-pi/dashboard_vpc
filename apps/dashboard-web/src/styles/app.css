@@ -1331,6 +1331,226 @@ input { font-family: inherit; }
   .cloud-health-title { font-size: 21px; }
 }
 
+/* ─── Admin users ───────────────────────────────────────────────── */
+.admin-users-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.page-head.compact {
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.page-head.compact h1 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.admin-users-alert {
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+.admin-users-alert.normal {
+  border-color: color-mix(in srgb, var(--safe) 28%, var(--line-2));
+  background: var(--safe-tint-2);
+}
+.admin-users-alert.danger {
+  border-color: color-mix(in srgb, var(--crit) 28%, var(--line-2));
+  background: var(--crit-tint-2);
+}
+.admin-users-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 14px;
+  align-items: start;
+}
+.admin-users-table-card,
+.admin-users-editor {
+  min-width: 0;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.admin-users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.admin-users-table th {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.admin-users-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--ink-2);
+  vertical-align: middle;
+}
+.admin-users-table tbody tr:hover td,
+.admin-users-table tbody tr.selected td {
+  background: var(--surface-2);
+}
+.link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  cursor: pointer;
+  text-align: left;
+  max-width: 260px;
+}
+.link-button .mono {
+  color: var(--ink-4);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.icon-btn.danger:hover {
+  border-color: color-mix(in srgb, var(--crit) 35%, var(--line-2));
+  color: var(--crit);
+  background: var(--crit-tint-2);
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  border: 1px solid var(--line-2);
+}
+.status-chip.active {
+  color: var(--safe);
+  background: var(--safe-tint-2);
+}
+.status-chip.disabled {
+  color: var(--ink-4);
+  background: var(--surface-2);
+}
+.admin-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.admin-form label > span,
+.factory-access-head {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--ink-4);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.admin-form input,
+.admin-form select,
+.factory-access-row select {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--line-3);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12.5px;
+}
+.admin-form input:focus,
+.admin-form select:focus,
+.factory-access-row select:focus {
+  outline: 2px solid var(--focus-tint);
+  border-color: var(--accent);
+}
+.factory-access-panel {
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.factory-access-panel.muted {
+  background: var(--surface-2);
+}
+.factory-access-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 11px;
+  border-bottom: 1px solid var(--line-2);
+}
+.factory-access-global {
+  padding: 14px 11px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.factory-access-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line-2);
+}
+.factory-access-row:last-child {
+  border-bottom: 0;
+}
+.check-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.check-row input {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+@media (max-width: 1100px) {
+  .admin-users-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ─── liveBlink animation ───────────────────────────────────────── */
 @keyframes liveBlink {
   0%, 100% { opacity: 1; }
