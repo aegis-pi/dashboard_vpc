@@ -1,7 +1,11 @@
 # Risk Twin Web Screen Design
 
 상태: source of truth
-기준일: 2026-05-14
+기준일: 2026-06-04
+
+수정 이력:
+- 2026-06-04  본 문서는 핵심 5개 관제 화면(Fleet/Factory Overview/Environment/Infrastructure/Timeline) 설계를 다룬다. 이후 운영 배포로 추가된 화면(Cloud Infra 상태, 일간 보고서 조회, 사용자 관리)은 아래 "추가 구현 화면" 참조. 세부 UI polish 기준은 `07_ui_quality_reference.md`.
+- 2026-05-14  초안.
 
 ## 목적
 
@@ -41,9 +45,20 @@ Risk Twin Web은 MVP 기준으로 두 단계 화면을 가진다.
 | 화면 영역 | 저장소 |
 | --- | --- |
 | 현재 상태 카드 | `DynamoDB LATEST` |
-| Risk / 환경 그래프 | `DynamoDB HISTORY#STATE` |
+| Risk / 환경 그래프 | `DynamoDB HISTORY#STATE` (window>1h는 `GRAPH#5M`) |
 | 노드/워크로드 그래프 | `DynamoDB HISTORY#STATE` |
 | 상세 이력/감사 | `S3 processed`, 필요 시 `S3 raw` |
+
+### 추가 구현 화면 (운영 배포 완료, 본 문서 핵심 5화면 외)
+
+아래 화면은 Phase 1 이후 운영 배포로 추가됐다. 본 문서는 핵심 관제 5화면의 wireframe만 다루며, 아래 화면의 데이터/API 계약은 각 명세를 본다(UI polish는 진행 중).
+
+| 화면 | 라우트 | 명세 / 데이터 출처 |
+| --- | --- | --- |
+| Cloud Infra 상태 | `/cloud-infra` | `06_cloud_infra_view.md`, DDB `CLOUD#infra` (Fast/Slow collector, ADR 0027) |
+| 일간 보고서 조회 | `/reports` | `02_api_spec.md` `/reports`, S3 `reports/daily/` Markdown (ADR 0029) |
+| 사용자 관리 (RBAC) | `/admin/users` | `02_api_spec.md` Auth/RBAC, Cognito + RDS `app_user`/`user_factory_access` (ADR 0031) |
+| 로그인 / 콜백 | `/login`, `/callback` | Cognito Hosted UI (ADR 0008) |
 
 ## 1. Fleet Overview
 

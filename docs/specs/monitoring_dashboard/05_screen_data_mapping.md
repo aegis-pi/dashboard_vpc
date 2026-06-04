@@ -1,8 +1,9 @@
 # Risk Twin Web Screen Data Mapping
 
 상태: source of truth
-기준일: 2026-06-01
+기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04  본 문서는 핵심 5개 관제 화면(Fleet/Factory 4탭)의 데이터 매핑을 다룬다. 운영 배포로 추가된 화면(Cloud Infra/일간 보고서/사용자 관리)의 데이터·API 매핑은 `02_api_spec.md`와 `06_cloud_infra_view.md` 참조(아래 "추가 화면" note).
   - 2026-06-01  Timeline Custom 1시간 근처 범위는 picker 초 단위 절삭을 고려해 `window=1h` 원시 조회로 고정하고, empty-state를 데이터 없음/이벤트 없음으로 구분.
   - 2026-06-01  Timeline Custom datetime picker가 최신 기준 24시간 전~현재 시각만 선택하도록 min/max 제약을 명시.
   - 2026-06-01  Timeline을 `/history` 기반 client-side derive 구조로 현행화하고 `10m/1h/custom` 범위, `top_causes` 원인 표시 기준 반영.
@@ -28,6 +29,14 @@
 | `S3 raw` | `raw/*` | 원본 확인, 감사, 재처리 |
 
 MVP 기본 화면은 DynamoDB만으로 그린다. S3는 상세/감사/장기 이력에서만 조회한다.
+
+### 추가 화면 데이터 매핑 (핵심 5화면 외, 운영 배포 완료)
+
+| 화면 | 데이터 소스 | 매핑 명세 |
+| --- | --- | --- |
+| Cloud Infra (`/cloud-infra`) | `DynamoDB CLOUD#infra` (LATEST / HISTORY#FAST / HISTORY#SLOW) | `06_cloud_infra_view.md` |
+| 일간 보고서 (`/reports`) | `S3 reports/daily/yyyy=…/{factory_id}/report.md` (Markdown) | `02_api_spec.md` `/reports` |
+| 사용자 관리 (`/admin/users`) | `RDS app_user` / `user_factory_access` / `factory` + Cognito | `02_api_spec.md` Auth/RBAC, ADR 0031 |
 
 ## DynamoDB Key 기준
 

@@ -1,28 +1,29 @@
 # Cloud Infra View — Backend/Frontend 구현 계약
 
 상태: draft
-기준일: 2026-06-02 / 언어: 한국어 (개조식)
+기준일: 2026-06-04 / 언어: 한국어 (개조식)
 수정 이력:
-  - 2026-06-02  Backend/Frontend read 화면 배포 완료. Backend image `sha-26a0a27` ECS revision 28 적용, Dashboard web S3 sync + CloudFront invalidation 완료. collector write는 팀원/후속.
+  - 2026-06-04  collector도 본 환경에서 구현·배포 완료로 정정. `apps/cloud-infra-collector/`(Fast 1m / Slow 5m), `AEGIS-Lambda-CloudInfraFastCollector`/`SlowCollector` 코드 업데이트 + EventBridge schedule ENABLED. FastCollector IAM에 ElastiCache/RDS read 권한, env에 Redis/RDS/CloudFront/DLQ 대상 명시. 따라서 본 문서의 "collector=팀원 담당" 표현은 read model 소비 경계 설명용 과거 가정이며, 실제 collector write도 워크스트림 B가 담당한다. 데이터 계약은 여전히 `docs/planning/29` / ADR 0027.
+  - 2026-06-02  Backend/Frontend read 화면 배포 완료. Backend image `sha-26a0a27` ECS revision 28 적용, Dashboard web S3 sync + CloudFront invalidation 완료.
   - 2026-06-02  단계 1 **Backend/Frontend read 화면 구현 완료**: Backend `routers/cloud_infra.py`, `services/cloud_infra.py`, `ddb.py`의 `get_cloud_infra_latest`/`get_cloud_infra_history`; Frontend `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards. 응답에 `stale_threshold_seconds` 동봉, stale 시 section `status=unknown` + `overall_status` warning 강등 반영.
   - 2026-06-01  초안. Cloud infra 상태를 관제 화면에 추가하기 위한 BE/FE 계약. 데이터 계약은 `docs/planning/29` / ADR 0027.
 
 ## 목적
 
 - 관제 화면에 공장 상태와 **분리된** Cloud infra 상태 화면을 추가한다(sidebar 별도 항목).
-- 데이터 수집/저장(collector → DynamoDB `CLOUD#infra` / S3)은 **팀원 담당**이고 본 환경(BE/FE)은 그것을 **읽어서 보여주는 쪽**이다.
-- collector가 아직 DDB에 쓰기 전이라도 BE/FE 골격을 먼저 만들어, 데이터가 채워지면 **코드 변경 최소로 바로 표시**되게 한다.
+- BE/FE는 DynamoDB `CLOUD#infra` read model을 **읽어서 보여주는 쪽**이다. collector(`apps/cloud-infra-collector/`, Fast/Slow)는 그 read model을 write하며 본 환경(워크스트림 B)에서 구현·배포 완료다(초안 시점엔 팀원 담당으로 가정했으나 정정됨, 위 수정 이력 참조).
+- BE/FE 골격을 먼저 만들어 두어, collector가 채운 데이터가 **코드 변경 최소로 바로 표시**되도록 설계했다.
 
 데이터 스키마(필드 보장 / `errors[]` / `reasons[]` / staleness / HISTORY reduced)의 source of truth는 `docs/planning/29_cloud_infra_metrics_pipeline_plan.md`다. 본 문서는 그 위에서의 **BE/FE 인터페이스 계약**만 정의한다.
 
 ## 데이터 출처와 경계 (중요)
 
 - Backend는 **EKS API / Kubernetes API / ArgoCD / CloudWatch에 직접 붙지 않는다.** 기존 결정(`docs/planning/07`, `03_data_model.md` 명시적 비채택) 그대로다.
-- Backend는 **기존 DynamoDB 테이블 `AEGIS-DynamoDB-FactoryStatus`의 `pk=CLOUD#infra` item만 추가로 read**한다. 이 item은 collector(팀원)가 write한다.
-- 즉 EKS/ArgoCD를 건드리는 건 collector(워크스트림 A 합류 지점, ADR 0027)이고, BE/FE는 read model만 소비하므로 경계가 유지된다.
+- Backend는 **기존 DynamoDB 테이블 `AEGIS-DynamoDB-FactoryStatus`의 `pk=CLOUD#infra` item만 추가로 read**한다. 이 item은 collector(`apps/cloud-infra-collector/`)가 write한다.
+- 즉 EKS/ArgoCD/CloudWatch를 조회하는 건 collector(ADR 0027, EKS/ArgoCD는 워크스트림 A 합류 지점)이고, BE/FE는 read model만 소비하므로 경계가 유지된다.
 
 ```text
-collector(팀원)  -> DynamoDB CLOUD#infra (LATEST / HISTORY#FAST / HISTORY#SLOW)
+collector(본 환경) -> DynamoDB CLOUD#infra (LATEST / HISTORY#FAST / HISTORY#SLOW)
                  -> S3 processed/cloud_infra/ (full snapshot)
 Backend(본 환경) -> DDB GetItem/Query (기존 ddb_table_status 재사용)
                  -> staleness 계산 후 응답

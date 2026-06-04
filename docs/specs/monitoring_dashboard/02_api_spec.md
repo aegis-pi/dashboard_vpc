@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: source of truth
-기준일: 2026-06-02
+기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04  Auth/RBAC Endpoint 섹션 추가(`/auth/me`, `/admin/users` CRUD, ADR 0031 구현·배포 완료). 공장별 인가 note 반영. Cloud Infra collector(write)도 본 환경 구현·배포 완료로 정정(`apps/cloud-infra-collector/`).
   - 2026-06-02  `/reports` · `/reports/{date}/{factory_id}` endpoint를 skeleton/DDB 기준에서 S3 `reports/daily/` 기반 구현 완료로 현행화. 응답 필드/IAM/경로 note 추가(ADR 0029). `/cloud-infra` · `/cloud-infra/history` Backend/Frontend read 화면 구현·배포 완료 상태로 현행화.
   - 2026-06-01  history endpoint의 `window<=1h` HISTORY#STATE 조회 기준과 Timeline `10m/custom` 사용 범위 반영.
   - 2026-06-01  Cloud Infra Status API(`/cloud-infra`, `/cloud-infra/history`) 추가. 데이터 계약은 `docs/planning/29` / ADR 0027, BE/FE 계약은 `06_cloud_infra_view.md`.
@@ -115,7 +116,7 @@ Authorization: Bearer <Cognito Access Token>
 
 공장 상태와 분리된 Cloud infra 상태 화면용. Backend는 **기존 테이블의 `pk=CLOUD#infra` item만 read**하며 EKS/ArgoCD/CloudWatch에 직접 붙지 않는다(collector가 write, ADR 0027).
 
-현재 구현 상태: `apps/dashboard-backend/routers/cloud_infra.py` + `services/cloud_infra.py` + `services/ddb.py`(`get_cloud_infra_latest`/`get_cloud_infra_history`)로 **백엔드 read 경로가 구현·배포됐다**. Frontend도 `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards까지 구현·배포됐다. collector(write)는 팀원/후속이다. staleness 임계값은 코드 기준 `fast 180초 / slow 900초`이며 응답에 `stale_threshold_seconds`로 동봉된다.
+현재 구현 상태: `apps/dashboard-backend/routers/cloud_infra.py` + `services/cloud_infra.py` + `services/ddb.py`(`get_cloud_infra_latest`/`get_cloud_infra_history`)로 **백엔드 read 경로가 구현·배포됐다**. Frontend도 `/cloud-infra` route, sidebar `System / 클라우드 인프라`, 타입/adapter/client/hooks, empty-state와 overview/detail cards까지 구현·배포됐다. collector(write)도 본 환경에서 구현·배포 완료다(`apps/cloud-infra-collector/`, Fast 1m/Slow 5m, ADR 0027 — 초안 시점엔 팀원 담당으로 가정했으나 정정됨). staleness 임계값은 코드 기준 `fast 180초 / slow 900초`이며 응답에 `stale_threshold_seconds`로 동봉된다.
 
 | Method | Path | 인증 | 동작 | 백엔드 조회 | 상태 |
 | --- | --- | --- | --- | --- | --- |
@@ -185,6 +186,25 @@ Risk Score 방향: **100 = 최안전, 0 = 최위험**
 | WS | `/ws/factories/{factory_id}` | Cognito JWT (?token= 파라미터) | 공장 상태 변경 push | Redis Pub/Sub `factory:update:<factory_id>` subscribe | 구현 완료 |
 
 **Note**: WebSocket JWT는 `Authorization` 헤더 대신 `?token=<JWT>` 쿼리 파라미터로 전달한다. 브라우저 WebSocket API는 커스텀 헤더를 지원하지 않기 때문이다.
+
+### Auth / RBAC Endpoint (ADR 0031 구현·배포 완료)
+
+Cognito 로그인 사용자의 권한은 RDS PostgreSQL 메타데이터(`factory` / `app_user` / `user_factory_access` / `audit_log`)로 관리한다. `/factories`·`/factories/{id}`·`/reports`·`/ws`는 사용자에게 허용된 공장만 노출하며, 미인가 공장 직접 호출은 거부한다.
+
+| Method | Path | 인증 | 동작 | 백엔드 경로 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/auth/me` | Cognito JWT | 현재 사용자 프로필 + 역할 + 접근 가능 공장 목록 | RDS `app_user`/`user_factory_access` | 구현 완료 |
+| GET | `/admin/users` | Cognito JWT (super_admin/org_admin) | 활성 사용자 목록(역할 우선 정렬) | RDS Query | 구현 완료 |
+| POST | `/admin/users` | Cognito JWT (super_admin/org_admin) | 사용자 생성 (Cognito AdminCreateUser + RDS row + 공장 권한) | Cognito Admin API + RDS | 구현 완료 |
+| PATCH | `/admin/users/{user_id}` | Cognito JWT (super_admin/org_admin) | 역할/공장 권한 수정 | RDS update | 구현 완료 |
+| DELETE | `/admin/users/{user_id}` | Cognito JWT (super_admin/org_admin) | 사용자 삭제 (Cognito AdminDeleteUser + RDS row 삭제) | Cognito Admin API + RDS | 구현 완료 |
+
+**Note (RBAC)**:
+- 역할은 `super_admin` / `org_admin` / `viewer` 등으로 제한된다(대시보드 RBAC 정책 ADR 0031). 관리자 CRUD는 super_admin/org_admin만 가능하다.
+- 비인증 호출은 401, 인가 부족은 403을 반환한다.
+- ECS task role에 Cognito `AdminCreateUser`/`AdminGetUser`/`AdminDeleteUser` 권한이 부여돼 있다.
+- metadata 테이블은 backend 기동 시 auto-create되며 `/readyz`가 `rds_metadata` 준비 상태를 점검한다.
+- 같은 email의 disabled 잔여 row가 있으면 생성 시 best-effort 정리 후 신규 생성한다(stale 재생성 409 보정).
 
 ### ALB / Backend 정책
 
