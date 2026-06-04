@@ -29,7 +29,7 @@ os.environ.update(
         "AWS_SECURITY_TOKEN": "testing",
         "AWS_SESSION_TOKEN": "testing",
         "AWS_DEFAULT_REGION": "ap-south-1",
-        "DATABASE_URL": "sqlite+aiosqlite://:memory:",
+        "DATABASE_URL": "sqlite+aiosqlite:///:memory:",
         "REDIS_URL": "redis://localhost:6379",
         "REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS": "2",
         "REDIS_SOCKET_TIMEOUT_SECONDS": "5",

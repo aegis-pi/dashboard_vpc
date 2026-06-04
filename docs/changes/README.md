@@ -1,7 +1,7 @@
 # Change Records
 
 상태: source of truth
-기준일: 2026-06-02
+기준일: 2026-06-04
 
 ## 목적
 
@@ -50,6 +50,7 @@
 | 0028 | Dashboard staleness threshold: infra 지연 표시와 pipeline_status 60/120초 통일 | accepted | 2026-06-02 | M4/M6, apps/data-processor, apps/dashboard-web, stale 표시 |
 | 0029 | Dashboard 보고서 조회: DynamoDB `aegis-daily-report` 대신 S3 `reports/daily/` Markdown read | accepted | 2026-06-02 | M6, apps/dashboard-backend/web, S3 reports prefix, ECS IAM |
 | 0030 | ECS backend right-sizing(0.5→1 vCPU) + Application Auto Scaling(min 2, ALBRequestCountPerTarget 40 + CPU 50%) | accepted | 2026-06-04 | M6, infra/data-dashboard ECS, 비용 baseline |
+| 0031 | Dashboard RBAC 사용자 관리: Cognito 로그인 + RDS 권한 모델 | accepted | 2026-06-04 | M6, apps/dashboard-backend/web, Cognito, RDS PostgreSQL |
 
 ## 파일 형식
 

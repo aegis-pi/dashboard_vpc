@@ -6,8 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # RDS (SQLAlchemy async). Tests use sqlite+aiosqlite://:memory:
-    database_url: str = "sqlite+aiosqlite://:memory:"
+    # RDS (SQLAlchemy async). Tests use sqlite+aiosqlite:///:memory:
+    database_url: str = "sqlite+aiosqlite:///:memory:"
 
     # ElastiCache Redis
     redis_url: str = "redis://localhost:6379"
