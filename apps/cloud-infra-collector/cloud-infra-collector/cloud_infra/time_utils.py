@@ -15,4 +15,3 @@ def parse_utc(value: str):
 
 def s3_timestamp(value: str) -> str:
     return value.replace(":", "-").replace(".", "-")
-

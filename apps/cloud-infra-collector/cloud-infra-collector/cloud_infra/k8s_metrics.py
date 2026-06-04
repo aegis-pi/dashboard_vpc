@@ -191,4 +191,3 @@ def _optional_get(client, path: str) -> dict | None:
         return client.get(path)
     except Exception:
         return None
-

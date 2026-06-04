@@ -40,4 +40,3 @@ def handler(event, context):
         "s3_key": s3_key,
         "errors": slow.get("errors") or [],
     }
-

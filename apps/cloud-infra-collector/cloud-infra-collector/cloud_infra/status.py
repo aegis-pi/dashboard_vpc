@@ -15,4 +15,3 @@ def worst_status(values: list[str | None]) -> str:
 
 def section_status(*values: str | None) -> str:
     return worst_status(list(values))
-

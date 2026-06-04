@@ -79,4 +79,3 @@ def test_kubernetes_summary_includes_nodes_pods_and_argocd():
     assert summary["pods"]["restart_count_total"] == 2
     assert summary["pods"]["top_by_cpu"][0]["cpu_millicores"] == 50
     assert summary["argocd"]["synced"] == 1
-

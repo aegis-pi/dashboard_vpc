@@ -37,4 +37,3 @@ def test_storage_status_and_limited_prefix_windows():
 
     days = list(_recent_days(now, 3))
     assert [item.date().isoformat() for item in days] == ["2026-06-01", "2026-05-31"]
-
