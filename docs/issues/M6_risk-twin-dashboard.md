@@ -1,6 +1,7 @@
 # M6. Risk Twin + 관제 화면
 
 수정 이력:
+- 2026-06-04 v0.3  Dashboard RBAC 사용자 관리 구현/배포 결과와 GitHub Issue Comment Draft 추가.
 - 2026-05-20 v0.2  Risk Score 기준을 안전점수 방식(100=가장 안전, 0=가장 위험)으로 정정.
 
 > **마일스톤 목표**: 수집된 데이터를 기반으로 Risk Score를 계산하고 본사 관제 담당자가 사용할 Dashboard VPC 기반 관제 화면을 완성한다.
@@ -326,3 +327,11 @@ Dashboard Web/API
 ```
 
 M6 구현 시 `risk-score-engine` ECR 이미지나 Kubernetes 파드 완료 조건은 사용하지 않는다.
+
+## GitHub Issue Comment Draft
+
+- 상태: 부분 완료
+- 진행 요약: Dashboard Web/API 운영 경로에 Cognito + RDS 기반 공장별 RBAC와 관리자 사용자 관리 화면을 추가하고 운영 배포까지 완료했다. Risk 계산/LLM 일간 보고서와 factory-a 실시간 Edge Agent 경로 검증은 별도 후속으로 남아 있다.
+- 변경/확인: `apps/dashboard-backend/` RBAC metadata model, factory/report/ws 인가, `/admin/users` CRUD API, `apps/dashboard-web/` 사용자 관리 UI, `infra/data-dashboard/` ECS task role Cognito AdminCreate/Get/Disable 권한 및 metadata env, `docs/ops/22_data_dashboard_vpc_runbook.md` 운영 절차.
+- 검증: backend `pytest -q` 90 passed, web lint/test/build 통과, Terraform fmt/validate 통과, GitHub Actions dashboard-backend/web 성공, ECS backend revision 33 `sha-abb81ed` rollout completed, desired/running 2, `/healthz` ok, `/readyz` dynamodb/redis/rds_metadata ok, 비인증 `/admin/users` API 401, web `/admin/users` 200, post-apply Terraform plan No changes.
+- 후속: Cognito super_admin bootstrap 후 실제 사용자 생성/권한 수정/삭제 수기 확인, factory-a Edge Agent 재활성화 후 IoT → DDB → Redis → WebSocket 실시간 경로 검증, LLM 일간 보고서 후속 구현.

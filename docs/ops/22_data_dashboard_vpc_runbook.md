@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04 v2.9  Dashboard RBAC 사용자 관리 운영 배포 완료 기준 추가. backend image `sha-abb81ed`, ECS task definition revision 33, desired/running 2, `/readyz` `rds_metadata=ok`, `/admin/users` API 인증 보호 및 SPA route 응답 확인.
   - 2026-06-04 v2.8  Dashboard RBAC 사용자 관리 운영 기준 추가. Cognito 로그인 + RDS `app_user/factory/user_factory_access` 권한 모델, ECS task role Cognito AdminCreate/Get/Disable 권한, `/admin/users` 사용자 관리 화면, `RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS` 초기 부트스트랩 절차를 반영.
   - 2026-06-02 v2.7  Cloud Infra dashboard read 화면 배포 반영. Dashboard backend image `sha-26a0a27` ECS task definition revision 28 적용, rollout completed, `/healthz`와 `/readyz` 정상. Dashboard web workflow 성공, S3 sync + CloudFront invalidation 완료. Terraform post-apply plan No changes.
   - 2026-06-02 v2.6  일간 보고서 목록 API가 S3 `ListObjectsV2`를 사용하지만 ECS task role에 `s3:ListBucket` 권한이 없어 목록 카드에 오류 문구가 남던 문제 수정. `reports/daily/*` prefix 한정 ListBucket 권한 추가, 공장 selector 알파벳 오름차순 정렬 반영. Dashboard web workflow 성공, Terraform post-apply plan No changes.
@@ -166,6 +167,20 @@ curl -fsS https://api.aegis-pi.cloud/readyz
 dependencies.dynamodb = ok
 dependencies.redis = ok
 dependencies.rds_metadata = ok
+```
+
+2026-06-04 배포 확인:
+
+```text
+backend image tag = sha-abb81ed
+ECS task definition revision = 33
+ECS desired/running = 2/2
+ECS task health = HEALTHY across ap-south-1a and ap-south-1c
+/healthz = ok
+/readyz = dynamodb:ok, redis:ok, rds_metadata:ok
+GET /admin/users without Bearer token = 401
+GET https://dashboard.aegis-pi.cloud/admin/users = 200
+post-apply terraform plan = No changes
 ```
 
 ```text

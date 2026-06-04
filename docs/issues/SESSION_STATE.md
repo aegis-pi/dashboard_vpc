@@ -3,6 +3,7 @@
 상태: working tracker
 기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04  Dashboard RBAC 사용자 관리 시스템 구현 및 운영 배포 완료. RDS metadata 모델(`factory/app_user/user_factory_access/audit_log`), 공장별 API/WS 인가, `/admin/users` 관리자 CRUD API, 사용자 관리 UI, ECS task role Cognito AdminCreate/Get/Disable 권한, metadata auto-create/readiness를 반영. commits: `4fac2d9`, `f5464da`, `a068f4a`, `27760ab`, `abb81ed`. GitHub Actions dashboard-backend/web 성공. Terraform apply로 ECS task definition revision 33 등록(`sha-abb81ed`) 후 service rollout completed, desired/running 2, task 2개 HEALTHY(AZ 1a/1c), `/healthz` ok, `/readyz` dynamodb/redis/rds_metadata ok, 비인증 `/admin/users` 401, web `/admin/users` 200, post-apply plan No changes.
   - 2026-06-04  Reports quick date 기본 범위 보정 완료. 오늘 보고서는 생성 전일 가능성이 높아 빠른 선택을 오늘 제외, 어제부터 최근 7일로 변경하고 페이지 기본 선택 날짜도 어제로 맞춤. 수동 date picker는 기존처럼 오늘까지 선택 가능. 변경: `recentDates(count, startOffsetDays)` 추가, ReportsPage `REPORT_DATES=recentDates(7, 1)`, 관련 unit test 추가. 검증: dashboard-web lint 통과, vitest 57 passed, production build 통과.
   - 2026-06-04  Cloud Infra page 상단 자동 refresh interval control 추가 완료. 기존 Fleet/Factory와 동일하게 TopBar selector(Off/5s/10s/30s/1m)를 노출하고, 수동/자동 refresh 시 `/cloud-infra` latest와 fast history를 함께 갱신하도록 `CloudInfraPage.tsx`에 interval state/effect 추가. 검증: dashboard-web lint 통과, vitest 56 passed, production build 통과.
   - 2026-06-04  ECS backend right-sizing + Application Auto Scaling 적용 완료(ADR 0030). 근거: 단일 0.5 vCPU task가 102 req/min 버스트에서 CPU 100%/응답 12~16s/Target 5xx, 메모리 max 40%(병목 아님). 원인: 이미지 `uvicorn --workers 2`인데 0.5 vCPU라 oversubscription + history 파싱이 GIL-bound. 변경: `infra/data-dashboard/ecs.tf` task cpu 512→1024·memory 1024→2048(변수화), 신규 `ecs_autoscaling.tf`(scalable target min 2/max 2 핀 + target tracking 2 policy: ALBRequestCountPerTarget 40, CPU 50%, 데모 프로파일이라 min==max로 inert). 적용: `terraform apply`로 task def revision 31 등록 + autoscaling 생성, `update-service --task-definition kjw-aegis-data-backend:31 --force-new-deployment`. 검증: `services-stable` STABLE, desired/running 2, rolloutState COMPLETED, task 2개 cpu 1024/memory 2048/HEALTHY, AZ 1a+1c 분산, scalable target min 2/max 2. 비용: 고정 ~$123.90→~$178.35/월(상시), 데모(16h) ~$6.55→~$7.73/월. 문서: ADR 0030, 비용 baseline v3.4. 후속: 데모 직전 pre-warm 권장, 프로덕션 전환 시 `ecs_backend_max_capacity` 3~4로 활성.
@@ -373,7 +374,7 @@ Claude Code 작업 제한:
 ## 현재 큰 상태
 
 ```text
-현재 단계: Phase 1 Step 9.5 permanent split 이후 infra/data-dashboard 일시 root 재기동 상태에서 Dashboard 운영 기능을 반복 배포 중. 최근 배포: Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시(ADR 0027 계열), GRAPH#5M multi-resolution history(ADR 0025), dashboard staleness 60/120초 통일(ADR 0028), S3 `reports/daily/` 기반 일간 보고서 조회 UI(ADR 0029). ECS desired/running 1, rollout completed, target healthy. https://dashboard.aegis-pi.cloud/ HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. 다음: 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비, Cloud infra collector(ADR 0027) 및 LLM report-generator(ADR 0016)는 팀원/후속.
+현재 단계: Phase 1 Step 9.5 permanent split 이후 infra/data-dashboard 일시 root 재기동 상태에서 Dashboard 운영 기능을 반복 배포 중. 최근 배포: Dashboard RBAC 사용자 관리(Cognito 로그인 + RDS app_user/factory/user_factory_access 권한 + `/admin/users` UI), Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시(ADR 0027 계열), GRAPH#5M multi-resolution history(ADR 0025), dashboard staleness 60/120초 통일(ADR 0028), S3 `reports/daily/` 기반 일간 보고서 조회 UI(ADR 0029). ECS desired/running 2, rollout completed, target healthy, backend image `sha-abb81ed`. https://dashboard.aegis-pi.cloud/admin/users HTTP 200. https://api.aegis-pi.cloud/healthz HTTP 200. https://api.aegis-pi.cloud/readyz dynamodb/redis/rds_metadata ok. 다음: Cognito super_admin bootstrap 후 관리자 화면에서 실제 사용자 권한 생성/수정 수기 확인, 사용자의 수동 테스트/캡처 진행 후 Step 10 운영 자동화/데모 준비, Cloud infra collector(ADR 0027) 및 LLM report-generator(ADR 0016)는 팀원/후속.
 워크스트림 B 집중: 1번 Data/Dashboard VPC (M4 소비측, M6 Dashboard)
 완료: M3 Issue 1 GitOps 저장소 구조, 공장별 values, smoke chart, GitHub Actions manifest validation
 완료: M3 Issue 4 ApplicationSet 구성, `aegis-spoke-factory-a` 자동 생성, 수동 Sync, factory-a K3s smoke Pod `Running`
@@ -400,6 +401,16 @@ Phase 1 Step 7 Backend 활성화: 2026-05-26 완료.
   + Task definition image: aegis/dashboard-backend:sha-9d2c200 확인
   + public health check: https://api.aegis-pi.cloud/healthz → HTTP 200, {"status":"ok"}
   + terraform plan with desired_count=1 and image sha-9d2c200: No changes
+Dashboard RBAC 사용자 관리 배포: 2026-06-04 완료.
+  + RDS metadata tables: factory / app_user / user_factory_access / audit_log auto-create
+  + Backend RBAC: Cognito JWT sub -> RDS app_user 조회, factories/reports/ws 공장별 인가, `/admin/users` super_admin/org_admin 제한
+  + Frontend: `/admin/users` 사용자 목록/생성/수정/삭제 및 공장 권한 편집 UI
+  + ECS task role: Cognito AdminCreateUser/AdminGetUser/AdminDisableUser 권한 추가
+  + ECR image tag: sha-abb81ed push 확인
+  + ECS service: task definition revision 33, desired=2, running=2, rolloutState=COMPLETED, task 2개 HEALTHY(AZ 1a/1c)
+  + public health: `/healthz` ok, `/readyz` dynamodb/redis/rds_metadata ok
+  + access check: 비인증 `/admin/users` API 401, web `/admin/users` SPA 200
+  + terraform plan with backend_container_image sha-abb81ed: No changes
 Phase 1 Step 7.5 Route53 Hosted Zone 영구 분리: 2026-05-26 완료.
   + infra/data-dashboard-dns/ 신규 Terraform root 생성 (main.tf/providers.tf/versions.tf/variables.tf/outputs.tf)
   + aws_route53_zone.dashboard lifecycle prevent_destroy = true
