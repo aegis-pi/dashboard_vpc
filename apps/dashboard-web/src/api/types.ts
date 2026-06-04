@@ -236,6 +236,34 @@ export interface ReportItem {
 // ─── Cloud infra status ───────────────────────────────────────────────
 export type CloudInfraStatusValue = 'normal' | 'warning' | 'critical' | 'unknown'
 
+// Per-section failure record (doc29 errors[] item). Present when a section
+// could not be collected; frontend shows it instead of recomputing thresholds.
+export interface CloudInfraError {
+  source?: string
+  code?: string
+  message?: string
+  at?: string
+}
+
+export interface CloudInfraRedis {
+  replication_group_id?: string
+  status?: string
+  node_count?: number | null
+  cpu_utilization_avg?: number | null
+  freeable_memory_mib?: number | null
+  current_connections?: number | null
+  evictions_5m?: number | null
+}
+
+export interface CloudInfraRds {
+  db_instance_id?: string
+  status?: string
+  cpu_utilization_avg?: number | null
+  database_connections?: number | null
+  freeable_memory_mib?: number | null
+  free_storage_mib?: number | null
+}
+
 export interface CloudInfraEcs {
   cluster_name?: string
   service_name?: string
@@ -280,11 +308,22 @@ export interface CloudInfraFast {
   status?: CloudInfraStatusValue
   backend_runtime?: {
     status?: CloudInfraStatusValue
+    reasons?: string[]
+    errors?: CloudInfraError[]
     ecs?: CloudInfraEcs
     alb?: CloudInfraAlb
   }
+  datastores?: {
+    status?: CloudInfraStatusValue
+    reasons?: string[]
+    errors?: CloudInfraError[]
+    redis?: CloudInfraRedis
+    rds?: CloudInfraRds
+  }
   data_pipeline?: {
     status?: CloudInfraStatusValue
+    reasons?: string[]
+    errors?: CloudInfraError[]
     lambdas?: CloudInfraLambda[]
     dynamodb?: {
       table_name?: string
@@ -292,19 +331,28 @@ export interface CloudInfraFast {
       write_throttle_events_5m?: number | null
       system_errors_5m?: number | null
     }
+    dlq?: {
+      queue_name?: string
+      messages_visible?: number | null
+      oldest_message_age_seconds?: number | null
+    }
     schedulers?: { name?: string; state?: string }[]
   }
   factory_freshness?: {
     status?: CloudInfraStatusValue
+    reasons?: string[]
+    errors?: CloudInfraError[]
     factories?: CloudInfraFactoryFreshness[]
   }
-  errors?: string[]
+  errors?: CloudInfraError[]
 }
 
 export interface CloudInfraSlow {
   status?: CloudInfraStatusValue
   eks_management?: {
     status?: CloudInfraStatusValue
+    reasons?: string[]
+    errors?: CloudInfraError[]
     cluster?: { name?: string; status?: string; version?: string }
     nodegroups?: {
       name?: string
@@ -345,6 +393,8 @@ export interface CloudInfraSlow {
   }
   storage_freshness?: {
     status?: CloudInfraStatusValue
+    reasons?: string[]
+    errors?: CloudInfraError[]
     factories?: {
       factory_id?: string
       status?: CloudInfraStatusValue
@@ -353,7 +403,7 @@ export interface CloudInfraSlow {
       latest_processed_agg_at?: string | null
     }[]
   }
-  errors?: string[]
+  errors?: CloudInfraError[]
 }
 
 export interface CloudInfraStatus {

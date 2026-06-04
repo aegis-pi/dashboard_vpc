@@ -14,7 +14,7 @@ import {
   secondsLabel,
 } from '../adapters/cloudInfra'
 import { relTime } from '../utils/format'
-import type { CloudInfraStatusValue } from '../api/types'
+import type { CloudInfraError, CloudInfraStatusValue } from '../api/types'
 
 function StatusPill({ status }: { status?: CloudInfraStatusValue | string }) {
   const tone = cloudInfraTone(status)
@@ -23,6 +23,45 @@ function StatusPill({ status }: { status?: CloudInfraStatusValue | string }) {
       <span className="dot" />
       {cloudInfraStatusLabel(status)}
     </span>
+  )
+}
+
+// reasons[] = collector-provided justification for warning/critical; errors[] =
+// per-section collection failures shown when status is unknown. The frontend
+// shows them verbatim (doc29 contract) and never recomputes thresholds.
+function SectionMeta({
+  status, reasons, errors,
+}: {
+  status?: CloudInfraStatusValue | string
+  reasons?: string[]
+  errors?: CloudInfraError[]
+}) {
+  const tone = cloudInfraTone(status)
+  const hasReasons = (reasons?.length ?? 0) > 0
+  const hasErrors = (errors?.length ?? 0) > 0
+  if (!hasReasons && !hasErrors) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+      {hasReasons && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {reasons!.map((reason) => (
+            <span key={reason} className={`pill ${tone === 'safe' ? 'warn' : tone}`} style={{ padding: '2px 7px', fontSize: 10.5 }}>
+              <span className="dot" />{reason}
+            </span>
+          ))}
+        </div>
+      )}
+      {hasErrors && (
+        <ul style={{ margin: 0, paddingLeft: 16 }}>
+          {errors!.map((err, i) => (
+            <li key={`${err.source ?? ''}-${i}`} className="micro" style={{ color: 'var(--ink-3)' }}>
+              {[err.code, err.message].filter(Boolean).join(': ') || '수집 실패'}
+              {err.source ? ` (${err.source})` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -42,10 +81,12 @@ function valueWithUnit(value: number | null | undefined, unit: string, digits = 
 }
 
 function SectionCard({
-  title, status, children,
+  title, status, reasons, errors, children,
 }: {
   title: string
   status?: CloudInfraStatusValue | string
+  reasons?: string[]
+  errors?: CloudInfraError[]
   children: React.ReactNode
 }) {
   return (
@@ -62,6 +103,7 @@ function SectionCard({
         <StatusPill status={status} />
       </div>
       <div style={{ padding: 16 }}>
+        <SectionMeta status={status} reasons={reasons} errors={errors} />
         {children}
       </div>
     </div>
@@ -162,6 +204,7 @@ export function CloudInfraPage() {
   const fast = data.fast
   const slow = data.slow
   const runtime = fast?.backend_runtime
+  const datastores = fast?.datastores
   const pipeline = fast?.data_pipeline
   const freshness = fast?.factory_freshness
   const eks = slow?.eks_management
@@ -203,10 +246,11 @@ export function CloudInfraPage() {
       <Overview data={overviewCards} />
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <SectionCard title="비즈니스 파이프라인" status={pipeline?.status}>
+        <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
           <div className="grid-3" style={{ marginBottom: 14 }}>
             <Metric label="Lambda errors" value={(pipeline?.lambdas ?? []).reduce((sum, l) => sum + (l.errors_5m ?? 0), 0)} sub="last 5m" />
             <Metric label="DDB throttle" value={(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} sub="read + write" />
+            <Metric label="DLQ" value={pipeline?.dlq?.messages_visible ?? '-'} sub={`oldest ${secondsLabel(pipeline?.dlq?.oldest_message_age_seconds)}`} />
             <Metric label="Schedulers" value={(pipeline?.schedulers ?? []).filter((s) => s.state === 'ENABLED').length} sub={`${pipeline?.schedulers?.length ?? 0} total`} />
           </div>
           <table className="tbl">
@@ -224,7 +268,7 @@ export function CloudInfraPage() {
           </table>
         </SectionCard>
 
-        <SectionCard title="Dashboard Runtime" status={runtime?.status}>
+        <SectionCard title="Dashboard Runtime" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
           <div className="grid-3">
             <Metric label="ECS running" value={`${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`} sub={runtime?.ecs?.status ?? 'unknown'} />
             <Metric label="CPU avg" value={`${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%`} />
@@ -236,25 +280,42 @@ export function CloudInfraPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Factory Freshness" status={freshness?.status}>
-        <table className="tbl">
-          <thead><tr><th>Factory</th><th>Pipeline</th><th>Infra age</th><th>Last infra</th><th>Risk</th></tr></thead>
-          <tbody>
-            {(freshness?.factories ?? []).map((factory) => (
-              <tr key={factory.factory_id}>
-                <td className="mono">{factory.factory_id}</td>
-                <td><StatusPill status={factory.pipeline_status} /></td>
-                <td className="tnum">{secondsLabel(factory.latest_infra_state_age_seconds)}</td>
-                <td>{relTime(factory.last_infra_state_at ?? undefined)}</td>
-                <td className="tnum">{factory.risk_score ?? '-'} · {factory.risk_level ?? 'unknown'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </SectionCard>
+      <div className="grid-2" style={{ marginBottom: 16 }}>
+        <SectionCard title="Datastores" status={datastores?.status} reasons={datastores?.reasons} errors={datastores?.errors}>
+          {datastores ? (
+            <div className="grid-3">
+              <Metric label="Redis" value={datastores.redis?.status ?? '-'} sub={`CPU ${numberLabel(datastores.redis?.cpu_utilization_avg, 1)}%`} />
+              <Metric label="Redis mem" value={valueWithUnit(datastores.redis?.freeable_memory_mib, ' MiB')} sub={`evict ${datastores.redis?.evictions_5m ?? 0}`} />
+              <Metric label="Redis conns" value={datastores.redis?.current_connections ?? '-'} sub="current" />
+              <Metric label="RDS" value={datastores.rds?.status ?? '-'} sub={`CPU ${numberLabel(datastores.rds?.cpu_utilization_avg, 1)}%`} />
+              <Metric label="RDS storage" value={valueWithUnit(datastores.rds?.free_storage_mib, ' MiB')} sub="free" />
+              <Metric label="RDS conns" value={datastores.rds?.database_connections ?? '-'} sub="active" />
+            </div>
+          ) : (
+            <div className="micro">Redis/RDS 수집 대기 — collector가 <code>fast.datastores</code>를 쓰면 자동 표시됩니다.</div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Factory Freshness" status={freshness?.status} reasons={freshness?.reasons} errors={freshness?.errors}>
+          <table className="tbl">
+            <thead><tr><th>Factory</th><th>Pipeline</th><th>Infra age</th><th>Last infra</th><th>Risk</th></tr></thead>
+            <tbody>
+              {(freshness?.factories ?? []).map((factory) => (
+                <tr key={factory.factory_id}>
+                  <td className="mono">{factory.factory_id}</td>
+                  <td><StatusPill status={factory.pipeline_status} /></td>
+                  <td className="tnum">{secondsLabel(factory.latest_infra_state_age_seconds)}</td>
+                  <td>{relTime(factory.last_infra_state_at ?? undefined)}</td>
+                  <td className="tnum">{factory.risk_score ?? '-'} · {factory.risk_level ?? 'unknown'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </SectionCard>
+      </div>
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <SectionCard title="Management Plane" status={eks?.status}>
+        <SectionCard title="Management Plane" status={eks?.status} reasons={eks?.reasons} errors={eks?.errors}>
           <div className="grid-3" style={{ marginBottom: 14 }}>
             <Metric label="EKS nodes" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
             <Metric label="Pods running" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
@@ -275,7 +336,7 @@ export function CloudInfraPage() {
           </table>
         </SectionCard>
 
-        <SectionCard title="Storage Freshness" status={storage?.status}>
+        <SectionCard title="Storage Freshness" status={storage?.status} reasons={storage?.reasons} errors={storage?.errors}>
           <table className="tbl">
             <thead><tr><th>Factory</th><th>Raw</th><th>Processed</th><th>Aggregate</th></tr></thead>
             <tbody>
