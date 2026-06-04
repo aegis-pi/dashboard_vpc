@@ -48,12 +48,7 @@ export function CompactTrendChart({ data, color }: { data: number[]; color: stri
           strokeLinejoin="round" strokeLinecap="round" />
       )}
       {hasData && lastV != null && (
-        <>
-          <circle cx={lastX} cy={lastY} r={3} fill={color} />
-          <text x={Math.min(lastX, VW - 17)} y={Math.max(8, lastY - 6)} textAnchor="middle" fontSize={8} fill={color} fontFamily="monospace" fontWeight="600">
-            {lastV}
-          </text>
-        </>
+        <circle cx={lastX} cy={lastY} r={3} fill={color} />
       )}
       <text x={pL} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">10m 전</text>
       <text x={pL + cW} y={pT + cH + 12} textAnchor="middle" fontSize={7.5} fill="var(--ink-5)">현재</text>

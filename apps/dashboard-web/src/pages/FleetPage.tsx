@@ -282,6 +282,7 @@ function FactoryCard({
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
   const sparkData = recentRiskScores(history1h)
   const score = f.riskScore ?? null
+  const trendScore = sparkData.length > 0 ? sparkData[sparkData.length - 1]! : score
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
 
   return (
@@ -338,7 +339,7 @@ function FactoryCard({
         <div className="factory-card-trend">
           <div className="factory-trend-head">
             <span className="eyebrow">10m trend</span>
-            <span className="mono">{sparkData.length}pt</span>
+            <span className="mono tnum" style={{ color }}>{trendScore ?? '—'}</span>
           </div>
           <CompactTrendChart data={sparkData} color={color} />
         </div>
