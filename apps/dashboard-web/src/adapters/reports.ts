@@ -8,10 +8,10 @@ export interface ReportState {
   error: string | null
 }
 
-export function recentDates(count = 7): string[] {
+export function recentDates(count = 7, startOffsetDays = 0): string[] {
   return Array.from({ length: count }, (_, i) => {
     const d = new Date()
-    d.setDate(d.getDate() - i)
+    d.setDate(d.getDate() - startOffsetDays - i)
     return d.toISOString().slice(0, 10)
   })
 }

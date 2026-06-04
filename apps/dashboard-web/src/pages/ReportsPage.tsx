@@ -267,8 +267,9 @@ function ReportEmptyState({
 
 // ─── Main page ────────────────────────────────────────────────────────
 
-const REPORT_DATES = recentDates(7)
 const TODAY = todayStr()
+const REPORT_DATES = recentDates(7, 1)
+const DEFAULT_REPORT_DATE = REPORT_DATES[0] ?? TODAY
 
 function unique<T>(items: T[]): T[] {
   return Array.from(new Set(items))
@@ -293,7 +294,7 @@ export function ReportsPage() {
   ), [fleetData?.factories])
 
   const [selectedFactory, setSelectedFactory] = useState<string>('')
-  const [date, setDate] = useState<string>(TODAY)
+  const [date, setDate] = useState<string>(DEFAULT_REPORT_DATE)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   // Report fetch state
