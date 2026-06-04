@@ -140,17 +140,6 @@ input { font-family: inherit; }
   border-bottom: 1px solid var(--chrome-line);
 }
 .sidebar-titleblock { min-width: 0; flex: 1; }
-.sidebar-toggle {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: var(--chrome-ink-3);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.sidebar-toggle:hover { background: var(--chrome-3); color: var(--chrome-ink); }
 .sidebar-logo-mark {
   width: 26px; height: 26px;
   border-radius: 7px;
@@ -252,7 +241,6 @@ input { font-family: inherit; }
   justify-content: center;
   padding-inline: 10px;
 }
-.sidebar.collapsed .sidebar-toggle { display: none; }
 .sidebar.collapsed .sidebar-nav {
   align-items: center;
   padding-inline: 8px;
@@ -288,7 +276,6 @@ input { font-family: inherit; }
   top: 0;
   z-index: 10;
 }
-.topbar-menu { display: none; }
 .topbar-breadcrumb {
   display: flex;
   align-items: center;
@@ -1806,7 +1793,6 @@ textarea:focus-visible,
     justify-content: flex-start;
     padding: 16px 16px 14px;
   }
-  .sidebar.collapsed .sidebar-toggle { display: inline-flex; }
   .sidebar.collapsed .sidebar-nav {
     align-items: stretch;
     padding: 10px 8px;
@@ -1820,8 +1806,6 @@ textarea:focus-visible,
     padding: 0 14px;
     gap: 8px;
   }
-  .topbar-menu { display: inline-flex; }
-  .topbar-sidebar-toggle { display: none; }
   .topbar-actions {
     gap: 6px;
     margin-left: auto;

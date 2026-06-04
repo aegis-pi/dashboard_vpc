@@ -5,7 +5,6 @@ import {
   FileText,
   LogOut,
   ChevronLeft,
-  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
@@ -23,7 +22,6 @@ import { ConnStatus } from './ConnStatus'
 interface SidebarProps {
   factories?: { factory_id: string; risk_level?: string; risk_score?: number }[]
   collapsed?: boolean
-  onToggle?: () => void
   onNavigate?: () => void
 }
 
@@ -34,7 +32,7 @@ function riskDotColor(level?: string): string {
   return 'var(--unk)'
 }
 
-export function Sidebar({ factories = [], collapsed = false, onToggle, onNavigate }: SidebarProps) {
+export function Sidebar({ factories = [], collapsed = false, onNavigate }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const currentUser = useCurrentUser()
@@ -82,17 +80,6 @@ export function Sidebar({ factories = [], collapsed = false, onToggle, onNavigat
           </div>
           <div className="sidebar-subtitle">Risk Twin</div>
         </div>
-        {onToggle && (
-          <button
-            type="button"
-            className="sidebar-toggle"
-            onClick={onToggle}
-            aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-          >
-            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-          </button>
-        )}
       </div>
 
       {/* Navigation */}
@@ -219,9 +206,8 @@ interface TopBarProps {
   onRefresh?: () => void
   refreshInterval?: number
   onIntervalChange?: (ms: number) => void
-  onMenuClick?: () => void
   onSidebarToggle?: () => void
-  sidebarCollapsed?: boolean
+  sidebarVisible?: boolean
 }
 
 export const REFRESH_INTERVAL_OPTIONS = [
@@ -254,33 +240,20 @@ export function TopBar({
   onRefresh,
   refreshInterval = 0,
   onIntervalChange,
-  onMenuClick,
   onSidebarToggle,
-  sidebarCollapsed = false,
+  sidebarVisible = true,
 }: TopBarProps) {
   return (
     <div className="topbar">
-      {onMenuClick && (
-        <button
-          type="button"
-          className="btn ghost btn-icon topbar-menu"
-          onClick={onMenuClick}
-          aria-label="탐색 메뉴 열기"
-          title="탐색 메뉴"
-        >
-          <Menu size={16} />
-        </button>
-      )}
-
       {onSidebarToggle && (
         <button
           type="button"
           className="btn ghost btn-icon topbar-sidebar-toggle"
           onClick={onSidebarToggle}
-          aria-label={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-          title={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          aria-label={sidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
+          title={sidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
         >
-          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          {sidebarVisible ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
         </button>
       )}
 
@@ -365,17 +338,36 @@ export function Shell({
 }: ShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('aegis.sidebar.collapsed') === 'true')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [isMobileShell, setIsMobileShell] = useState(() => window.matchMedia('(max-width: 800px)').matches)
 
   useEffect(() => {
     window.localStorage.setItem('aegis.sidebar.collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 800px)')
+    const update = () => {
+      setIsMobileShell(media.matches)
+      if (!media.matches) setMobileSidebarOpen(false)
+    }
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  const toggleSidebar = () => {
+    if (isMobileShell) {
+      setMobileSidebarOpen((value) => !value)
+    } else {
+      setSidebarCollapsed((value) => !value)
+    }
+  }
 
   return (
     <div className={`shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'sidebar-mobile-open' : ''}`}>
       <Sidebar
         factories={factories}
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed((value) => !value)}
         onNavigate={() => setMobileSidebarOpen(false)}
       />
       <button
@@ -393,9 +385,8 @@ export function Shell({
           onRefresh={onRefresh}
           refreshInterval={refreshInterval}
           onIntervalChange={onIntervalChange}
-          onMenuClick={() => setMobileSidebarOpen(true)}
-          onSidebarToggle={() => setSidebarCollapsed((value) => !value)}
-          sidebarCollapsed={sidebarCollapsed}
+          onSidebarToggle={toggleSidebar}
+          sidebarVisible={isMobileShell ? mobileSidebarOpen : !sidebarCollapsed}
         />
         <div className="content">
           {children}
