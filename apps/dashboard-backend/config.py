@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     # RDS (SQLAlchemy async). Tests use sqlite+aiosqlite:///:memory:
     database_url: str = "sqlite+aiosqlite:///:memory:"
+    database_auto_create_metadata: bool = True
 
     # ElastiCache Redis
     redis_url: str = "redis://localhost:6379"

@@ -212,6 +212,19 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     ]
   }
 
+  statement {
+    sid    = "CognitoUserAdmin"
+    effect = "Allow"
+    actions = [
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminDisableUser",
+    ]
+    resources = [
+      data.terraform_remote_state.permanent.outputs.cognito_user_pool_arn,
+    ]
+  }
+
 }
 
 resource "aws_iam_role_policy" "ecs_task_inline" {
@@ -272,6 +285,8 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "COGNITO_APP_CLIENT_ID", value = data.terraform_remote_state.permanent.outputs.cognito_app_client_id },
         { name = "COGNITO_JWKS_TIMEOUT_SECONDS", value = "5" },
         { name = "COGNITO_JWKS_TTL_SECONDS", value = "3600" },
+        { name = "RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS", value = var.rbac_bootstrap_super_admin_subs },
+        { name = "DATABASE_AUTO_CREATE_METADATA", value = "true" },
         # REDIS_AUTH_TOKEN_SECRET_ARN: ARN only (not the token itself).
         { name = "REDIS_AUTH_TOKEN_SECRET_ARN", value = aws_secretsmanager_secret.redis_auth.arn },
         { name = "REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", value = "2" },

@@ -161,6 +161,12 @@ variable "backend_container_image" {
   default     = ""
 }
 
+variable "rbac_bootstrap_super_admin_subs" {
+  description = "Comma-separated Cognito sub values that may bootstrap as dashboard super_admin. Keep empty after the first admin user is created."
+  type        = string
+  default     = ""
+}
+
 variable "github_repo_for_oidc" {
   description = "GitHub repository path (org/repo) trusted in the OIDC assume-role condition for ECR push."
   type        = string

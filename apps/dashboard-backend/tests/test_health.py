@@ -23,7 +23,11 @@ def test_readyz_returns_ok_when_dependencies_pass(client, monkeypatch):
     r = client.get("/readyz")
 
     assert r.status_code == 200
-    assert r.json()["dependencies"] == {"dynamodb": "ok", "redis": "ok"}
+    assert r.json()["dependencies"] == {
+        "dynamodb": "ok",
+        "redis": "ok",
+        "rds_metadata": "ok",
+    }
 
 
 def test_readyz_returns_503_when_dependency_fails(client, monkeypatch):
@@ -49,3 +53,4 @@ def test_readyz_returns_503_when_dependency_fails(client, monkeypatch):
     assert detail["status"] == "degraded"
     assert detail["dependencies"]["dynamodb"] == "failed"
     assert detail["dependencies"]["redis"] == "ok"
+    assert detail["dependencies"]["rds_metadata"] == "ok"

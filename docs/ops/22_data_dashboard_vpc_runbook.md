@@ -1,8 +1,9 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-06-02
+기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04 v2.8  Dashboard RBAC 사용자 관리 운영 기준 추가. Cognito 로그인 + RDS `app_user/factory/user_factory_access` 권한 모델, ECS task role Cognito AdminCreate/Get/Disable 권한, `/admin/users` 사용자 관리 화면, `RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS` 초기 부트스트랩 절차를 반영.
   - 2026-06-02 v2.7  Cloud Infra dashboard read 화면 배포 반영. Dashboard backend image `sha-26a0a27` ECS task definition revision 28 적용, rollout completed, `/healthz`와 `/readyz` 정상. Dashboard web workflow 성공, S3 sync + CloudFront invalidation 완료. Terraform post-apply plan No changes.
   - 2026-06-02 v2.6  일간 보고서 목록 API가 S3 `ListObjectsV2`를 사용하지만 ECS task role에 `s3:ListBucket` 권한이 없어 목록 카드에 오류 문구가 남던 문제 수정. `reports/daily/*` prefix 한정 ListBucket 권한 추가, 공장 selector 알파벳 오름차순 정렬 반영. Dashboard web workflow 성공, Terraform post-apply plan No changes.
   - 2026-06-02 v2.5  S3 `reports/daily/yyyy=YYYY/mm=MM/dd=DD/{factory_id}/report.md` 기반 일간 보고서 목록/본문 표시 반영. Dashboard backend image `sha-055fb75` ECS task definition revision 27 적용, rollout completed, `/healthz`와 `/readyz` 정상.
@@ -111,6 +112,61 @@ scripts/destroy/destroy-all.sh
 이후 운영 Dashboard UI가 실제 DDB flat/nested 데이터 shape를 모두 처리하도록 수정되었고, Aegis-frontend 기준 UI 포팅과 `top_causes` field/name 양식 보정이 진행됐다.
 추가로 frontend refresh/subsampling 개선이 반영되어 WS 메시지 기반 refresh는 3초 throttle을 적용하고, 인증 실패 close code 4001은 재시도 없이 offline 처리한다. TopBar refresh interval과 Fleet/Factory auto polling도 반영됐다. Fleet은 선택 간격으로 목록과 최근 변화를 갱신하고, Factory는 WS 우선 + 미연결 시 polling 구조를 사용한다.
 Backend는 CORS 운영 origin을 명시하도록 수정되어 `https://dashboard.aegis-pi.cloud` preflight와 인증 API 호출을 허용한다.
+
+## Dashboard RBAC 사용자 관리
+
+기준:
+
+```text
+Cognito User Pool      로그인, MFA, 임시 비밀번호, 세션
+RDS PostgreSQL         app_user / factory / user_factory_access / audit_log
+FastAPI Backend        Cognito JWT sub -> RDS app_user 조회 -> 공장별 인가
+Dashboard Web          /admin/users 사용자 관리 화면
+```
+
+서버에서 강제하는 접근 제어:
+
+| API | 권한 기준 |
+| --- | --- |
+| `GET /factories` | 로그인 사용자가 접근 가능한 공장만 반환 |
+| `GET /factories/{factory_id}` | 권한 없으면 `403` |
+| `GET /factories/{factory_id}/history` | 권한 없으면 `403` |
+| `GET /reports` | 접근 가능한 공장 리포트만 반환 |
+| `GET /reports/{date}/{factory_id}` | 권한 없으면 `403` |
+| `GET /ws/factories/{factory_id}` | 구독 전 권한 검증, 권한 없으면 close `4003` |
+| `/admin/users` | `super_admin` / `org_admin`만 접근 |
+
+초기 부트스트랩:
+
+```text
+1. 운영자가 Cognito Hosted UI에서 로그인할 Cognito 사용자를 준비한다.
+2. 해당 사용자의 Cognito sub 값을 확인한다.
+3. Terraform variable `rbac_bootstrap_super_admin_subs`에 sub를 임시로 설정한다.
+4. `terraform -chdir=infra/data-dashboard apply` 후 backend service를 새 task definition으로 배포한다.
+5. Dashboard `/admin/users`에서 실제 본사 관리자 계정을 생성하거나 기존 계정 권한을 설정한다.
+6. `rbac_bootstrap_super_admin_subs`를 빈 값으로 되돌리고 다시 apply/deploy한다.
+```
+
+주의:
+
+- Cognito sub 값은 개인 식별자이므로 문서에 기록하지 않는다.
+- 사용자 비밀번호는 Cognito 임시 비밀번호/초기 설정 흐름으로만 다룬다. RDS에 비밀번호를 저장하지 않는다.
+- `DELETE /admin/users/{user_id}`는 Cognito 사용자를 disable하고 RDS 사용자를 `disabled`로 표시하는 soft-delete다.
+- Backend startup은 `DATABASE_AUTO_CREATE_METADATA=true`일 때 RBAC metadata table을 idempotent하게 생성하고 `DASHBOARD_FACTORY_IDS`의 공장 ID를 `factory` table에 동기화한다.
+
+운영 확인:
+
+```bash
+curl -fsS https://api.aegis-pi.cloud/readyz
+```
+
+정상 기준:
+
+```text
+dependencies.dynamodb = ok
+dependencies.redis = ok
+dependencies.rds_metadata = ok
+```
 
 ```text
 terraform destroy: 73 destroyed

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
 from routers import admin_users, cloud_infra, factories, reports, ws
 from services import ddb
+from services.metadata import check_metadata_db, ensure_metadata_schema
 from services.redis_client import get_redis
 
 app = FastAPI(title="Aegis Dashboard Backend", version="0.1.0")
@@ -66,6 +67,12 @@ async def _warmup_ddb():
     consumed by timeout waits — causing immediate 504s for all new requests.
     """
     settings = get_settings()
+    try:
+        await ensure_metadata_schema(settings)
+        logger.info("metadata_schema ok")
+    except Exception as exc:
+        logger.warning("metadata_schema failed err=%s", exc)
+
     factory_ids = [f.strip() for f in settings.dashboard_factory_ids.split(",") if f.strip()]
     probe = factory_ids[0] if factory_ids else "factory-a"
     try:
@@ -106,6 +113,12 @@ async def readyz():
         dependencies["redis"] = "ok"
     except Exception:
         dependencies["redis"] = "failed"
+
+    try:
+        await check_metadata_db(settings)
+        dependencies["rds_metadata"] = "ok"
+    except Exception:
+        dependencies["rds_metadata"] = "failed"
 
     if any(status != "ok" for status in dependencies.values()):
         raise HTTPException(
