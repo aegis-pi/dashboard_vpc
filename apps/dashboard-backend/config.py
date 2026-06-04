@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     cognito_app_client_id: str = ""
     cognito_jwks_timeout_seconds: float = 5.0
     cognito_jwks_ttl_seconds: float = 3600.0
+    rbac_bootstrap_super_admin_subs: str = ""
 
     # AWS
     aws_region: str = "ap-south-1"

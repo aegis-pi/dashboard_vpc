@@ -2,7 +2,7 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from deps.auth import verify_cognito_token
+from deps.rbac import Principal, get_current_principal, require_factory_access
 from services import ddb
 
 router = APIRouter(prefix="/factories", tags=["factories"])
@@ -54,26 +54,31 @@ def _normalize_factories(items: list) -> list:
 
 @router.get("")
 async def list_factories(
-    _claims: dict = Depends(verify_cognito_token),
+    principal: Principal = Depends(get_current_principal),
 ):
     global _factories_cache, _factories_cache_at
     if _factories_cache is not None and time.monotonic() - _factories_cache_at < _FACTORIES_TTL:
-        return _factories_cache
-    try:
-        items = await ddb.list_factories()
-    except ddb.DynamoDBUnavailableError as exc:
-        raise _ddb_gateway_timeout() from exc
-    result = _normalize_factories(items)
-    _factories_cache = result
-    _factories_cache_at = time.monotonic()
-    return result
+        result = _factories_cache
+    else:
+        try:
+            items = await ddb.list_factories()
+        except ddb.DynamoDBUnavailableError as exc:
+            raise _ddb_gateway_timeout() from exc
+        result = _normalize_factories(items)
+        _factories_cache = result
+        _factories_cache_at = time.monotonic()
+    if principal.can_access_all_factories:
+        return result
+    allowed = principal.allowed_factory_ids or frozenset()
+    return [item for item in result if item["factory_id"] in allowed]
 
 
 @router.get("/{factory_id}")
 async def get_factory(
     factory_id: str,
-    _claims: dict = Depends(verify_cognito_token),
+    principal: Principal = Depends(get_current_principal),
 ):
+    require_factory_access(principal, factory_id)
     try:
         item = await ddb.get_factory_latest(factory_id)
     except ddb.DynamoDBUnavailableError as exc:
@@ -88,13 +93,14 @@ async def get_factory_history(
     factory_id: str,
     window: str = Query(default="1h", pattern=r"^\d+[hmd]$"),
     limit: int = Query(default=500, ge=1, le=2000),
-    _claims: dict = Depends(verify_cognito_token),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Return the most recent HISTORY#STATE items (newest-first cap, returned ascending).
 
     window examples: 1h, 2h, 24h, 7d, 30m
     limit: hard cap on items returned (default 500, max 2000).
     """
+    require_factory_access(principal, factory_id)
     try:
         return await ddb.get_factory_history(factory_id, window, limit)
     except ddb.DynamoDBUnavailableError as exc:

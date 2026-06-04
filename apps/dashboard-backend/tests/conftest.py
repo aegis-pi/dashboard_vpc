@@ -56,6 +56,7 @@ os.environ.update(
         "COGNITO_APP_CLIENT_ID": "test-client-id",
         "COGNITO_JWKS_TIMEOUT_SECONDS": "5",
         "COGNITO_JWKS_TTL_SECONDS": "3600",
+        "RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS": "test-user,test-user-sub",
         "AWS_REGION": "ap-south-1",
     }
 )
@@ -65,6 +66,7 @@ from config import get_settings  # noqa: E402
 get_settings.cache_clear()
 
 import deps.auth as auth_module  # noqa: E402
+import deps.rbac as rbac_module  # noqa: E402
 from main import app  # noqa: E402
 
 # ─── RSA key pair ─────────────────────────────────────────────────────────────
@@ -177,9 +179,19 @@ def client():
         }
 
     app.dependency_overrides[auth_module.verify_cognito_token] = _always_auth
+    app.dependency_overrides[rbac_module.get_current_principal] = lambda: rbac_module.Principal(
+        user_id="test-user",
+        cognito_sub="test-user",
+        email="test@example.com",
+        display_name="Test User",
+        global_role="super_admin",
+        status="active",
+        allowed_factory_ids=None,
+    )
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
     app.dependency_overrides.pop(auth_module.verify_cognito_token, None)
+    app.dependency_overrides.pop(rbac_module.get_current_principal, None)
 
 
 @pytest.fixture
