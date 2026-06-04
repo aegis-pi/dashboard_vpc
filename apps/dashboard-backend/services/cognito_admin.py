@@ -73,12 +73,17 @@ def create_user(email: str, display_name: str) -> str:
     return _attr(user.get("UserAttributes", []), "sub") or user.get("Username") or email
 
 
-def delete_user(email: str) -> None:
+def delete_user(email: str, *, ignore_not_found: bool = False) -> None:
     settings = get_settings()
     try:
         _cognito().admin_delete_user(
             UserPoolId=settings.cognito_user_pool_id,
             Username=email,
         )
-    except (BotoCoreError, ClientError) as exc:
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if ignore_not_found and error_code == "UserNotFoundException":
+            return
+        raise CognitoAdminError("Cognito user deletion failed") from exc
+    except BotoCoreError as exc:
         raise CognitoAdminError("Cognito user deletion failed") from exc

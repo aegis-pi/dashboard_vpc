@@ -163,6 +163,40 @@ def test_admin_create_factory_admin_normalizes_factory_roles_to_admin(client, mo
     assert r.json()["factories"] == [{"factory_id": "factory-b", "role": "admin"}]
 
 
+def test_admin_create_user_replaces_stale_disabled_user(client, monkeypatch):
+    calls: list[tuple[str, str]] = []
+    deleted: list[tuple[str, bool]] = []
+
+    def _create_user(email, display_name):
+        calls.append((email, display_name))
+        return "new-disabled-sub"
+
+    def _delete_user(email, *, ignore_not_found=False):
+        deleted.append((email, ignore_not_found))
+
+    monkeypatch.setattr(cognito_admin, "create_user", _create_user)
+    monkeypatch.setattr(cognito_admin, "delete_user", _delete_user)
+
+    r = client.post(
+        "/admin/users",
+        json={
+            "email": "disabled@example.com",
+            "display_name": "Restored User",
+            "global_role": "factory_admin",
+            "factories": [{"factory_id": "factory-b", "role": "admin"}],
+        },
+    )
+
+    assert r.status_code == 201
+    body = r.json()
+    assert deleted == [("disabled@example.com", True)]
+    assert calls == [("disabled@example.com", "Restored User")]
+    assert body["email"] == "disabled@example.com"
+    assert body["status"] == "active"
+    assert body["cognito_sub"] == "new-disabled-sub"
+    assert body["factories"] == [{"factory_id": "factory-b", "role": "admin"}]
+
+
 def test_admin_create_user_rejects_removed_global_roles(client, monkeypatch):
     monkeypatch.setattr(cognito_admin, "create_user", lambda email, display_name: "unused")
 

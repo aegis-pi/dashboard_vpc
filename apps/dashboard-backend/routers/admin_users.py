@@ -144,8 +144,17 @@ async def create_user(
     await _ensure_factories_exist(session, factories)
 
     exists = await session.execute(select(AppUser).where(AppUser.email == str(payload.email)))
-    if exists.scalar_one_or_none() is not None:
+    existing_user = exists.scalar_one_or_none()
+    if existing_user is not None and existing_user.status == UserStatus.ACTIVE.value:
         raise HTTPException(status_code=409, detail="User already exists")
+    if existing_user is not None:
+        try:
+            cognito_admin.delete_user(existing_user.email, ignore_not_found=True)
+        except cognito_admin.CognitoAdminError as exc:
+            raise HTTPException(status_code=502, detail="Stale Cognito user cleanup failed") from exc
+        await session.execute(delete(UserFactoryAccess).where(UserFactoryAccess.user_id == existing_user.id))
+        await session.delete(existing_user)
+        await session.flush()
 
     try:
         cognito_sub = cognito_admin.create_user(str(payload.email), payload.display_name)
