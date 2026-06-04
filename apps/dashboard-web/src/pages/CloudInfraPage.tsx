@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, RefreshCw, Server } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
@@ -260,9 +261,25 @@ function EmptyState() {
 }
 
 export function CloudInfraPage() {
+  const [refreshInterval, setRefreshInterval] = useState(0)
   const factories = useFactories()
   const cloud = useCloudInfra()
   const history = useCloudInfraHistory('1h', 'fast', Boolean(cloud.data?.available), 120)
+  const refreshCloud = cloud.refresh
+  const refreshHistory = history.refresh
+
+  const refreshPageData = useCallback(() => {
+    void refreshCloud()
+    void refreshHistory()
+  }, [refreshCloud, refreshHistory])
+
+  useEffect(() => {
+    if (refreshInterval <= 0) return
+    const id = window.setInterval(() => {
+      refreshPageData()
+    }, refreshInterval)
+    return () => window.clearInterval(id)
+  }, [refreshInterval, refreshPageData])
 
   const sidebarFactories = (factories.data?.factories ?? [])
     .map(adaptSidebarFactory)
@@ -377,7 +394,9 @@ export function CloudInfraPage() {
     <Shell
       factories={sidebarFactories}
       crumbs={[{ label: 'System' }, { label: '클라우드 인프라' }]}
-      onRefresh={() => { void cloud.refresh(); void history.refresh() }}
+      onRefresh={refreshPageData}
+      refreshInterval={refreshInterval}
+      onIntervalChange={setRefreshInterval}
     >
       <div className="cloud-page-head" style={{
         marginBottom: 18,
