@@ -5,6 +5,9 @@ import {
   FileText,
   LogOut,
   ChevronLeft,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Server,
   Users,
@@ -19,9 +22,19 @@ import { ConnStatus } from './ConnStatus'
 // ─── Sidebar ──────────────────────────────────────────────────────────
 interface SidebarProps {
   factories?: { factory_id: string; risk_level?: string; risk_score?: number }[]
+  collapsed?: boolean
+  onToggle?: () => void
+  onNavigate?: () => void
 }
 
-export function Sidebar({ factories = [] }: SidebarProps) {
+function riskDotColor(level?: string): string {
+  if (level === 'danger' || level === 'critical') return 'var(--crit)'
+  if (level === 'warning') return 'var(--warn)'
+  if (level === 'safe' || level === 'normal' || level === 'active') return 'var(--safe)'
+  return 'var(--unk)'
+}
+
+export function Sidebar({ factories = [], collapsed = false, onToggle, onNavigate }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const currentUser = useCurrentUser()
@@ -50,20 +63,36 @@ export function Sidebar({ factories = [] }: SidebarProps) {
         ? [{ factory_id: urlFactoryId, risk_level: undefined as string | undefined, risk_score: undefined as number | undefined }]
         : []
 
+  const go = (path: string) => {
+    navigate(path)
+    onNavigate?.()
+  }
+
   return (
-    <nav className="sidebar">
+    <nav className={`sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="주요 탐색">
       {/* Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-mark">
           <span className="serif" style={{ fontSize: 18, lineHeight: 1 }}>π</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+        <div className="sidebar-titleblock" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
           <div className="sidebar-title">
             Aegis<span style={{ color: 'var(--chrome-ink-3)' }}>·</span>
             <span style={{ fontFamily: 'var(--font-serif)', fontSize: 17 }}>π</span>
           </div>
           <div className="sidebar-subtitle">Risk Twin</div>
         </div>
+        {onToggle && (
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={onToggle}
+            aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          >
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -72,12 +101,14 @@ export function Sidebar({ factories = [] }: SidebarProps) {
 
         <button
           className={`nav-item ${isFleet ? 'active' : ''}`}
-          onClick={() => navigate('/')}
+          onClick={() => go('/')}
+          aria-label="전체 개요"
+          title="전체 개요"
         >
           <LayoutGrid size={15} />
-          <span style={{ flex: 1 }}>전체 개요</span>
+          <span className="nav-item-label" style={{ flex: 1 }}>전체 개요</span>
           {factories.length > 0 && (
-            <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
+            <span className="mono tnum nav-item-count" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
               {factories.length}
             </span>
           )}
@@ -88,23 +119,22 @@ export function Sidebar({ factories = [] }: SidebarProps) {
             <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Factories</div>
             {visibleFactories.map((f) => {
               const isActive = location.pathname === `/factory/${f.factory_id}`
-              const dotColor =
-                f.risk_level === 'danger' ? 'var(--crit)' :
-                f.risk_level === 'warning' ? 'var(--warn)' :
-                f.risk_level === 'safe' ? 'var(--safe)' : 'var(--chrome-ink-3)'
+              const dotColor = riskDotColor(f.risk_level)
               return (
                 <button
                   key={f.factory_id}
                   className={`nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => navigate(`/factory/${f.factory_id}`)}
+                  onClick={() => go(`/factory/${f.factory_id}`)}
+                  aria-label={`${f.factory_id} 공장 상세`}
+                  title={`${f.factory_id} · ${f.risk_score ?? '미수신'}`}
                 >
                   <span style={{
                     width: 7, height: 7, borderRadius: '50%',
                     background: dotColor, flexShrink: 0,
                   }} />
-                  <span style={{ flex: 1 }}>{f.factory_id}</span>
+                  <span className="nav-item-label" style={{ flex: 1 }}>{f.factory_id}</span>
                   {f.risk_score != null && (
-                    <span className="mono tnum" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
+                    <span className="mono tnum nav-item-count" style={{ fontSize: 10.5, color: 'var(--chrome-ink-3)' }}>
                       {f.risk_score}
                     </span>
                   )}
@@ -120,10 +150,12 @@ export function Sidebar({ factories = [] }: SidebarProps) {
             {canViewSystem && (
               <button
                 className={`nav-item ${isCloudInfra ? 'active' : ''}`}
-                onClick={() => navigate('/cloud-infra')}
+                onClick={() => go('/cloud-infra')}
+                aria-label="클라우드 인프라"
+                title="클라우드 인프라"
               >
                 <Server size={15} />
-                <span style={{ flex: 1 }}>클라우드 인프라</span>
+                <span className="nav-item-label" style={{ flex: 1 }}>클라우드 인프라</span>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',
                   background: cloudInfraDotColor(cloudStatus), flexShrink: 0,
@@ -133,10 +165,12 @@ export function Sidebar({ factories = [] }: SidebarProps) {
             {canManageUsers && (
               <button
                 className={`nav-item ${isAdminUsers ? 'active' : ''}`}
-                onClick={() => navigate('/admin/users')}
+                onClick={() => go('/admin/users')}
+                aria-label="사용자 관리"
+                title="사용자 관리"
               >
                 <Users size={15} />
-                <span style={{ flex: 1 }}>사용자 관리</span>
+                <span className="nav-item-label" style={{ flex: 1 }}>사용자 관리</span>
               </button>
             )}
           </>
@@ -145,10 +179,12 @@ export function Sidebar({ factories = [] }: SidebarProps) {
         <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Workspace</div>
         <button
           className={`nav-item ${isReports ? 'active' : ''}`}
-          onClick={() => navigate('/reports')}
+          onClick={() => go('/reports')}
+          aria-label="일간 보고서"
+          title="일간 보고서"
         >
           <FileText size={15} />
-          <span style={{ flex: 1 }}>일간 보고서</span>
+          <span className="nav-item-label" style={{ flex: 1 }}>일간 보고서</span>
         </button>
       </div>
 
@@ -158,9 +194,11 @@ export function Sidebar({ factories = [] }: SidebarProps) {
           className="nav-item"
           style={{ width: '100%' }}
           onClick={() => { void logout() }}
+          aria-label="로그아웃"
+          title="로그아웃"
         >
           <LogOut size={14} />
-          로그아웃
+          <span className="nav-item-label">로그아웃</span>
         </button>
       </div>
     </nav>
@@ -181,6 +219,9 @@ interface TopBarProps {
   onRefresh?: () => void
   refreshInterval?: number
   onIntervalChange?: (ms: number) => void
+  onMenuClick?: () => void
+  onSidebarToggle?: () => void
+  sidebarCollapsed?: boolean
 }
 
 export const REFRESH_INTERVAL_OPTIONS = [
@@ -213,11 +254,38 @@ export function TopBar({
   onRefresh,
   refreshInterval = 0,
   onIntervalChange,
+  onMenuClick,
+  onSidebarToggle,
+  sidebarCollapsed = false,
 }: TopBarProps) {
   return (
     <div className="topbar">
+      {onMenuClick && (
+        <button
+          type="button"
+          className="btn ghost btn-icon topbar-menu"
+          onClick={onMenuClick}
+          aria-label="탐색 메뉴 열기"
+          title="탐색 메뉴"
+        >
+          <Menu size={16} />
+        </button>
+      )}
+
+      {onSidebarToggle && (
+        <button
+          type="button"
+          className="btn ghost btn-icon topbar-sidebar-toggle"
+          onClick={onSidebarToggle}
+          aria-label={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          title={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+      )}
+
       {onBack && (
-        <button className="btn ghost" onClick={onBack} style={{ padding: '4px 6px' }}>
+        <button className="btn ghost btn-icon" onClick={onBack} aria-label="이전 화면" title="이전 화면">
           <ChevronLeft size={16} />
         </button>
       )}
@@ -252,7 +320,7 @@ export function TopBar({
         )}
 
         {onRefresh && (
-          <button className="btn ghost" onClick={onRefresh} title="수동 새로고침" style={{ padding: '4px 8px' }}>
+          <button className="btn ghost btn-icon" onClick={onRefresh} title="수동 새로고침" aria-label="수동 새로고침">
             <RefreshCw size={13} />
           </button>
         )}
@@ -295,9 +363,27 @@ export function Shell({
   refreshInterval,
   onIntervalChange,
 }: ShellProps) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('aegis.sidebar.collapsed') === 'true')
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    window.localStorage.setItem('aegis.sidebar.collapsed', String(sidebarCollapsed))
+  }, [sidebarCollapsed])
+
   return (
-    <div className="shell">
-      <Sidebar factories={factories} />
+    <div className={`shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'sidebar-mobile-open' : ''}`}>
+      <Sidebar
+        factories={factories}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((value) => !value)}
+        onNavigate={() => setMobileSidebarOpen(false)}
+      />
+      <button
+        type="button"
+        className="sidebar-backdrop"
+        aria-label="탐색 메뉴 닫기"
+        onClick={() => setMobileSidebarOpen(false)}
+      />
       <div className="main">
         <TopBar
           crumbs={crumbs}
@@ -307,6 +393,9 @@ export function Shell({
           onRefresh={onRefresh}
           refreshInterval={refreshInterval}
           onIntervalChange={onIntervalChange}
+          onMenuClick={() => setMobileSidebarOpen(true)}
+          onSidebarToggle={() => setSidebarCollapsed((value) => !value)}
+          sidebarCollapsed={sidebarCollapsed}
         />
         <div className="content">
           {children}

@@ -286,17 +286,11 @@ function FactoryCard({
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
 
   return (
-    <div
+    <button
+      type="button"
       className="card factory-card"
       onClick={onClick}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--ink-5)'
-        e.currentTarget.style.boxShadow = 'var(--shadow-lift)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--line)'
-        e.currentTarget.style.boxShadow = 'var(--shadow-card)'
-      }}
+      aria-label={`${f.factory_id} 공장 상세 보기, 현재 점수 ${score ?? '미수신'}`}
     >
       <div className="factory-card-accent" style={{ background: color }} />
 
@@ -374,7 +368,7 @@ function FactoryCard({
           snapshotReceivedAt={f.snapshot_received_at}
         />
       </div>
-    </div>
+    </button>
   )
 }
 

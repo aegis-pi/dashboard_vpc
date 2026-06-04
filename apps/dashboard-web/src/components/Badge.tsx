@@ -1,7 +1,13 @@
 import type { RiskLevel, PipelineStatus } from '../api/types'
+import { statusMeta, type StatusTone } from '../utils/status'
+
+interface StatusMeta {
+  label: string
+  tone: StatusTone
+}
 
 // ─── Risk level badge ─────────────────────────────────────────────────
-const LEVEL_META: Record<string, { label: string; tone: string }> = {
+const LEVEL_META: Record<string, StatusMeta> = {
   safe:    { label: '안전', tone: 'safe' },
   warning: { label: '주의', tone: 'warn' },
   danger:  { label: '위험', tone: 'crit' },
@@ -13,7 +19,7 @@ interface LevelBadgeProps {
 }
 
 export function LevelBadge({ level, size = 'md' }: LevelBadgeProps) {
-  const meta = LEVEL_META[level ?? ''] ?? { label: '미계산', tone: 'unk' }
+  const meta = LEVEL_META[level ?? ''] ?? statusMeta(level)
   const padStyle = size === 'sm' ? '3px 6px' : size === 'lg' ? '5px 12px' : '4px 8px'
   const fontSize = size === 'sm' ? 10.5 : size === 'lg' ? 13 : 11.5
   return (
@@ -25,14 +31,14 @@ export function LevelBadge({ level, size = 'md' }: LevelBadgeProps) {
 }
 
 // ─── Pipeline badge ───────────────────────────────────────────────────
-const PIPELINE_META: Record<string, { label: string; tone: string }> = {
+const PIPELINE_META: Record<string, StatusMeta> = {
   normal:   { label: '정상',  tone: 'safe' },
   warning:  { label: '주의',  tone: 'warn' },
   critical: { label: '위험',  tone: 'crit' },
 }
 
 export function PipelineBadge({ status }: { status?: PipelineStatus | string }) {
-  const meta = PIPELINE_META[status ?? ''] ?? { label: '미수신', tone: 'unk' }
+  const meta = PIPELINE_META[status ?? ''] ?? statusMeta(status)
   return (
     <span className={`pill ${meta.tone}`} style={{ padding: '3px 6px', fontSize: 10.5 }}>
       <span className="dot" />

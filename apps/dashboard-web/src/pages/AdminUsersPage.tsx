@@ -6,6 +6,7 @@ import type { AdminUser, GlobalRole, UserFactoryAccess } from '../api/types'
 import { useAdminUsers } from '../hooks/useAdminUsers'
 import { useFactories } from '../hooks/useFactories'
 import { adaptSidebarFactory } from '../adapters/factory'
+import { statusMeta } from '../utils/status'
 
 const GLOBAL_ROLES: { value: GlobalRole; label: string }[] = [
   { value: 'super_admin', label: '본사 관리자' },
@@ -81,6 +82,16 @@ function sortUsers(users: AdminUser[]): AdminUser[] {
     || a.display_name.localeCompare(b.display_name)
     || a.email.localeCompare(b.email)
   ))
+}
+
+function UserStatusChip({ status }: { status: AdminUser['status'] }) {
+  const meta = statusMeta(status)
+  return (
+    <span className={`pill ${meta.tone} admin-status-pill`}>
+      <span className="dot" />
+      {meta.label}
+    </span>
+  )
 }
 
 function upsertAccess(
@@ -244,7 +255,7 @@ export function AdminUsersPage() {
                       <td>{roleLabel(user.global_role)}</td>
                       <td className="mono">{accessSummary(user)}</td>
                       <td>
-                        <span className={`status-chip ${user.status}`}>{user.status}</span>
+                        <UserStatusChip status={user.status} />
                       </td>
                       <td>
                         <div className="admin-users-row-actions">
