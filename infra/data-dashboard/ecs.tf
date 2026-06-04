@@ -230,8 +230,8 @@ resource "aws_ecs_task_definition" "backend" {
   family                   = "${local.name_prefix_lc}-backend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  cpu                      = var.ecs_backend_task_cpu
+  memory                   = var.ecs_backend_task_memory
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 

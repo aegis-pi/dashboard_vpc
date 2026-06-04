@@ -103,9 +103,56 @@ variable "shared_data_bucket_name" {
 # ---------------------------------------------------------------------------
 
 variable "ecs_backend_desired_count" {
-  description = "Desired number of running ECS backend tasks."
+  description = "Initial desired ECS backend tasks. Managed by Application Auto Scaling after creation (service ignores desired_count); kept >= min_capacity for HA across AZs."
   type        = number
-  default     = 1
+  default     = 2
+}
+
+# --- ECS backend task sizing ------------------------------------------------
+# Raised from 512/1024 after the 2026-06-04 incident (ADR 0030): the heavy
+# work is GIL-bound Python (parsing up to 2000 DDB HISTORY items -> Decimal->
+# float -> JSON), and the image runs `uvicorn --workers 2`. 0.5 vCPU left two
+# workers contending for half a core. 1 vCPU gives each worker ~0.5 core plus
+# I/O overlap. Memory is sized for the Fargate 1-vCPU floor (2 GB); observed
+# usage was ~40% of 1 GB, so memory was never the bottleneck.
+# Valid Fargate combos: 1024 vCPU allows 2048-8192 memory (1 GB steps).
+
+variable "ecs_backend_task_cpu" {
+  description = "Fargate task CPU units for the backend (1024 = 1 vCPU)."
+  type        = string
+  default     = "1024"
+}
+
+variable "ecs_backend_task_memory" {
+  description = "Fargate task memory (MiB) for the backend. 2048 = Fargate floor for 1 vCPU; observed usage ~40% of 1 GB so this is headroom, not a requirement."
+  type        = string
+  default     = "2048"
+}
+
+# --- ECS backend Application Auto Scaling (see ecs_autoscaling.tf) -----------
+
+variable "ecs_backend_min_capacity" {
+  description = "Auto Scaling floor for ECS backend tasks. 2 = HA across AZs + spike split (a 100 req/min burst lands as ~50/task instead of saturating one 0.5 vCPU task)."
+  type        = number
+  default     = 2
+}
+
+variable "ecs_backend_max_capacity" {
+  description = "Auto Scaling ceiling for ECS backend tasks. Default 2 = pinned to min for the demo profile (reactive scaling is too slow for a short bursty demo; warm provisioned capacity is what matters). Raise to 3-4 for sustained/production load to let the target-tracking policies act."
+  type        = number
+  default     = 2
+}
+
+variable "ecs_backend_requests_per_target" {
+  description = "Target ALBRequestCountPerTarget (req/target/min) for the primary scaling policy. ~40 = scale out at ~40% of the observed single-task saturation point (~100 req/min @ 100% CPU), leaving headroom for scale-out + task cold start."
+  type        = number
+  default     = 40
+}
+
+variable "ecs_backend_cpu_target" {
+  description = "Target average CPU % for the safety-net scaling policy. 50 (not 60-70) gives margin for Target Tracking lag + Fargate cold start before saturation."
+  type        = number
+  default     = 50
 }
 
 variable "backend_container_image" {
