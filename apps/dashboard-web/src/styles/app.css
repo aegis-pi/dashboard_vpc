@@ -1376,6 +1376,22 @@ input { font-family: inherit; }
 .admin-users-editor {
   min-width: 0;
 }
+.admin-users-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.admin-users-card-actions select {
+  height: 30px;
+  border: 1px solid var(--line-3);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 9px;
+  font: inherit;
+  font-size: 12px;
+}
 .table-wrap {
   overflow-x: auto;
 }
@@ -1532,6 +1548,29 @@ input { font-family: inherit; }
 }
 .factory-access-row:last-child {
   border-bottom: 0;
+}
+.factory-role-fixed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--ink-4);
+  font-size: 12px;
+  font-weight: 600;
+}
+.factory-role-fixed.active {
+  border-color: color-mix(in srgb, var(--safe) 28%, var(--line-2));
+  background: var(--safe-tint-2);
+  color: var(--safe);
+}
+.system-access-panel {
+  background: var(--surface);
+}
+.system-access-row {
+  padding: 12px 11px;
 }
 .check-row {
   flex-direction: row !important;

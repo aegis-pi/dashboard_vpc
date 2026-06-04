@@ -73,6 +73,7 @@ export interface AdminUser {
   email: string
   display_name: string
   global_role: GlobalRole
+  can_view_system: boolean
   status: UserStatus
   factories: UserFactoryAccess[]
 }
@@ -81,7 +82,18 @@ export interface AdminUserPayload {
   email?: string
   display_name: string
   global_role: GlobalRole
+  can_view_system: boolean
   factories: UserFactoryAccess[]
+}
+
+export interface CurrentUser {
+  id: string
+  email: string
+  display_name: string
+  global_role: GlobalRole
+  can_manage_users: boolean
+  can_view_system: boolean
+  allowed_factory_ids: string[] | null
 }
 
 // ─── Device entry (nested format from infra_state.devices) ──────────

@@ -12,6 +12,7 @@ import {
 import { logout } from '../auth/auth'
 import type { WsStatus } from '../hooks/useWebSocket'
 import { useCloudInfra } from '../hooks/useCloudInfra'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { cloudInfraDotColor } from '../adapters/cloudInfra'
 import { ConnStatus } from './ConnStatus'
 
@@ -23,7 +24,10 @@ interface SidebarProps {
 export function Sidebar({ factories = [] }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { data: cloudInfra } = useCloudInfra()
+  const currentUser = useCurrentUser()
+  const canViewSystem = currentUser.data?.can_view_system === true
+  const canManageUsers = currentUser.data?.can_manage_users === true
+  const { data: cloudInfra } = useCloudInfra(canViewSystem)
 
   const isFleet = location.pathname === '/'
   const isReports = location.pathname === '/reports'
@@ -110,25 +114,33 @@ export function Sidebar({ factories = [] }: SidebarProps) {
           </>
         )}
 
-        <div className="sidebar-nav-label" style={{ marginTop: 8 }}>System</div>
-        <button
-          className={`nav-item ${isCloudInfra ? 'active' : ''}`}
-          onClick={() => navigate('/cloud-infra')}
-        >
-          <Server size={15} />
-          <span style={{ flex: 1 }}>클라우드 인프라</span>
-          <span style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: cloudInfraDotColor(cloudStatus), flexShrink: 0,
-          }} />
-        </button>
-        <button
-          className={`nav-item ${isAdminUsers ? 'active' : ''}`}
-          onClick={() => navigate('/admin/users')}
-        >
-          <Users size={15} />
-          <span style={{ flex: 1 }}>사용자 관리</span>
-        </button>
+        {(canViewSystem || canManageUsers) && (
+          <>
+            <div className="sidebar-nav-label" style={{ marginTop: 8 }}>System</div>
+            {canViewSystem && (
+              <button
+                className={`nav-item ${isCloudInfra ? 'active' : ''}`}
+                onClick={() => navigate('/cloud-infra')}
+              >
+                <Server size={15} />
+                <span style={{ flex: 1 }}>클라우드 인프라</span>
+                <span style={{
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: cloudInfraDotColor(cloudStatus), flexShrink: 0,
+                }} />
+              </button>
+            )}
+            {canManageUsers && (
+              <button
+                className={`nav-item ${isAdminUsers ? 'active' : ''}`}
+                onClick={() => navigate('/admin/users')}
+              >
+                <Users size={15} />
+                <span style={{ flex: 1 }}>사용자 관리</span>
+              </button>
+            )}
+          </>
+        )}
 
         <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Workspace</div>
         <button

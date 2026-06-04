@@ -9,6 +9,7 @@ import type {
   CloudInfraHistoryItem,
   AdminUser,
   AdminUserPayload,
+  CurrentUser,
 } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -154,6 +155,10 @@ export async function fetchCloudInfraHistory(
   return Array.isArray(raw) ? raw as CloudInfraHistoryItem[] : []
 }
 
+export async function fetchCurrentUser(): Promise<CurrentUser> {
+  return apiFetch<CurrentUser>('/auth/me')
+}
+
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
   const raw = await apiFetch<unknown>('/admin/users')
   return Array.isArray(raw) ? raw as AdminUser[] : []
@@ -167,6 +172,7 @@ export async function updateAdminUser(userId: string, payload: AdminUserPayload)
   const body = {
     display_name: payload.display_name,
     global_role: payload.global_role,
+    can_view_system: payload.can_view_system,
     factories: payload.factories,
   }
   return apiFetch<AdminUser>(`/admin/users/${userId}`, { method: 'PATCH', body })

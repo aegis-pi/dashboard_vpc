@@ -2,21 +2,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, Save, Trash2, UserCog } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { createAdminUser, deleteAdminUser, updateAdminUser } from '../api/client'
-import type { AdminUser, FactoryAccessRole, GlobalRole, UserFactoryAccess } from '../api/types'
+import type { AdminUser, GlobalRole, UserFactoryAccess } from '../api/types'
 import { useAdminUsers } from '../hooks/useAdminUsers'
 import { useFactories } from '../hooks/useFactories'
 import { adaptSidebarFactory } from '../adapters/factory'
 
 const GLOBAL_ROLES: { value: GlobalRole; label: string }[] = [
   { value: 'super_admin', label: '본사 관리자' },
-  { value: 'org_admin', label: '조직 관리자' },
   { value: 'factory_admin', label: '공장 관리자' },
-  { value: 'viewer', label: '조회 전용' },
 ]
 
-const FACTORY_ROLES: { value: FactoryAccessRole; label: string }[] = [
-  { value: 'admin', label: '관리' },
-  { value: 'viewer', label: '조회' },
+const ROLE_LABELS: Record<GlobalRole, string> = {
+  super_admin: '본사 관리자',
+  org_admin: '조직 관리자',
+  factory_admin: '공장 관리자',
+  viewer: '조회 전용',
+}
+
+type UserRoleFilter = 'all' | 'factory_admin' | 'super_admin'
+
+const USER_ROLE_FILTERS: { value: UserRoleFilter; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'factory_admin', label: '공장 관리자' },
+  { value: 'super_admin', label: '본사 관리자' },
 ]
 
 interface FormState {
@@ -24,6 +32,7 @@ interface FormState {
   email: string
   display_name: string
   global_role: GlobalRole
+  can_view_system: boolean
   factories: UserFactoryAccess[]
 }
 
@@ -32,22 +41,25 @@ function emptyForm(): FormState {
     email: '',
     display_name: '',
     global_role: 'factory_admin',
+    can_view_system: false,
     factories: [],
   }
 }
 
 function formFromUser(user: AdminUser): FormState {
+  const editableRole: GlobalRole = user.global_role === 'super_admin' ? 'super_admin' : 'factory_admin'
   return {
     id: user.id,
     email: user.email,
     display_name: user.display_name,
-    global_role: user.global_role,
-    factories: user.factories,
+    global_role: editableRole,
+    can_view_system: user.can_view_system,
+    factories: user.factories.map((item) => ({ ...item, role: 'admin' })),
   }
 }
 
 function roleLabel(role: GlobalRole): string {
-  return GLOBAL_ROLES.find((item) => item.value === role)?.label ?? role
+  return ROLE_LABELS[role] ?? role
 }
 
 function accessSummary(user: AdminUser): string {
@@ -60,19 +72,10 @@ function upsertAccess(
   access: UserFactoryAccess[],
   factoryId: string,
   enabled: boolean,
-  role: FactoryAccessRole = 'viewer',
 ): UserFactoryAccess[] {
   if (!enabled) return access.filter((item) => item.factory_id !== factoryId)
   if (access.some((item) => item.factory_id === factoryId)) return access
-  return [...access, { factory_id: factoryId, role }]
-}
-
-function updateAccessRole(
-  access: UserFactoryAccess[],
-  factoryId: string,
-  role: FactoryAccessRole,
-): UserFactoryAccess[] {
-  return access.map((item) => item.factory_id === factoryId ? { ...item, role } : item)
+  return [...access, { factory_id: factoryId, role: 'admin' }]
 }
 
 export function AdminUsersPage() {
@@ -82,6 +85,7 @@ export function AdminUsersPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [roleFilter, setRoleFilter] = useState<UserRoleFilter>('all')
 
   const sidebarFactories = useMemo(() => (
     (factories.data?.factories ?? [])
@@ -101,7 +105,8 @@ export function AdminUsersPage() {
   }, [form.global_role])
 
   const selectedAccess = new Map(form.factories.map((item) => [item.factory_id, item.role]))
-  const isGlobal = form.global_role === 'super_admin' || form.global_role === 'org_admin'
+  const isGlobal = form.global_role === 'super_admin'
+  const filteredUsers = users.data.filter((user) => roleFilter === 'all' || user.global_role === roleFilter)
 
   async function submit() {
     setSaving(true)
@@ -112,7 +117,8 @@ export function AdminUsersPage() {
         email: form.email,
         display_name: form.display_name,
         global_role: form.global_role,
-        factories: isGlobal ? [] : form.factories,
+        can_view_system: isGlobal || form.can_view_system,
+        factories: isGlobal ? [] : form.factories.map((item) => ({ ...item, role: 'admin' as const })),
       }
       if (form.id) {
         const updated = await updateAdminUser(form.id, payload)
@@ -182,7 +188,18 @@ export function AdminUsersPage() {
                 <div className="eyebrow">Users</div>
                 <h2>계정 목록</h2>
               </div>
-              <span className="mono tnum">{users.data.length}</span>
+              <div className="admin-users-card-actions">
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value as UserRoleFilter)}
+                  aria-label="계정 목록 역할 필터"
+                >
+                  {USER_ROLE_FILTERS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <span className="mono tnum">{filteredUsers.length}/{users.data.length}</span>
+              </div>
             </div>
             <div className="table-wrap">
               <table className="admin-users-table">
@@ -199,7 +216,7 @@ export function AdminUsersPage() {
                   {users.loading && (
                     <tr><td colSpan={5}>불러오는 중</td></tr>
                   )}
-                  {!users.loading && users.data.map((user) => (
+                  {!users.loading && filteredUsers.map((user) => (
                     <tr key={user.id} className={form.id === user.id ? 'selected' : ''}>
                       <td>
                         <button className="link-button" onClick={() => setForm(formFromUser(user))}>
@@ -271,7 +288,6 @@ export function AdminUsersPage() {
                 ) : (
                   factoryIds.map((factoryId) => {
                     const enabled = selectedAccess.has(factoryId)
-                    const role = selectedAccess.get(factoryId) ?? 'viewer'
                     return (
                       <div className="factory-access-row" key={factoryId}>
                         <label className="check-row">
@@ -285,23 +301,28 @@ export function AdminUsersPage() {
                           />
                           <span className="mono">{factoryId}</span>
                         </label>
-                        <select
-                          value={role}
-                          disabled={!enabled}
-                          onChange={(e) => setForm((current) => ({
-                            ...current,
-                            factories: updateAccessRole(current.factories, factoryId, e.target.value as FactoryAccessRole),
-                          }))}
-                        >
-                          {FACTORY_ROLES.map((item) => (
-                            <option key={item.value} value={item.value}>{item.label}</option>
-                          ))}
-                        </select>
+                        <span className={`factory-role-fixed ${enabled ? 'active' : ''}`}>관리</span>
                       </div>
                     )
                   })
                 )}
               </div>
+
+              {!isGlobal && (
+                <div className="factory-access-panel system-access-panel">
+                  <div className="factory-access-head">
+                    <span>System 권한</span>
+                  </div>
+                  <label className="check-row system-access-row">
+                    <input
+                      type="checkbox"
+                      checked={form.can_view_system}
+                      onChange={(e) => setForm((current) => ({ ...current, can_view_system: e.target.checked }))}
+                    />
+                    <span>클라우드 인프라 보기</span>
+                  </label>
+                </div>
+              )}
 
               <button className="btn primary" onClick={() => { void submit() }} disabled={saving || !form.email || !form.display_name}>
                 <Save size={15} />
