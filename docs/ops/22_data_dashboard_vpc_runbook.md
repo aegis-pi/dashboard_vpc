@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-04
 수정 이력:
+  - 2026-06-04 v3.0  사용자 관리 삭제/정렬/수정 UX 보정 운영 배포 완료. 삭제는 Cognito `AdminDeleteUser` + RDS row 삭제로 변경, 목록은 active 사용자만 역할 우선 정렬. backend image `sha-813f7ed`, ECS task definition revision 36, desired/running 2, `/healthz`와 `/readyz` 정상, 비인증 `/admin/users` 401, Terraform post-apply plan No changes.
   - 2026-06-04 v2.9  Dashboard RBAC 사용자 관리 운영 배포 완료 기준 추가. backend image `sha-abb81ed`, ECS task definition revision 33, desired/running 2, `/readyz` `rds_metadata=ok`, `/admin/users` API 인증 보호 및 SPA route 응답 확인.
   - 2026-06-04 v2.8  Dashboard RBAC 사용자 관리 운영 기준 추가. Cognito 로그인 + RDS `app_user/factory/user_factory_access` 권한 모델, ECS task role Cognito AdminCreate/Get/Disable 권한, `/admin/users` 사용자 관리 화면, `RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS` 초기 부트스트랩 절차를 반영.
   - 2026-06-02 v2.7  Cloud Infra dashboard read 화면 배포 반영. Dashboard backend image `sha-26a0a27` ECS task definition revision 28 적용, rollout completed, `/healthz`와 `/readyz` 정상. Dashboard web workflow 성공, S3 sync + CloudFront invalidation 완료. Terraform post-apply plan No changes.
@@ -169,17 +170,17 @@ dependencies.redis = ok
 dependencies.rds_metadata = ok
 ```
 
-2026-06-04 배포 확인:
+2026-06-04 사용자 관리 삭제/정렬/수정 UX 보정 배포 확인:
 
 ```text
-backend image tag = sha-abb81ed
-ECS task definition revision = 33
+backend image tag = sha-813f7ed
+ECS task definition revision = 36
 ECS desired/running = 2/2
 ECS task health = HEALTHY across ap-south-1a and ap-south-1c
 /healthz = ok
 /readyz = dynamodb:ok, redis:ok, rds_metadata:ok
 GET /admin/users without Bearer token = 401
-GET https://dashboard.aegis-pi.cloud/admin/users = 200
+dashboard-web workflow = success
 post-apply terraform plan = No changes
 ```
 
