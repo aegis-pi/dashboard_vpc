@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+from deps.rbac import Principal, get_current_principal
+from main import app
 from services import ddb
 from services.cloud_infra import _status_with_staleness
 
@@ -56,6 +58,46 @@ def _put_cloud_latest(table, fast_age_seconds: int = 60, slow_age_seconds: int =
 
 def test_cloud_infra_returns_available_false_without_item(client, ddb_mock):
     r = client.get("/cloud-infra")
+
+    assert r.status_code == 200
+    assert r.json() == {"available": False}
+
+
+def test_cloud_infra_requires_system_permission_for_factory_admin(client, ddb_mock):
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        user_id="factory-user",
+        cognito_sub="factory-sub",
+        email="factory@example.com",
+        display_name="Factory Admin",
+        global_role="factory_admin",
+        can_view_system=False,
+        status="active",
+        allowed_factory_ids=frozenset({"factory-a"}),
+    )
+    try:
+        r = client.get("/cloud-infra")
+    finally:
+        app.dependency_overrides.pop(get_current_principal, None)
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "System access denied"
+
+
+def test_cloud_infra_allows_factory_admin_with_system_permission(client, ddb_mock):
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        user_id="factory-user",
+        cognito_sub="factory-sub",
+        email="factory@example.com",
+        display_name="Factory Admin",
+        global_role="factory_admin",
+        can_view_system=True,
+        status="active",
+        allowed_factory_ids=frozenset({"factory-a"}),
+    )
+    try:
+        r = client.get("/cloud-infra")
+    finally:
+        app.dependency_overrides.pop(get_current_principal, None)
 
     assert r.status_code == 200
     assert r.json() == {"available": False}

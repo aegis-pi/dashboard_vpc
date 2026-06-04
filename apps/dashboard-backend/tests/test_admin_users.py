@@ -18,6 +18,7 @@ def _super_admin_principal() -> Principal:
         email="admin@example.com",
         display_name="Admin",
         global_role="super_admin",
+        can_view_system=True,
         status="active",
         allowed_factory_ids=None,
     )
@@ -30,6 +31,7 @@ def _factory_admin_principal() -> Principal:
         email="factory@example.com",
         display_name="Factory Admin",
         global_role="factory_admin",
+        can_view_system=False,
         status="active",
         allowed_factory_ids=frozenset({"factory-a"}),
     )
@@ -53,6 +55,7 @@ async def _reset_admin_db():
                     email="existing@example.com",
                     display_name="Existing User",
                     global_role="factory_admin",
+                    can_view_system=False,
                     status="active",
                 ),
                 UserFactoryAccess(user_id="user-existing", factory_id="factory-a", role="admin"),
@@ -88,6 +91,7 @@ def test_admin_list_users_returns_factory_access(client):
         "email": "existing@example.com",
         "display_name": "Existing User",
         "global_role": "factory_admin",
+        "can_view_system": False,
         "status": "active",
         "factories": [{"factory_id": "factory-a", "role": "admin"}],
     }
@@ -110,6 +114,7 @@ def test_admin_create_user_calls_cognito_and_stores_access(client, monkeypatch):
             "email": "factory-c-admin@example.com",
             "display_name": "C 관리자",
             "global_role": "factory_admin",
+            "can_view_system": True,
             "factories": [{"factory_id": "factory-c", "role": "admin"}],
         },
     )
@@ -118,7 +123,41 @@ def test_admin_create_user_calls_cognito_and_stores_access(client, monkeypatch):
     body = r.json()
     assert calls == [("factory-c-admin@example.com", "C 관리자")]
     assert body["cognito_sub"] == "new-cognito-sub"
+    assert body["can_view_system"] is True
     assert body["factories"] == [{"factory_id": "factory-c", "role": "admin"}]
+
+
+def test_admin_create_factory_admin_normalizes_factory_roles_to_admin(client, monkeypatch):
+    monkeypatch.setattr(cognito_admin, "create_user", lambda email, display_name: "viewer-role-sub")
+
+    r = client.post(
+        "/admin/users",
+        json={
+            "email": "viewer-role@example.com",
+            "display_name": "Viewer Role",
+            "global_role": "factory_admin",
+            "factories": [{"factory_id": "factory-b", "role": "viewer"}],
+        },
+    )
+
+    assert r.status_code == 201
+    assert r.json()["factories"] == [{"factory_id": "factory-b", "role": "admin"}]
+
+
+def test_admin_create_user_rejects_removed_global_roles(client, monkeypatch):
+    monkeypatch.setattr(cognito_admin, "create_user", lambda email, display_name: "unused")
+
+    r = client.post(
+        "/admin/users",
+        json={
+            "email": "viewer@example.com",
+            "display_name": "Viewer",
+            "global_role": "viewer",
+            "factories": [],
+        },
+    )
+
+    assert r.status_code == 422
 
 
 def test_admin_update_user_replaces_factory_access(client):
@@ -138,7 +177,7 @@ def test_admin_update_user_replaces_factory_access(client):
     assert body["display_name"] == "A-B 관리자"
     assert body["factories"] == [
         {"factory_id": "factory-a", "role": "admin"},
-        {"factory_id": "factory-b", "role": "viewer"},
+        {"factory_id": "factory-b", "role": "admin"},
     ]
 
 

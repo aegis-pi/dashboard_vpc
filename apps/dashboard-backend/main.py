@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
-from routers import admin_users, cloud_infra, factories, reports, ws
+from routers import admin_users, auth_me, cloud_infra, factories, reports, ws
 from services import ddb
 from services.metadata import check_metadata_db, ensure_metadata_schema
 from services.redis_client import get_redis
@@ -32,6 +32,7 @@ app.include_router(factories.router)
 app.include_router(cloud_infra.router)
 app.include_router(reports.router)
 app.include_router(admin_users.router)
+app.include_router(auth_me.router)
 app.include_router(ws.router)
 
 

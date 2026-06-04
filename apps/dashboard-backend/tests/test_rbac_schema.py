@@ -81,9 +81,9 @@ async def _assert_metadata_sync_persists_bootstrap_super_admins():
         ).scalars().all()
 
     assert {
-        (user.cognito_sub, user.email, user.display_name, user.global_role, user.status)
+        (user.cognito_sub, user.email, user.display_name, user.global_role, user.can_view_system, user.status)
         for user in users
     } == {
-        ("test-user", "test-user@example.com", "Admin test-user", "super_admin", "active"),
-        ("test-user-sub", "test-user-sub@example.com", "Admin test-user-sub", "super_admin", "active"),
+        ("test-user", "test-user@example.com", "Admin test-user", "super_admin", True, "active"),
+        ("test-user-sub", "test-user-sub@example.com", "Admin test-user-sub", "super_admin", True, "active"),
     }

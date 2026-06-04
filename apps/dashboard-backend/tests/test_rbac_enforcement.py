@@ -10,6 +10,7 @@ def _factory_a_principal() -> Principal:
         email="factory-a-admin@example.com",
         display_name="FACTORY A 관리자",
         global_role="factory_admin",
+        can_view_system=False,
         status="active",
         allowed_factory_ids=frozenset({"factory-a"}),
     )
@@ -22,6 +23,7 @@ def _super_admin_principal() -> Principal:
         email="test@example.com",
         display_name="Test User",
         global_role="super_admin",
+        can_view_system=True,
         status="active",
         allowed_factory_ids=None,
     )

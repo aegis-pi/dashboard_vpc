@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select, text
+from sqlalchemy import inspect, select, text
 
 from config import Settings, get_settings
 from db.models import AppUser, Factory, GlobalRole, UserStatus
@@ -41,6 +41,13 @@ async def ensure_metadata_schema(settings: Settings | None = None) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        def _ensure_system_column(sync_conn):
+            columns = {column["name"] for column in inspect(sync_conn).get_columns("app_user")}
+            if "can_view_system" not in columns:
+                sync_conn.execute(text("ALTER TABLE app_user ADD COLUMN can_view_system BOOLEAN NOT NULL DEFAULT false"))
+
+        await conn.run_sync(_ensure_system_column)
+
     Session = _factory(settings.database_url)
     async with Session() as session:
         for factory_id in _configured_factory_ids(settings):
@@ -70,6 +77,7 @@ async def ensure_metadata_schema(settings: Settings | None = None) -> None:
                     email=email,
                     display_name=display_name,
                     global_role=GlobalRole.SUPER_ADMIN.value,
+                    can_view_system=True,
                     status=UserStatus.ACTIVE.value,
                 )
                 session.add(user)
@@ -77,6 +85,7 @@ async def ensure_metadata_schema(settings: Settings | None = None) -> None:
                 user.email = email
                 user.display_name = display_name
                 user.global_role = GlobalRole.SUPER_ADMIN.value
+                user.can_view_system = True
                 user.status = UserStatus.ACTIVE.value
 
         await session.commit()

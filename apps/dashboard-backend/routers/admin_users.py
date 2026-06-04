@@ -23,13 +23,15 @@ class FactoryAccessIn(BaseModel):
 class UserCreateIn(BaseModel):
     email: str = Field(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", max_length=255)
     display_name: str = Field(min_length=1, max_length=120)
-    global_role: str = Field(pattern="^(super_admin|org_admin|factory_admin|viewer)$")
+    global_role: str = Field(pattern="^(super_admin|factory_admin)$")
+    can_view_system: bool = False
     factories: list[FactoryAccessIn] = Field(default_factory=list)
 
 
 class UserUpdateIn(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=120)
-    global_role: str | None = Field(default=None, pattern="^(super_admin|org_admin|factory_admin|viewer)$")
+    global_role: str | None = Field(default=None, pattern="^(super_admin|factory_admin)$")
+    can_view_system: bool | None = None
     factories: list[FactoryAccessIn] | None = None
 
 
@@ -40,6 +42,7 @@ def _serialize_user(user: AppUser, access: list[UserFactoryAccess]) -> dict:
         "email": user.email,
         "display_name": user.display_name,
         "global_role": user.global_role,
+        "can_view_system": bool(user.can_view_system),
         "status": user.status,
         "factories": [
             {"factory_id": row.factory_id, "role": row.role}
@@ -98,6 +101,15 @@ def _validate_access_for_role(global_role: str, factories: list[FactoryAccessIn]
         )
 
 
+def _normalize_access_for_role(global_role: str, factories: list[FactoryAccessIn]) -> list[FactoryAccessIn]:
+    if global_role == GlobalRole.FACTORY_ADMIN.value:
+        return [
+            FactoryAccessIn(factory_id=access.factory_id, role=FactoryRole.ADMIN.value)
+            for access in factories
+        ]
+    return factories
+
+
 @router.get("")
 async def list_users(
     principal: Principal = Depends(get_current_principal),
@@ -117,8 +129,9 @@ async def create_user(
     session: AsyncSession = Depends(get_db),
 ):
     require_user_admin(principal)
-    _validate_access_for_role(payload.global_role, payload.factories)
-    await _ensure_factories_exist(session, payload.factories)
+    factories = _normalize_access_for_role(payload.global_role, payload.factories)
+    _validate_access_for_role(payload.global_role, factories)
+    await _ensure_factories_exist(session, factories)
 
     exists = await session.execute(select(AppUser).where(AppUser.email == str(payload.email)))
     if exists.scalar_one_or_none() is not None:
@@ -135,11 +148,12 @@ async def create_user(
         email=str(payload.email),
         display_name=payload.display_name,
         global_role=payload.global_role,
+        can_view_system=payload.global_role == GlobalRole.SUPER_ADMIN.value or payload.can_view_system,
         status=UserStatus.ACTIVE.value,
     )
     session.add(user)
     await session.flush()
-    await _replace_access(session, user.id, payload.factories)
+    await _replace_access(session, user.id, factories)
     session.add(
         AuditLog(
             actor_user_id=principal.user_id,
@@ -176,6 +190,7 @@ async def update_user(
             FactoryAccessIn(factory_id=row.factory_id, role=row.role)
             for row in existing.get(user.id, [])
         ]
+    next_factories = _normalize_access_for_role(next_global_role, next_factories)
     _validate_access_for_role(next_global_role, next_factories)
     await _ensure_factories_exist(session, next_factories)
 
@@ -183,6 +198,10 @@ async def update_user(
         user.display_name = payload.display_name
     if payload.global_role is not None:
         user.global_role = payload.global_role
+    if payload.can_view_system is not None:
+        user.can_view_system = next_global_role == GlobalRole.SUPER_ADMIN.value or payload.can_view_system
+    elif next_global_role == GlobalRole.SUPER_ADMIN.value:
+        user.can_view_system = True
     if payload.factories is not None or next_global_role in {GlobalRole.SUPER_ADMIN.value, GlobalRole.ORG_ADMIN.value}:
         await _replace_access(session, user.id, next_factories)
 

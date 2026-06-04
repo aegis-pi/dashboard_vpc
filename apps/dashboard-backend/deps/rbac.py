@@ -20,6 +20,7 @@ class Principal:
     email: str
     display_name: str
     global_role: str
+    can_view_system: bool
     status: str
     allowed_factory_ids: frozenset[str] | None
 
@@ -30,6 +31,10 @@ class Principal:
     @property
     def can_manage_users(self) -> bool:
         return self.global_role in {GlobalRole.SUPER_ADMIN.value, GlobalRole.ORG_ADMIN.value}
+
+    @property
+    def can_access_system(self) -> bool:
+        return self.can_manage_users or self.can_view_system
 
 
 def _bootstrap_subs(settings: Settings) -> set[str]:
@@ -51,6 +56,7 @@ def _bootstrap_principal(claims: dict, settings: Settings) -> Principal | None:
         email=email,
         display_name=email,
         global_role=GlobalRole.SUPER_ADMIN.value,
+        can_view_system=True,
         status=UserStatus.ACTIVE.value,
         allowed_factory_ids=None,
     )
@@ -100,6 +106,7 @@ async def principal_from_claims(
         email=user.email,
         display_name=user.display_name,
         global_role=user.global_role,
+        can_view_system=bool(user.can_view_system),
         status=user.status,
         allowed_factory_ids=allowed_factory_ids,
     )
@@ -121,3 +128,8 @@ def require_factory_access(principal: Principal, factory_id: str) -> None:
 def require_user_admin(principal: Principal) -> None:
     if not principal.can_manage_users:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User admin access denied")
+
+
+def require_system_access(principal: Principal) -> None:
+    if not principal.can_access_system:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System access denied")

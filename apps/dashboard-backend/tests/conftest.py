@@ -185,6 +185,7 @@ def client():
         email="test@example.com",
         display_name="Test User",
         global_role="super_admin",
+        can_view_system=True,
         status="active",
         allowed_factory_ids=None,
     )

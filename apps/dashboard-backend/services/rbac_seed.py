@@ -15,6 +15,7 @@ class SeedUser:
     email: str
     display_name: str
     global_role: str
+    can_view_system: bool
     factories: tuple[tuple[str, str], ...]
 
 
@@ -31,6 +32,7 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         email="head-admin@example.com",
         display_name="본사 관리자",
         global_role=GlobalRole.SUPER_ADMIN.value,
+        can_view_system=True,
         factories=(),
     ),
     SeedUser(
@@ -39,6 +41,7 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         email="factory-a-admin@example.com",
         display_name="FACTORY A 관리자",
         global_role=GlobalRole.FACTORY_ADMIN.value,
+        can_view_system=False,
         factories=(("factory-a", FactoryRole.ADMIN.value),),
     ),
     SeedUser(
@@ -47,6 +50,7 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         email="factory-ab-admin@example.com",
         display_name="A-B 관리자",
         global_role=GlobalRole.FACTORY_ADMIN.value,
+        can_view_system=True,
         factories=(("factory-a", FactoryRole.ADMIN.value), ("factory-b", FactoryRole.ADMIN.value)),
     ),
     SeedUser(
@@ -55,6 +59,7 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         email="factory-ac-admin@example.com",
         display_name="A-C 관리자",
         global_role=GlobalRole.FACTORY_ADMIN.value,
+        can_view_system=False,
         factories=(("factory-a", FactoryRole.ADMIN.value), ("factory-c", FactoryRole.ADMIN.value)),
     ),
     SeedUser(
@@ -63,6 +68,7 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         email="factory-c-admin@example.com",
         display_name="C 관리자",
         global_role=GlobalRole.FACTORY_ADMIN.value,
+        can_view_system=False,
         factories=(("factory-c", FactoryRole.ADMIN.value),),
     ),
 )
@@ -91,6 +97,7 @@ async def seed_rbac_reference_data(
                 email=seed.email,
                 display_name=seed.display_name,
                 global_role=seed.global_role,
+                can_view_system=seed.can_view_system,
                 status=UserStatus.ACTIVE.value,
             )
             session.add(user)
@@ -99,6 +106,7 @@ async def seed_rbac_reference_data(
             user.email = seed.email
             user.display_name = seed.display_name
             user.global_role = seed.global_role
+            user.can_view_system = seed.can_view_system
             user.status = UserStatus.ACTIVE.value
 
         for factory_id, role in seed.factories:
