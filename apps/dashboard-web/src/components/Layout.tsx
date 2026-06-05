@@ -124,7 +124,7 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
                   className={`nav-item ${isActive ? 'active' : ''}`}
                   onClick={() => go(`/factory/${f.factory_id}`)}
                   aria-label={`${f.factory_id} 공장 상세`}
-                  title={`${f.factory_id} · ${f.risk_score ?? '미수신'}`}
+                  title={`${f.factory_id} · ${f.risk_score ?? '—'}`}
                 >
                   <span className="nav-factory-mark">
                     <span className="nav-risk-dot" style={{ background: dotColor }} />

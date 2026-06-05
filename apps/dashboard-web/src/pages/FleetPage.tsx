@@ -290,7 +290,7 @@ function FactoryCard({
       type="button"
       className="card factory-card"
       onClick={onClick}
-      aria-label={`${f.factory_id} 공장 상세 보기, 현재 점수 ${score ?? '미수신'}`}
+      aria-label={`${f.factory_id} 공장 상세 보기, 현재 점수 ${score ?? '—'}`}
     >
       <div className="factory-card-accent" style={{ background: color }} />
 
@@ -314,7 +314,7 @@ function FactoryCard({
             <div className="factory-meta-line">
               <span>node</span>
               <strong className="tnum">
-                {f.nodeReady != null && f.nodeTotal != null ? `${f.nodeReady}/${f.nodeTotal}` : '미수신'}
+                {f.nodeReady != null && f.nodeTotal != null ? `${f.nodeReady}/${f.nodeTotal}` : '—'}
               </strong>
             </div>
             <PipelineBadge status={f.pipeline} />

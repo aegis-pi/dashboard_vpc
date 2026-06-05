@@ -20,8 +20,8 @@ describe('riskColor', () => {
 })
 
 describe('relTime', () => {
-  it('returns 미수신 for undefined', () => {
-    expect(relTime(undefined)).toBe('미수신')
+  it('returns dash for undefined', () => {
+    expect(relTime(undefined)).toBe('—')
   })
   it('returns 방금 for recent timestamp', () => {
     const now = new Date().toISOString()

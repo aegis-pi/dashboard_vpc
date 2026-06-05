@@ -64,7 +64,7 @@ describe('cloud infra adapter', () => {
   })
 
   it('formats age seconds compactly', () => {
-    expect(secondsLabel(null)).toBe('미수신')
+    expect(secondsLabel(null)).toBe('—')
     expect(secondsLabel(42)).toBe('42s')
     expect(secondsLabel(180)).toBe('3m')
     expect(secondsLabel(7200)).toBe('2h')
