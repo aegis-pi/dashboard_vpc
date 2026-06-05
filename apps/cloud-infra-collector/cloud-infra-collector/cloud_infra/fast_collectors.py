@@ -220,6 +220,7 @@ def _redis_summary(config: dict, now) -> dict:
         "status": group.get("Status"),
         "node_count": len(member_clusters),
         "cpu_utilization_avg": _avg_present(values.get("cpu") or []),
+        "memory_usage_percent": _avg_present(values.get("memory_usage_percent") or []),
         "freeable_memory_mib": _bytes_to_mib(_sum_present(values.get("memory") or [])),
         "current_connections": _int_or_none(_sum_present(values.get("connections") or [])),
         "evictions_5m": int(_sum_present(values.get("evictions") or []) or 0),
@@ -236,6 +237,7 @@ def _redis_metric_values(member_clusters: list[str], now, minutes: int) -> dict:
         ]
         for field, metric_name, stat in [
             ("cpu", "EngineCPUUtilization", "Average"),
+            ("memory_usage_percent", "DatabaseMemoryUsagePercentage", "Average"),
             ("memory", "FreeableMemory", "Average"),
             ("connections", "CurrConnections", "Average"),
             ("evictions", "Evictions", "Sum"),
@@ -244,7 +246,7 @@ def _redis_metric_values(member_clusters: list[str], now, minutes: int) -> dict:
             lookup[metric_id] = field
             queries.append(_metric_query(metric_id, "AWS/ElastiCache", metric_name, stat, dimensions))
     raw = _get_metric_values(queries, now, minutes) if queries else {}
-    result = {"cpu": [], "memory": [], "connections": [], "evictions": []}
+    result = {"cpu": [], "memory_usage_percent": [], "memory": [], "connections": [], "evictions": []}
     for metric_id, value in raw.items():
         result[lookup[metric_id]].append(value)
     return result
@@ -269,6 +271,8 @@ def _rds_summary(config: dict, now) -> dict:
         "database_connections": _int_or_none(values.get("rds_connections")),
         "freeable_memory_mib": _bytes_to_mib(values.get("rds_memory")),
         "free_storage_mib": _bytes_to_mib(values.get("rds_storage")),
+        "allocated_storage_gib": instance.get("AllocatedStorage"),
+        "max_allocated_storage_gib": instance.get("MaxAllocatedStorage"),
     }
 
 

@@ -8,8 +8,10 @@ export type CloudInfraTone = 'safe' | 'warn' | 'crit' | 'unk'
 
 export function cloudInfraTone(status?: CloudInfraStatusValue | string): CloudInfraTone {
   if (status === 'normal') return 'safe'
+  if (status === 'available' || status === 'active' || status === 'healthy' || status === 'ENABLED') return 'safe'
   if (status === 'warning') return 'warn'
   if (status === 'critical') return 'crit'
+  if (status === 'stopped' || status === 'failed' || status === 'deleting') return 'crit'
   return 'unk'
 }
 
@@ -25,6 +27,7 @@ export function cloudInfraStatusLabel(status?: CloudInfraStatusValue | string): 
   if (status === 'normal') return '정상'
   if (status === 'warning') return '주의'
   if (status === 'critical') return '위험'
+  if (status && status !== 'unknown') return status
   return '미확인'
 }
 

@@ -78,6 +78,22 @@ function valueWithUnit(value: number | null | undefined, unit: string, digits = 
   return `${numberLabel(value, digits)}${unit}`
 }
 
+function gibToMib(value: number | null | undefined): number | null {
+  if (value == null || Number.isNaN(value)) return null
+  return value * 1024
+}
+
+function mibLabel(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '-'
+  if (value >= 1024) return `${numberLabel(value / 1024, 1)} GiB`
+  return `${numberLabel(value, 0)} MiB`
+}
+
+function percentLabel(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '-'
+  return `${numberLabel(Math.max(0, Math.min(100, value)), 1)}%`
+}
+
 function errorCount(errors?: CloudInfraError[]): number {
   return errors?.length ?? 0
 }
@@ -203,17 +219,79 @@ function DependencyRail({ rows }: { rows: ComponentRow[] }) {
 }
 
 function StatusHistoryBar({ items }: { items: CloudInfraHistoryItem[] }) {
-  const latest = items.slice(0, 60).reverse()
+  const latest = items.slice(-60)
   if (latest.length === 0) return <div className="micro">history 수집 대기</div>
+  const first = latest[0]
+  const last = latest[latest.length - 1]
   return (
-    <div className="status-bar" aria-label="최근 상태 흐름">
-      {latest.map((item, index) => (
-        <span
-          key={item.sk ?? `${item.updated_at ?? 'item'}-${index}`}
-          className={`status-seg ${cloudInfraTone(item.overall_status)}`}
-          title={`${item.updated_at ?? item.sk ?? ''} · ${cloudInfraStatusLabel(item.overall_status)}`}
-        />
-      ))}
+    <div className="status-flow" aria-label="최근 1시간 상태 흐름">
+      <div className="status-flow-scale">
+        <span>1시간 전</span>
+        <span className="status-flow-now">최신</span>
+      </div>
+      <div className="status-bar">
+        {latest.map((item, index) => (
+          <span
+            key={item.sk ?? `${item.updated_at ?? 'item'}-${index}`}
+            className={`status-seg ${cloudInfraTone(item.overall_status)}`}
+            title={`${item.updated_at ?? item.sk ?? ''} · ${cloudInfraStatusLabel(item.overall_status)}`}
+          />
+        ))}
+      </div>
+      <div className="status-flow-caption">
+        <span>{first?.updated_at ? relTime(first.updated_at) : 'oldest sample'}</span>
+        <span>{last?.updated_at ? relTime(last.updated_at) : 'latest sample'}</span>
+      </div>
+    </div>
+  )
+}
+
+function CapacityBar({ usedPercent }: { usedPercent: number | null }) {
+  const pct = usedPercent == null || Number.isNaN(usedPercent) ? null : Math.max(0, Math.min(100, usedPercent))
+  return (
+    <div className="capacity-bar" aria-hidden="true">
+      <span style={{ width: `${pct ?? 0}%` }} />
+    </div>
+  )
+}
+
+function DatastoreResourceRow({
+  name,
+  status,
+  primary,
+  secondary,
+  usedPercent,
+  metrics,
+}: {
+  name: string
+  status?: string
+  primary: string
+  secondary: string
+  usedPercent: number | null
+  metrics: { label: string; value: string | number }[]
+}) {
+  return (
+    <div className="datastore-resource-row">
+      <div className="datastore-resource-head">
+        <div>
+          <div className="datastore-resource-name">{name}</div>
+          <div className="micro">{secondary}</div>
+        </div>
+        <StatusPill status={status} />
+      </div>
+      <div className="datastore-resource-primary">
+        <span>{primary}</span>
+        <span>{usedPercent == null ? '총량 미수집' : percentLabel(usedPercent)}</span>
+      </div>
+      <CapacityBar usedPercent={usedPercent} />
+      <div className="datastore-resource-metrics">
+        {metrics.map((metric) => (
+          <div key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -326,6 +404,22 @@ export function CloudInfraPage() {
   const freshness = fast?.factory_freshness
   const eks = slow?.eks_management
   const storage = slow?.storage_freshness
+  const redisTotalMemoryMib = datastores?.redis?.total_memory_mib ?? datastores?.redis?.cache_node_memory_mib ?? null
+  const redisFreeMemoryMib = datastores?.redis?.freeable_memory_mib ?? null
+  const redisUsedMemoryMib = redisTotalMemoryMib != null && redisFreeMemoryMib != null
+    ? Math.max(0, redisTotalMemoryMib - redisFreeMemoryMib)
+    : null
+  const redisUsedPercent = redisTotalMemoryMib != null && redisUsedMemoryMib != null && redisTotalMemoryMib > 0
+    ? (redisUsedMemoryMib / redisTotalMemoryMib) * 100
+    : datastores?.redis?.memory_usage_percent ?? null
+  const rdsTotalStorageMib = gibToMib(datastores?.rds?.allocated_storage_gib)
+  const rdsFreeStorageMib = datastores?.rds?.free_storage_mib ?? null
+  const rdsUsedStorageMib = rdsTotalStorageMib != null && rdsFreeStorageMib != null
+    ? Math.max(0, rdsTotalStorageMib - rdsFreeStorageMib)
+    : null
+  const rdsUsedPercent = rdsTotalStorageMib != null && rdsUsedStorageMib != null && rdsTotalStorageMib > 0
+    ? (rdsUsedStorageMib / rdsTotalStorageMib) * 100
+    : null
   const componentRows: ComponentRow[] = [
     {
       id: 'pipeline',
@@ -466,13 +560,35 @@ export function CloudInfraPage() {
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <SectionCard title="Datastores" status={datastores?.status} reasons={datastores?.reasons} errors={datastores?.errors}>
           {datastores ? (
-            <div className="grid-3">
-              <Metric label="Redis" value={datastores.redis?.status ?? '-'} sub={`CPU ${numberLabel(datastores.redis?.cpu_utilization_avg, 1)}%`} />
-              <Metric label="Redis mem" value={valueWithUnit(datastores.redis?.freeable_memory_mib, ' MiB')} sub={`evict ${datastores.redis?.evictions_5m ?? 0}`} />
-              <Metric label="Redis conns" value={datastores.redis?.current_connections ?? '-'} sub="current" />
-              <Metric label="RDS" value={datastores.rds?.status ?? '-'} sub={`CPU ${numberLabel(datastores.rds?.cpu_utilization_avg, 1)}%`} />
-              <Metric label="RDS storage" value={valueWithUnit(datastores.rds?.free_storage_mib, ' MiB')} sub="free" />
-              <Metric label="RDS conns" value={datastores.rds?.database_connections ?? '-'} sub="active" />
+            <div className="datastore-resource-list">
+              <DatastoreResourceRow
+                name="Redis"
+                status={datastores.redis?.status}
+                primary={redisTotalMemoryMib == null
+                  ? `사용률 ${percentLabel(redisUsedPercent)} · 여유 ${mibLabel(redisFreeMemoryMib)}`
+                  : `${mibLabel(redisUsedMemoryMib)} / ${mibLabel(redisTotalMemoryMib)}`}
+                secondary={redisTotalMemoryMib == null ? 'memory usage percent / freeable memory' : 'memory used / total'}
+                usedPercent={redisUsedPercent}
+                metrics={[
+                  { label: 'CPU', value: `${numberLabel(datastores.redis?.cpu_utilization_avg, 1)}%` },
+                  { label: 'Connections', value: datastores.redis?.current_connections ?? '-' },
+                  { label: 'Evictions', value: datastores.redis?.evictions_5m ?? 0 },
+                ]}
+              />
+              <DatastoreResourceRow
+                name="RDS"
+                status={datastores.rds?.status}
+                primary={rdsTotalStorageMib == null
+                  ? `여유 ${mibLabel(rdsFreeStorageMib)}`
+                  : `${mibLabel(rdsUsedStorageMib)} / ${mibLabel(rdsTotalStorageMib)}`}
+                secondary={rdsTotalStorageMib == null ? 'free storage 기준' : 'storage used / allocated'}
+                usedPercent={rdsUsedPercent}
+                metrics={[
+                  { label: 'CPU', value: `${numberLabel(datastores.rds?.cpu_utilization_avg, 1)}%` },
+                  { label: 'Connections', value: datastores.rds?.database_connections ?? '-' },
+                  { label: 'Free mem', value: mibLabel(datastores.rds?.freeable_memory_mib) },
+                ]}
+              />
             </div>
           ) : (
             <div className="micro">Redis/RDS 수집 대기 — collector가 <code>fast.datastores</code>를 쓰면 자동 표시됩니다.</div>

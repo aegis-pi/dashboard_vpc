@@ -287,7 +287,10 @@ export interface CloudInfraRedis {
   replication_group_id?: string
   status?: string
   node_count?: number | null
+  total_memory_mib?: number | null
+  cache_node_memory_mib?: number | null
   cpu_utilization_avg?: number | null
+  memory_usage_percent?: number | null
   freeable_memory_mib?: number | null
   current_connections?: number | null
   evictions_5m?: number | null
@@ -300,6 +303,8 @@ export interface CloudInfraRds {
   database_connections?: number | null
   freeable_memory_mib?: number | null
   free_storage_mib?: number | null
+  allocated_storage_gib?: number | null
+  max_allocated_storage_gib?: number | null
 }
 
 export interface CloudInfraEcs {
