@@ -74,7 +74,13 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
   return (
     <nav className={`sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="주요 탐색">
       {/* Logo */}
-      <div className="sidebar-logo">
+      <button
+        type="button"
+        className="sidebar-logo"
+        onClick={() => go('/')}
+        aria-label="전체 개요로 이동"
+        title="전체 개요"
+      >
         <div className="sidebar-logo-mark">
           <span className="serif" style={{ fontSize: 18, lineHeight: 1 }}>π</span>
         </div>
@@ -85,7 +91,7 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
           </div>
           <div className="sidebar-subtitle">Risk Twin</div>
         </div>
-      </div>
+      </button>
 
       {/* Navigation */}
       <div className="sidebar-nav">
