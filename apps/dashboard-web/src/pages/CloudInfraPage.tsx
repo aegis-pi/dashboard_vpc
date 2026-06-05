@@ -24,6 +24,13 @@ function StatusPill({ status }: { status?: CloudInfraStatusValue | string }) {
   )
 }
 
+function reasonTone(reason: string, fallbackStatus?: CloudInfraStatusValue | string) {
+  if (reason.includes('=critical') || reason.includes('critical')) return 'crit'
+  if (reason.includes('=warning') || reason.includes('warning')) return 'warn'
+  const tone = cloudInfraTone(fallbackStatus)
+  return tone === 'safe' ? 'warn' : tone
+}
+
 // reasons[] = collector-provided justification for warning/critical; errors[] =
 // per-section collection failures shown when status is unknown. The frontend
 // shows them verbatim (doc29 contract) and never recomputes thresholds.
@@ -34,7 +41,6 @@ function SectionMeta({
   reasons?: string[]
   errors?: CloudInfraError[]
 }) {
-  const tone = cloudInfraTone(status)
   const hasReasons = (reasons?.length ?? 0) > 0
   const hasErrors = (errors?.length ?? 0) > 0
   if (!hasReasons && !hasErrors) return null
@@ -43,7 +49,7 @@ function SectionMeta({
       {hasReasons && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {reasons!.map((reason) => (
-            <span key={reason} className={`pill ${tone === 'safe' ? 'warn' : tone}`} style={{ padding: '2px 7px', fontSize: 10.5 }}>
+            <span key={reason} className={`pill ${reasonTone(reason, status)}`} style={{ padding: '2px 7px', fontSize: 10.5 }}>
               <span className="dot" />{reason}
             </span>
           ))}
@@ -99,6 +105,10 @@ function usageText(used: number | null, total: number | null, usedPercent: numbe
   if (used != null && total != null) return `사용 ${mibLabel(used)} / 총 ${mibLabel(total)}`
   if (percent != null) return `사용률 ${percentLabel(percent)}`
   return '사용량 수집 대기'
+}
+
+function usagePercentText(usedPercent: number | null): string {
+  return usedPercent == null || Number.isNaN(usedPercent) ? '계산 대기' : percentLabel(usedPercent)
 }
 
 function usageSubText(usedPercent: number | null, free: number | null, total: number | null): string {
@@ -324,7 +334,7 @@ function DatastoreResourceRow({
       </div>
       <div className="datastore-resource-primary">
         <span>{primary}</span>
-        <span>{usedPercent == null ? '사용률 미수집' : percentLabel(usedPercent)}</span>
+        <span>{usagePercentText(usedPercent)}</span>
       </div>
       <CapacityBar usedPercent={usedPercent} />
       <div className="datastore-resource-metrics">
