@@ -263,7 +263,7 @@ function DependencyRail({ rows }: { rows: ComponentRow[] }) {
     <div className="cloud-rail-card">
       <div className="cloud-rail-head">
         <div className="cloud-rail-title">의존성 흐름</div>
-        <div className="micro">수집 → 서빙 → 저장소 → 영구 저장 → 관리 플레인 순서의 상태 전파를 봅니다.</div>
+        <div className="micro">수집/처리 → 데이터 저장소 → 영구 저장 → Dashboard 서빙 순서의 데이터 의존 경로입니다.</div>
       </div>
       <div className="cloud-rail">
         {rows.map((row, index) => (
@@ -537,10 +537,9 @@ export function CloudInfraPage() {
   ]
   const railRows = [
     componentRows[0],
-    componentRows[1],
     componentRows[2],
     componentRows[5],
-    componentRows[4],
+    componentRows[1],
   ]
 
   return (
