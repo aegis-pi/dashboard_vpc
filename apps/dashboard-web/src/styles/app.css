@@ -1465,6 +1465,67 @@ input { font-family: inherit; }
   background: var(--line-3);
   margin-left: 4px;
 }
+.runtime-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.runtime-row {
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+.runtime-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.runtime-row-title {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.runtime-row-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.runtime-row-metrics div {
+  min-width: 0;
+  background: var(--surface-2);
+  padding: 9px 10px;
+}
+.runtime-row-metrics span,
+.runtime-row-metrics strong,
+.runtime-row-metrics em {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.runtime-row-metrics span {
+  color: var(--ink-4);
+  font-size: 10.5px;
+  margin-bottom: 4px;
+}
+.runtime-row-metrics strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+.runtime-row-metrics em {
+  color: var(--ink-4);
+  font-size: 10.5px;
+  font-style: normal;
+  margin-top: 2px;
+}
 .status-bar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(4px, 1fr));
@@ -1635,6 +1696,9 @@ input { font-family: inherit; }
   .cloud-health-strip { grid-template-columns: 1fr; }
   .cloud-health-main { grid-column: auto; }
   .cloud-health-title { font-size: 21px; }
+  .runtime-row-metrics {
+    grid-template-columns: 1fr;
+  }
   .datastore-resource-head,
   .datastore-resource-primary {
     align-items: flex-start;

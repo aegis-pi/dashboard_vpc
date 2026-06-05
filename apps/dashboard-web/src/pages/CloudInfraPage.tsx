@@ -355,6 +355,34 @@ function DatastoreResourceRow({
   )
 }
 
+function RuntimeRow({
+  title,
+  status,
+  metrics,
+}: {
+  title: string
+  status?: CloudInfraStatusValue | string
+  metrics: { label: string; value: string | number; sub?: string }[]
+}) {
+  return (
+    <div className="runtime-row">
+      <div className="runtime-row-head">
+        <div className="runtime-row-title">{title}</div>
+        <StatusPill status={status} />
+      </div>
+      <div className="runtime-row-metrics">
+        {metrics.map((metric) => (
+          <div key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            {metric.sub && <em>{metric.sub}</em>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SectionCard({
   title, status, reasons, errors, children,
 }: {
@@ -604,13 +632,25 @@ export function CloudInfraPage() {
         </SectionCard>
 
         <SectionCard title="Dashboard 런타임" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
-          <div className="grid-3">
-            <Metric label="ECS 실행" value={`${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`} sub={runtime?.ecs?.status ?? 'unknown'} />
-            <Metric label="CPU 평균" value={`${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%`} />
-            <Metric label="Memory 평균" value={`${numberLabel(runtime?.ecs?.memory_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.memory_utilization_max, 1)}%`} />
-            <Metric label="ALB 정상" value={`${runtime?.alb?.healthy_host_count ?? 0}`} sub={`unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}`} />
-            <Metric label="ALB 5xx" value={runtime?.alb?.target_5xx_count_5m ?? 0} sub="최근 5분" />
-            <Metric label="p95 지연" value={valueWithUnit(runtime?.alb?.target_response_time_p95, 's', 3)} />
+          <div className="runtime-list">
+            <RuntimeRow
+              title="ECS 서비스"
+              status={runtime?.ecs?.status ?? runtime?.status}
+              metrics={[
+                { label: '실행/목표', value: `${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}` },
+                { label: 'CPU 평균', value: `${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%` },
+                { label: 'Memory 평균', value: `${numberLabel(runtime?.ecs?.memory_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.memory_utilization_max, 1)}%` },
+              ]}
+            />
+            <RuntimeRow
+              title="ALB 진입점"
+              status={runtime?.status}
+              metrics={[
+                { label: '정상 target', value: runtime?.alb?.healthy_host_count ?? 0, sub: `unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}` },
+                { label: '5xx', value: runtime?.alb?.target_5xx_count_5m ?? 0, sub: '최근 5분' },
+                { label: 'p95 지연', value: valueWithUnit(runtime?.alb?.target_response_time_p95, 's', 3) },
+              ]}
+            />
           </div>
         </SectionCard>
       </div>
@@ -669,11 +709,6 @@ export function CloudInfraPage() {
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <SectionCard title="관리 플레인" status={eks?.status} reasons={eks?.reasons} errors={eks?.errors}>
-          <div className="grid-3" style={{ marginBottom: 14 }}>
-            <Metric label="EKS 노드" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
-            <Metric label="Pod 실행" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
-            <Metric label="ArgoCD 동기화" value={`${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`} sub={`degraded ${eks?.argocd?.degraded ?? 0}`} />
-          </div>
           <table className="tbl">
             <thead><tr><th>노드</th><th>Ready</th><th>CPU</th><th>Memory</th></tr></thead>
             <tbody>
@@ -687,6 +722,11 @@ export function CloudInfraPage() {
               ))}
             </tbody>
           </table>
+          <div className="grid-3" style={{ marginTop: 14 }}>
+            <Metric label="EKS 노드" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
+            <Metric label="Pod 실행" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
+            <Metric label="ArgoCD 동기화" value={`${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`} sub={`degraded ${eks?.argocd?.degraded ?? 0}`} />
+          </div>
         </SectionCard>
 
         <SectionCard title="스토리지 최신성" status={storage?.status} reasons={storage?.reasons} errors={storage?.errors}>
