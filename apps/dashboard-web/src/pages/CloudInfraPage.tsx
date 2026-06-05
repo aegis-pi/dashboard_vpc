@@ -269,7 +269,6 @@ function DependencyRail({ rows }: { rows: ComponentRow[] }) {
         {rows.map((row, index) => (
           <div className={`cloud-rail-step ${cloudInfraTone(row.status)}`} key={row.id}>
             <span className="rail-index">{index + 1}</span>
-            <span className="rail-dot" />
             <span className="rail-name">{row.name}</span>
             {index < rows.length - 1 && <span className="rail-line" />}
           </div>

@@ -1444,16 +1444,21 @@ input { font-family: inherit; }
   font-size: 10px;
   flex-shrink: 0;
 }
-.rail-dot {
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  background: var(--unk);
-  box-shadow: 0 0 0 3px var(--unk-tint);
-  flex-shrink: 0;
+.cloud-rail-step.safe .rail-index {
+  border-color: color-mix(in srgb, var(--safe) 32%, var(--line-2));
+  background: var(--safe-tint-2);
+  color: var(--safe);
 }
-.cloud-rail-step.safe .rail-dot { background: var(--safe); box-shadow: 0 0 0 3px var(--safe-tint); }
-.cloud-rail-step.warn .rail-dot { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-tint); }
-.cloud-rail-step.crit .rail-dot { background: var(--crit); box-shadow: 0 0 0 3px var(--crit-tint); }
+.cloud-rail-step.warn .rail-index {
+  border-color: color-mix(in srgb, var(--warn) 32%, var(--line-2));
+  background: var(--warn-tint-2);
+  color: var(--warn);
+}
+.cloud-rail-step.crit .rail-index {
+  border-color: color-mix(in srgb, var(--crit) 32%, var(--line-2));
+  background: var(--crit-tint-2);
+  color: var(--crit);
+}
 .rail-line {
   width: 32px;
   height: 1px;
