@@ -137,6 +137,19 @@ function statusRank(status?: CloudInfraStatusValue | string): number {
   return 1
 }
 
+function ratioStatus(running?: number | null, desired?: number | null): CloudInfraStatusValue {
+  if (desired == null || desired <= 0) return 'unknown'
+  if ((running ?? 0) <= 0) return 'critical'
+  if ((running ?? 0) < desired) return 'warning'
+  return 'normal'
+}
+
+function albStatus(healthy?: number | null, unhealthy?: number | null, target5xx?: number | null): CloudInfraStatusValue {
+  if ((healthy ?? 0) <= 0) return 'critical'
+  if ((unhealthy ?? 0) > 0 || (target5xx ?? 0) > 0) return 'warning'
+  return 'normal'
+}
+
 function totalErrorCount(data: CloudInfraStatus): number {
   const fast = data.fast
   const slow = data.slow
@@ -507,21 +520,27 @@ export function CloudInfraPage() {
   const rdsUsedPercent = rdsTotalStorageMib != null && rdsUsedStorageMib != null && rdsTotalStorageMib > 0
     ? (rdsUsedStorageMib / rdsTotalStorageMib) * 100
     : null
+  const lambdaErrors = (pipeline?.lambdas ?? []).reduce((sum, l) => sum + (l.errors_5m ?? 0), 0)
+  const lambdaThrottles = (pipeline?.lambdas ?? []).reduce((sum, l) => sum + (l.throttles_5m ?? 0), 0)
+  const ddbThrottleEvents = (pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)
+  const enabledSchedulers = (pipeline?.schedulers ?? []).filter((s) => s.state === 'ENABLED').length
+  const ecsStatus = ratioStatus(runtime?.ecs?.running_count, runtime?.ecs?.desired_count)
+  const runtimeAlbStatus = albStatus(runtime?.alb?.healthy_host_count, runtime?.alb?.unhealthy_host_count, runtime?.alb?.target_5xx_count_5m)
   const componentRows: ComponentRow[] = [
     {
       id: 'pipeline',
       name: '데이터 파이프라인',
       group: '수집',
       status: pipeline?.status,
-      signal: `Lambda 오류 ${(pipeline?.lambdas ?? []).reduce((sum, fn) => sum + (fn.errors_5m ?? 0), 0)}`,
-      detail: `DDB throttle ${(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} · DLQ ${pipeline?.dlq?.messages_visible ?? 0}`,
+      signal: `Lambda 오류 ${lambdaErrors}`,
+      detail: `DDB throttle ${ddbThrottleEvents} · DLQ ${pipeline?.dlq?.messages_visible ?? 0}`,
       errors: pipeline?.errors,
     },
     {
       id: 'runtime',
       name: 'Dashboard 런타임',
       group: '서빙',
-      status: runtime?.status,
+      status: ecsStatus === 'normal' ? runtimeAlbStatus : ecsStatus,
       signal: `ECS ${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`,
       detail: `ALB healthy ${runtime?.alb?.healthy_host_count ?? 0} · 5xx ${runtime?.alb?.target_5xx_count_5m ?? 0}`,
       errors: runtime?.errors,
@@ -610,32 +629,48 @@ export function CloudInfraPage() {
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
-          <div className="grid-3" style={{ marginBottom: 14 }}>
-            <Metric label="Lambda 오류" value={(pipeline?.lambdas ?? []).reduce((sum, l) => sum + (l.errors_5m ?? 0), 0)} sub="최근 5분" />
-            <Metric label="DDB 제한" value={(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} sub="read + write" />
-            <Metric label="DLQ" value={pipeline?.dlq?.messages_visible ?? '-'} sub={`oldest ${secondsLabel(pipeline?.dlq?.oldest_message_age_seconds)}`} />
-            <Metric label="Schedulers" value={(pipeline?.schedulers ?? []).filter((s) => s.state === 'ENABLED').length} sub={`${pipeline?.schedulers?.length ?? 0} total`} />
+          <div className="runtime-list">
+            <RuntimeRow
+              title="Lambda 처리"
+              status={lambdaErrors > 0 || lambdaThrottles > 0 ? 'warning' : 'normal'}
+              metrics={[
+                { label: '오류', value: lambdaErrors, sub: '최근 5분' },
+                { label: 'Throttle', value: lambdaThrottles, sub: '최근 5분' },
+                { label: '함수', value: pipeline?.lambdas?.length ?? 0 },
+              ]}
+            />
+            <RuntimeRow
+              title="데이터 저장/스케줄"
+              status={ddbThrottleEvents > 0 || (pipeline?.dlq?.messages_visible ?? 0) > 0 || enabledSchedulers < (pipeline?.schedulers?.length ?? 0) ? 'warning' : 'normal'}
+              metrics={[
+                { label: 'DDB 제한', value: ddbThrottleEvents, sub: 'read + write' },
+                { label: 'DLQ', value: pipeline?.dlq?.messages_visible ?? '-', sub: `oldest ${secondsLabel(pipeline?.dlq?.oldest_message_age_seconds)}` },
+                { label: 'Scheduler', value: `${enabledSchedulers}/${pipeline?.schedulers?.length ?? 0}` },
+              ]}
+            />
           </div>
-          <table className="tbl">
-            <thead><tr><th>Lambda</th><th>호출</th><th>오류</th><th>p95</th></tr></thead>
-            <tbody>
-              {(pipeline?.lambdas ?? []).map((fn) => (
-                <tr key={fn.name}>
-                  <td className="mono">{fn.name}</td>
-                  <td className="tnum">{fn.invocations_5m ?? '-'}</td>
-                  <td className="tnum">{fn.errors_5m ?? '-'}</td>
-                  <td className="tnum">{valueWithUnit(fn.duration_p95_ms, 'ms', 1)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="section-table-block">
+            <table className="tbl">
+              <thead><tr><th>Lambda</th><th>호출</th><th>오류</th><th>p95</th></tr></thead>
+              <tbody>
+                {(pipeline?.lambdas ?? []).map((fn) => (
+                  <tr key={fn.name}>
+                    <td className="mono">{fn.name}</td>
+                    <td className="tnum">{fn.invocations_5m ?? '-'}</td>
+                    <td className="tnum">{fn.errors_5m ?? '-'}</td>
+                    <td className="tnum">{valueWithUnit(fn.duration_p95_ms, 'ms', 1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </SectionCard>
 
         <SectionCard title="Dashboard 런타임" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
           <div className="runtime-list">
             <RuntimeRow
               title="ECS 서비스"
-              status={runtime?.ecs?.status ?? runtime?.status}
+              status={ecsStatus}
               metrics={[
                 { label: '실행/목표', value: `${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}` },
                 { label: 'CPU 평균', value: `${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%` },
@@ -644,7 +679,7 @@ export function CloudInfraPage() {
             />
             <RuntimeRow
               title="ALB 진입점"
-              status={runtime?.status}
+              status={runtimeAlbStatus}
               metrics={[
                 { label: '정상 target', value: runtime?.alb?.healthy_host_count ?? 0, sub: `unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}` },
                 { label: '5xx', value: runtime?.alb?.target_5xx_count_5m ?? 0, sub: '최근 5분' },
@@ -722,7 +757,7 @@ export function CloudInfraPage() {
               ))}
             </tbody>
           </table>
-          <div className="grid-3" style={{ marginTop: 14 }}>
+          <div className="section-summary-below">
             <Metric label="EKS 노드" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
             <Metric label="Pod 실행" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
             <Metric label="ArgoCD 동기화" value={`${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`} sub={`degraded ${eks?.argocd?.degraded ?? 0}`} />

@@ -1526,6 +1526,19 @@ input { font-family: inherit; }
   font-style: normal;
   margin-top: 2px;
 }
+.section-table-block {
+  margin-top: 14px;
+  border-top: 1px solid var(--line-2);
+  padding-top: 14px;
+}
+.section-summary-below {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-2);
+}
 .status-bar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(4px, 1fr));
@@ -1697,6 +1710,9 @@ input { font-family: inherit; }
   .cloud-health-main { grid-column: auto; }
   .cloud-health-title { font-size: 21px; }
   .runtime-row-metrics {
+    grid-template-columns: 1fr;
+  }
+  .section-summary-below {
     grid-template-columns: 1fr;
   }
   .datastore-resource-head,

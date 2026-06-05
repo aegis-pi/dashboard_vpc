@@ -7,11 +7,12 @@ import type {
 export type CloudInfraTone = 'safe' | 'warn' | 'crit' | 'unk'
 
 export function cloudInfraTone(status?: CloudInfraStatusValue | string): CloudInfraTone {
-  if (status === 'normal') return 'safe'
-  if (status === 'available' || status === 'active' || status === 'healthy' || status === 'ENABLED') return 'safe'
-  if (status === 'warning') return 'warn'
-  if (status === 'critical') return 'crit'
-  if (status === 'stopped' || status === 'failed' || status === 'deleting') return 'crit'
+  const normalized = status?.toLowerCase()
+  if (normalized === 'normal') return 'safe'
+  if (normalized === 'available' || normalized === 'active' || normalized === 'healthy' || normalized === 'enabled') return 'safe'
+  if (normalized === 'warning') return 'warn'
+  if (normalized === 'critical') return 'crit'
+  if (normalized === 'stopped' || normalized === 'failed' || normalized === 'deleting') return 'crit'
   return 'unk'
 }
 
@@ -24,10 +25,11 @@ export function cloudInfraDotColor(status?: CloudInfraStatusValue | string): str
 }
 
 export function cloudInfraStatusLabel(status?: CloudInfraStatusValue | string): string {
-  if (status === 'normal') return '정상'
-  if (status === 'warning') return '주의'
-  if (status === 'critical') return '위험'
-  if (status && status !== 'unknown') return status
+  const normalized = status?.toLowerCase()
+  if (normalized === 'normal') return '정상'
+  if (normalized === 'warning') return '주의'
+  if (normalized === 'critical') return '위험'
+  if (status && normalized !== 'unknown') return status
   return '미확인'
 }
 
