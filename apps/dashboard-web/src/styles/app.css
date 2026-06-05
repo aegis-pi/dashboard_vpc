@@ -1395,16 +1395,30 @@ input { font-family: inherit; }
 .cloud-row-unk td { background: var(--unk-tint); }
 .cloud-row-warn:hover td { background: var(--warn-tint); }
 .cloud-row-crit:hover td { background: var(--crit-tint); }
-.cloud-rail {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+.cloud-rail-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-card);
   margin-bottom: 16px;
+  overflow: hidden;
+}
+.cloud-rail-head {
+  padding: 12px 14px 9px;
+  border-bottom: 1px solid var(--line-2);
+}
+.cloud-rail-title {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.cloud-rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
   overflow-x: auto;
 }
 .cloud-rail-step {
@@ -1415,6 +1429,20 @@ input { font-family: inherit; }
   color: var(--ink-3);
   font-size: 12px;
   font-weight: 600;
+}
+.rail-index {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex-shrink: 0;
 }
 .rail-dot {
   width: 9px; height: 9px;

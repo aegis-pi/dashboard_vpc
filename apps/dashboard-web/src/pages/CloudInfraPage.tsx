@@ -155,11 +155,11 @@ function totalErrorCount(data: CloudInfraStatus): number {
 function topIssueLabel(data: CloudInfraStatus): string {
   const rows = [
     { label: '데이터 파이프라인', status: data.fast?.data_pipeline?.status, errors: data.fast?.data_pipeline?.errors },
-    { label: 'Dashboard Runtime', status: data.fast?.backend_runtime?.status, errors: data.fast?.backend_runtime?.errors },
-    { label: 'Datastores', status: data.fast?.datastores?.status, errors: data.fast?.datastores?.errors },
-    { label: 'Factory Freshness', status: data.fast?.factory_freshness?.status, errors: data.fast?.factory_freshness?.errors },
-    { label: 'Management Plane', status: data.slow?.eks_management?.status, errors: data.slow?.eks_management?.errors },
-    { label: 'Storage Freshness', status: data.slow?.storage_freshness?.status, errors: data.slow?.storage_freshness?.errors },
+    { label: 'Dashboard 런타임', status: data.fast?.backend_runtime?.status, errors: data.fast?.backend_runtime?.errors },
+    { label: '데이터 저장소', status: data.fast?.datastores?.status, errors: data.fast?.datastores?.errors },
+    { label: '공장 최신성', status: data.fast?.factory_freshness?.status, errors: data.fast?.factory_freshness?.errors },
+    { label: '관리 플레인', status: data.slow?.eks_management?.status, errors: data.slow?.eks_management?.errors },
+    { label: '스토리지 최신성', status: data.slow?.storage_freshness?.status, errors: data.slow?.storage_freshness?.errors },
   ]
   const issue = rows.find((row) => row.status && row.status !== 'normal') ?? rows.find((row) => errorCount(row.errors) > 0)
   return issue ? issue.label : '활성 이슈 없음'
@@ -260,14 +260,21 @@ function StatusLegend() {
 
 function DependencyRail({ rows }: { rows: ComponentRow[] }) {
   return (
-    <div className="cloud-rail">
-      {rows.map((row, index) => (
-        <div className={`cloud-rail-step ${cloudInfraTone(row.status)}`} key={row.id}>
-          <span className="rail-dot" />
-          <span className="rail-name">{row.name}</span>
-          {index < rows.length - 1 && <span className="rail-line" />}
-        </div>
-      ))}
+    <div className="cloud-rail-card">
+      <div className="cloud-rail-head">
+        <div className="cloud-rail-title">의존성 흐름</div>
+        <div className="micro">수집 → 서빙 → 저장소 → 영구 저장 → 관리 플레인 순서의 상태 전파를 봅니다.</div>
+      </div>
+      <div className="cloud-rail">
+        {rows.map((row, index) => (
+          <div className={`cloud-rail-step ${cloudInfraTone(row.status)}`} key={row.id}>
+            <span className="rail-index">{index + 1}</span>
+            <span className="rail-dot" />
+            <span className="rail-name">{row.name}</span>
+            {index < rows.length - 1 && <span className="rail-line" />}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -494,7 +501,7 @@ export function CloudInfraPage() {
     },
     {
       id: 'datastores',
-      name: 'Datastores',
+      name: '데이터 저장소',
       group: '상태 저장소',
       status: datastores?.status,
       signal: `Redis ${datastores?.redis?.status ?? '-'} · RDS ${datastores?.rds?.status ?? '-'}`,
@@ -513,7 +520,7 @@ export function CloudInfraPage() {
     {
       id: 'management',
       name: '관리 플레인',
-      group: 'Control',
+      group: '관리',
       status: eks?.status,
       signal: `Nodes ${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`,
       detail: `Pods ${eks?.pods?.running ?? 0} running · ArgoCD ${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`,
@@ -525,7 +532,7 @@ export function CloudInfraPage() {
       group: '저장',
       status: storage?.status,
       signal: `${storage?.factories?.length ?? 0}개 공장`,
-      detail: `raw / processed / aggregate freshness`,
+      detail: `원본 / 처리 / 집계 최신성`,
       errors: storage?.errors,
     },
   ]
@@ -562,8 +569,8 @@ export function CloudInfraPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <StatusPill status={data.overall_status} />
-          {data.fast_stale && <span className="pill warn"><span className="dot" />fast stale</span>}
-          {data.slow_stale && <span className="pill warn"><span className="dot" />slow stale</span>}
+          {data.fast_stale && <span className="pill warn"><span className="dot" />fast 수집 지연</span>}
+          {data.slow_stale && <span className="pill warn"><span className="dot" />slow 수집 지연</span>}
           <span className="pill info">
             <span className="dot" />
             fast {secondsLabel(data.fast_age_seconds)} · slow {secondsLabel(data.slow_age_seconds)}
@@ -578,13 +585,13 @@ export function CloudInfraPage() {
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
           <div className="grid-3" style={{ marginBottom: 14 }}>
-            <Metric label="Lambda errors" value={(pipeline?.lambdas ?? []).reduce((sum, l) => sum + (l.errors_5m ?? 0), 0)} sub="last 5m" />
-            <Metric label="DDB throttle" value={(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} sub="read + write" />
+            <Metric label="Lambda 오류" value={(pipeline?.lambdas ?? []).reduce((sum, l) => sum + (l.errors_5m ?? 0), 0)} sub="최근 5분" />
+            <Metric label="DDB 제한" value={(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} sub="read + write" />
             <Metric label="DLQ" value={pipeline?.dlq?.messages_visible ?? '-'} sub={`oldest ${secondsLabel(pipeline?.dlq?.oldest_message_age_seconds)}`} />
             <Metric label="Schedulers" value={(pipeline?.schedulers ?? []).filter((s) => s.state === 'ENABLED').length} sub={`${pipeline?.schedulers?.length ?? 0} total`} />
           </div>
           <table className="tbl">
-            <thead><tr><th>Lambda</th><th>Invocations</th><th>Errors</th><th>p95</th></tr></thead>
+            <thead><tr><th>Lambda</th><th>호출</th><th>오류</th><th>p95</th></tr></thead>
             <tbody>
               {(pipeline?.lambdas ?? []).map((fn) => (
                 <tr key={fn.name}>
@@ -600,18 +607,18 @@ export function CloudInfraPage() {
 
         <SectionCard title="Dashboard 런타임" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
           <div className="grid-3">
-            <Metric label="ECS running" value={`${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`} sub={runtime?.ecs?.status ?? 'unknown'} />
-            <Metric label="CPU avg" value={`${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%`} />
-            <Metric label="Memory avg" value={`${numberLabel(runtime?.ecs?.memory_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.memory_utilization_max, 1)}%`} />
-            <Metric label="ALB healthy" value={`${runtime?.alb?.healthy_host_count ?? 0}`} sub={`unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}`} />
-            <Metric label="ALB 5xx" value={runtime?.alb?.target_5xx_count_5m ?? 0} sub="last 5m" />
-            <Metric label="p95 latency" value={valueWithUnit(runtime?.alb?.target_response_time_p95, 's', 3)} />
+            <Metric label="ECS 실행" value={`${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`} sub={runtime?.ecs?.status ?? 'unknown'} />
+            <Metric label="CPU 평균" value={`${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%`} />
+            <Metric label="Memory 평균" value={`${numberLabel(runtime?.ecs?.memory_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.memory_utilization_max, 1)}%`} />
+            <Metric label="ALB 정상" value={`${runtime?.alb?.healthy_host_count ?? 0}`} sub={`unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}`} />
+            <Metric label="ALB 5xx" value={runtime?.alb?.target_5xx_count_5m ?? 0} sub="최근 5분" />
+            <Metric label="p95 지연" value={valueWithUnit(runtime?.alb?.target_response_time_p95, 's', 3)} />
           </div>
         </SectionCard>
       </div>
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <SectionCard title="Datastores" status={datastores?.status} reasons={datastores?.reasons} errors={datastores?.errors}>
+        <SectionCard title="데이터 저장소" status={datastores?.status} reasons={datastores?.reasons} errors={datastores?.errors}>
           {datastores ? (
             <div className="datastore-resource-list">
               <DatastoreResourceRow
@@ -622,7 +629,7 @@ export function CloudInfraPage() {
                 usedPercent={redisUsedPercent}
                 metrics={[
                   { label: 'CPU', value: `${numberLabel(datastores.redis?.cpu_utilization_avg, 1)}%` },
-                  { label: 'Connections', value: datastores.redis?.current_connections ?? '-' },
+                  { label: '연결', value: datastores.redis?.current_connections ?? '-' },
                   { label: 'Evictions', value: datastores.redis?.evictions_5m ?? 0 },
                 ]}
               />
@@ -634,8 +641,8 @@ export function CloudInfraPage() {
                 usedPercent={rdsUsedPercent}
                 metrics={[
                   { label: 'CPU', value: `${numberLabel(datastores.rds?.cpu_utilization_avg, 1)}%` },
-                  { label: 'Connections', value: datastores.rds?.database_connections ?? '-' },
-                  { label: 'Free mem', value: mibLabel(datastores.rds?.freeable_memory_mib) },
+                  { label: '연결', value: datastores.rds?.database_connections ?? '-' },
+                  { label: '여유 메모리', value: mibLabel(datastores.rds?.freeable_memory_mib) },
                 ]}
               />
             </div>
@@ -644,9 +651,9 @@ export function CloudInfraPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Factory Freshness" status={freshness?.status} reasons={freshness?.reasons} errors={freshness?.errors}>
+        <SectionCard title="공장 최신성" status={freshness?.status} reasons={freshness?.reasons} errors={freshness?.errors}>
           <table className="tbl">
-            <thead><tr><th>Factory</th><th>Pipeline</th><th>Infra age</th><th>Last infra</th><th>Risk</th></tr></thead>
+            <thead><tr><th>공장</th><th>파이프라인</th><th>인프라 지연</th><th>마지막 인프라</th><th>위험도</th></tr></thead>
             <tbody>
               {(freshness?.factories ?? []).map((factory) => (
                 <tr key={factory.factory_id}>
@@ -665,12 +672,12 @@ export function CloudInfraPage() {
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <SectionCard title="관리 플레인" status={eks?.status} reasons={eks?.reasons} errors={eks?.errors}>
           <div className="grid-3" style={{ marginBottom: 14 }}>
-            <Metric label="EKS nodes" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
-            <Metric label="Pods running" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
-            <Metric label="ArgoCD synced" value={`${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`} sub={`degraded ${eks?.argocd?.degraded ?? 0}`} />
+            <Metric label="EKS 노드" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
+            <Metric label="Pod 실행" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
+            <Metric label="ArgoCD 동기화" value={`${eks?.argocd?.synced ?? 0}/${eks?.argocd?.applications_total ?? 0}`} sub={`degraded ${eks?.argocd?.degraded ?? 0}`} />
           </div>
           <table className="tbl">
-            <thead><tr><th>Node</th><th>Ready</th><th>CPU</th><th>Memory</th></tr></thead>
+            <thead><tr><th>노드</th><th>Ready</th><th>CPU</th><th>Memory</th></tr></thead>
             <tbody>
               {(eks?.nodes?.items ?? []).map((node) => (
                 <tr key={node.name}>
@@ -686,7 +693,7 @@ export function CloudInfraPage() {
 
         <SectionCard title="스토리지 최신성" status={storage?.status} reasons={storage?.reasons} errors={storage?.errors}>
           <table className="tbl">
-            <thead><tr><th>Factory</th><th>Raw</th><th>Processed</th><th>Aggregate</th></tr></thead>
+            <thead><tr><th>공장</th><th>원본</th><th>처리</th><th>집계</th></tr></thead>
             <tbody>
               {(storage?.factories ?? []).map((factory) => (
                 <tr key={factory.factory_id}>
