@@ -101,9 +101,12 @@ function usageText(used: number | null, total: number | null, usedPercent: numbe
   return '사용량 수집 대기'
 }
 
-function usageSubText(free: number | null, total: number | null): string {
-  if (free == null) return total == null ? '총량 수집 대기' : '여유량 수집 대기'
-  return `여유 ${mibLabel(free)}`
+function usageSubText(usedPercent: number | null, free: number | null, total: number | null): string {
+  const parts: string[] = []
+  if (usedPercent != null && !Number.isNaN(usedPercent)) parts.push(`총 사용량 중 ${percentLabel(usedPercent)} 사용`)
+  if (total != null && !Number.isNaN(total)) parts.push(`총량 ${mibLabel(total)}`)
+  if (free != null && !Number.isNaN(free)) parts.push(`남은 용량 ${mibLabel(free)}`)
+  return parts.length > 0 ? parts.join(' · ') : '사용량/총량 수집 대기'
 }
 
 function usageTone(usedPercent: number | null): 'safe' | 'warn' | 'crit' | 'unk' {
@@ -267,7 +270,6 @@ function StatusHistoryBar({ items }: { items: CloudInfraHistoryItem[] }) {
   return (
     <div className="status-flow" aria-label="최근 1시간 상태 흐름">
       <div className="status-flow-scale">
-        <span>1시간 전</span>
         <span className="status-flow-now">최신</span>
       </div>
       <div className="status-bar">
@@ -606,7 +608,7 @@ export function CloudInfraPage() {
                 name="Redis"
                 status={datastores.redis?.status}
                 primary={usageText(redisUsedMemoryMib, redisTotalMemoryMib, redisUsedPercent, datastores.redis?.memory_usage_percent)}
-                secondary={usageSubText(redisFreeMemoryMib, redisTotalMemoryMib)}
+                secondary={usageSubText(redisUsedPercent, redisFreeMemoryMib, redisTotalMemoryMib)}
                 usedPercent={redisUsedPercent}
                 metrics={[
                   { label: 'CPU', value: `${numberLabel(datastores.redis?.cpu_utilization_avg, 1)}%` },
@@ -618,7 +620,7 @@ export function CloudInfraPage() {
                 name="RDS"
                 status={datastores.rds?.status}
                 primary={usageText(rdsUsedStorageMib, rdsTotalStorageMib, rdsUsedPercent)}
-                secondary={usageSubText(rdsFreeStorageMib, rdsTotalStorageMib)}
+                secondary={usageSubText(rdsUsedPercent, rdsFreeStorageMib, rdsTotalStorageMib)}
                 usedPercent={rdsUsedPercent}
                 metrics={[
                   { label: 'CPU', value: `${numberLabel(datastores.rds?.cpu_utilization_avg, 1)}%` },

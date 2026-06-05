@@ -1444,7 +1444,15 @@ input { font-family: inherit; }
   flex-direction: column;
   gap: 7px;
 }
-.status-flow-scale,
+.status-flow-scale {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
 .status-flow-caption {
   display: flex;
   align-items: center;
