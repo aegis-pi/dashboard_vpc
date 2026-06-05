@@ -94,8 +94,34 @@ function percentLabel(value: number | null | undefined): string {
   return `${numberLabel(Math.max(0, Math.min(100, value)), 1)}%`
 }
 
+function usageText(used: number | null, total: number | null, usedPercent: number | null, fallbackPercent?: number | null): string {
+  const percent = usedPercent ?? fallbackPercent ?? null
+  if (used != null && total != null) return `사용 ${mibLabel(used)} / 총 ${mibLabel(total)}`
+  if (percent != null) return `사용률 ${percentLabel(percent)}`
+  return '사용량 수집 대기'
+}
+
+function usageSubText(free: number | null, total: number | null): string {
+  if (free == null) return total == null ? '총량 수집 대기' : '여유량 수집 대기'
+  return `여유 ${mibLabel(free)}`
+}
+
+function usageTone(usedPercent: number | null): 'safe' | 'warn' | 'crit' | 'unk' {
+  if (usedPercent == null || Number.isNaN(usedPercent)) return 'unk'
+  if (usedPercent >= 90) return 'crit'
+  if (usedPercent >= 75) return 'warn'
+  return 'safe'
+}
+
 function errorCount(errors?: CloudInfraError[]): number {
   return errors?.length ?? 0
+}
+
+function statusRank(status?: CloudInfraStatusValue | string): number {
+  if (status === 'critical') return 4
+  if (status === 'warning') return 3
+  if (!status || status === 'unknown') return 2
+  return 1
 }
 
 function totalErrorCount(data: CloudInfraStatus): number {
@@ -123,7 +149,7 @@ function topIssueLabel(data: CloudInfraStatus): string {
     { label: 'Storage Freshness', status: data.slow?.storage_freshness?.status, errors: data.slow?.storage_freshness?.errors },
   ]
   const issue = rows.find((row) => row.status && row.status !== 'normal') ?? rows.find((row) => errorCount(row.errors) > 0)
-  return issue ? issue.label : 'No active issue'
+  return issue ? issue.label : '활성 이슈 없음'
 }
 
 function HealthStrip({ data }: { data: CloudInfraStatus }) {
@@ -140,24 +166,24 @@ function HealthStrip({ data }: { data: CloudInfraStatus }) {
           {data.overall_status === 'normal' ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
         </div>
         <div>
-          <div className="cloud-health-label">Overall Status</div>
+          <div className="cloud-health-label">종합 상태</div>
           <div className="cloud-health-title">{cloudInfraStatusLabel(data.overall_status)}</div>
         </div>
       </div>
       <div className="cloud-health-stat">
-        <span className="label">Top signal</span>
+        <span className="label">주요 신호</span>
         <span className="value">{topIssueLabel(data)}</span>
       </div>
       <div className="cloud-health-stat">
-        <span className="label">Collector age</span>
+        <span className="label">수집 지연</span>
         <span className="value">fast {secondsLabel(data.fast_age_seconds)} · slow {secondsLabel(data.slow_age_seconds)}</span>
       </div>
       <div className="cloud-health-stat">
-        <span className="label">Errors</span>
+        <span className="label">오류</span>
         <span className="value">{totalErrors} collector · {lambdaErrors} lambda</span>
       </div>
       <div className="cloud-health-stat">
-        <span className="label">Fresh factories</span>
+        <span className="label">공장 최신성</span>
         <span className="value">{factories.length - staleFactories}/{factories.length} · sched {enabledSchedulers}</span>
       </div>
     </div>
@@ -175,19 +201,23 @@ interface ComponentRow {
 }
 
 function ComponentMatrix({ rows }: { rows: ComponentRow[] }) {
+  const sortedRows = rows.slice().sort((a, b) => {
+    const byStatus = statusRank(b.status) - statusRank(a.status)
+    if (byStatus !== 0) return byStatus
+    return errorCount(b.errors) - errorCount(a.errors)
+  })
   return (
     <div className="card cloud-matrix-card">
       <div className="card-hd">
         <div>
-          <div className="h2">Component Health</div>
-          <div className="micro" style={{ marginTop: 3 }}>section rollup 기준. 문제가 있는 행을 먼저 스캔합니다.</div>
+          <div className="h2">컴포넌트 상태</div>
         </div>
       </div>
       <div className="table-scroll">
         <table className="tbl cloud-matrix">
-          <thead><tr><th>Component</th><th>Group</th><th>Status</th><th>Signal</th><th>Detail</th><th>Errors</th></tr></thead>
+          <thead><tr><th>컴포넌트</th><th>영역</th><th>상태</th><th>핵심 신호</th><th>상세</th><th>오류</th></tr></thead>
           <tbody>
-            {rows.map((row) => (
+            {sortedRows.map((row) => (
               <tr key={row.id} className={`cloud-row-${cloudInfraTone(row.status)}`}>
                 <td className="strong">{row.name}</td>
                 <td>{row.group}</td>
@@ -200,6 +230,17 @@ function ComponentMatrix({ rows }: { rows: ComponentRow[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+function StatusLegend() {
+  return (
+    <div className="status-legend" aria-label="상태 색상 범례">
+      <span><i className="safe" />정상</span>
+      <span><i className="warn" />주의</span>
+      <span><i className="crit" />위험</span>
+      <span><i className="unk" />미확인</span>
     </div>
   )
 }
@@ -249,7 +290,7 @@ function StatusHistoryBar({ items }: { items: CloudInfraHistoryItem[] }) {
 function CapacityBar({ usedPercent }: { usedPercent: number | null }) {
   const pct = usedPercent == null || Number.isNaN(usedPercent) ? null : Math.max(0, Math.min(100, usedPercent))
   return (
-    <div className="capacity-bar" aria-hidden="true">
+    <div className={`capacity-bar ${usageTone(pct)}`} aria-hidden="true">
       <span style={{ width: `${pct ?? 0}%` }} />
     </div>
   )
@@ -281,7 +322,7 @@ function DatastoreResourceRow({
       </div>
       <div className="datastore-resource-primary">
         <span>{primary}</span>
-        <span>{usedPercent == null ? '총량 미수집' : percentLabel(usedPercent)}</span>
+        <span>{usedPercent == null ? '사용률 미수집' : percentLabel(usedPercent)}</span>
       </div>
       <CapacityBar usedPercent={usedPercent} />
       <div className="datastore-resource-metrics">
@@ -423,17 +464,17 @@ export function CloudInfraPage() {
   const componentRows: ComponentRow[] = [
     {
       id: 'pipeline',
-      name: 'Data Pipeline',
-      group: 'Ingestion',
+      name: '데이터 파이프라인',
+      group: '수집',
       status: pipeline?.status,
-      signal: `${(pipeline?.lambdas ?? []).reduce((sum, fn) => sum + (fn.errors_5m ?? 0), 0)} lambda errors`,
+      signal: `Lambda 오류 ${(pipeline?.lambdas ?? []).reduce((sum, fn) => sum + (fn.errors_5m ?? 0), 0)}`,
       detail: `DDB throttle ${(pipeline?.dynamodb?.read_throttle_events_5m ?? 0) + (pipeline?.dynamodb?.write_throttle_events_5m ?? 0)} · DLQ ${pipeline?.dlq?.messages_visible ?? 0}`,
       errors: pipeline?.errors,
     },
     {
       id: 'runtime',
-      name: 'Dashboard Runtime',
-      group: 'Serving',
+      name: 'Dashboard 런타임',
+      group: '서빙',
       status: runtime?.status,
       signal: `ECS ${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`,
       detail: `ALB healthy ${runtime?.alb?.healthy_host_count ?? 0} · 5xx ${runtime?.alb?.target_5xx_count_5m ?? 0}`,
@@ -442,7 +483,7 @@ export function CloudInfraPage() {
     {
       id: 'datastores',
       name: 'Datastores',
-      group: 'State',
+      group: '상태 저장소',
       status: datastores?.status,
       signal: `Redis ${datastores?.redis?.status ?? '-'} · RDS ${datastores?.rds?.status ?? '-'}`,
       detail: `Redis CPU ${numberLabel(datastores?.redis?.cpu_utilization_avg, 1)}% · RDS CPU ${numberLabel(datastores?.rds?.cpu_utilization_avg, 1)}%`,
@@ -450,16 +491,16 @@ export function CloudInfraPage() {
     },
     {
       id: 'freshness',
-      name: 'Factory Freshness',
-      group: 'Factories',
+      name: '공장 최신성',
+      group: '공장',
       status: freshness?.status,
-      signal: `${freshness?.factories?.length ?? 0} factories`,
+      signal: `${freshness?.factories?.length ?? 0}개 공장`,
       detail: `max infra age ${secondsLabel(Math.max(0, ...(freshness?.factories ?? []).map((f) => f.latest_infra_state_age_seconds ?? 0)))}`,
       errors: freshness?.errors,
     },
     {
       id: 'management',
-      name: 'Management Plane',
+      name: '관리 플레인',
       group: 'Control',
       status: eks?.status,
       signal: `Nodes ${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`,
@@ -468,10 +509,10 @@ export function CloudInfraPage() {
     },
     {
       id: 'storage',
-      name: 'Storage Freshness',
-      group: 'Durable data',
+      name: '스토리지 최신성',
+      group: '저장',
       status: storage?.status,
-      signal: `${storage?.factories?.length ?? 0} factories`,
+      signal: `${storage?.factories?.length ?? 0}개 공장`,
       detail: `raw / processed / aggregate freshness`,
       errors: storage?.errors,
     },
@@ -545,7 +586,7 @@ export function CloudInfraPage() {
           </table>
         </SectionCard>
 
-        <SectionCard title="Dashboard Runtime" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
+        <SectionCard title="Dashboard 런타임" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
           <div className="grid-3">
             <Metric label="ECS running" value={`${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}`} sub={runtime?.ecs?.status ?? 'unknown'} />
             <Metric label="CPU avg" value={`${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`} sub={`max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%`} />
@@ -564,10 +605,8 @@ export function CloudInfraPage() {
               <DatastoreResourceRow
                 name="Redis"
                 status={datastores.redis?.status}
-                primary={redisTotalMemoryMib == null
-                  ? `사용률 ${percentLabel(redisUsedPercent)} · 여유 ${mibLabel(redisFreeMemoryMib)}`
-                  : `${mibLabel(redisUsedMemoryMib)} / ${mibLabel(redisTotalMemoryMib)}`}
-                secondary={redisTotalMemoryMib == null ? 'memory usage percent / freeable memory' : 'memory used / total'}
+                primary={usageText(redisUsedMemoryMib, redisTotalMemoryMib, redisUsedPercent, datastores.redis?.memory_usage_percent)}
+                secondary={usageSubText(redisFreeMemoryMib, redisTotalMemoryMib)}
                 usedPercent={redisUsedPercent}
                 metrics={[
                   { label: 'CPU', value: `${numberLabel(datastores.redis?.cpu_utilization_avg, 1)}%` },
@@ -578,10 +617,8 @@ export function CloudInfraPage() {
               <DatastoreResourceRow
                 name="RDS"
                 status={datastores.rds?.status}
-                primary={rdsTotalStorageMib == null
-                  ? `여유 ${mibLabel(rdsFreeStorageMib)}`
-                  : `${mibLabel(rdsUsedStorageMib)} / ${mibLabel(rdsTotalStorageMib)}`}
-                secondary={rdsTotalStorageMib == null ? 'free storage 기준' : 'storage used / allocated'}
+                primary={usageText(rdsUsedStorageMib, rdsTotalStorageMib, rdsUsedPercent)}
+                secondary={usageSubText(rdsFreeStorageMib, rdsTotalStorageMib)}
                 usedPercent={rdsUsedPercent}
                 metrics={[
                   { label: 'CPU', value: `${numberLabel(datastores.rds?.cpu_utilization_avg, 1)}%` },
@@ -614,7 +651,7 @@ export function CloudInfraPage() {
       </div>
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <SectionCard title="Management Plane" status={eks?.status} reasons={eks?.reasons} errors={eks?.errors}>
+        <SectionCard title="관리 플레인" status={eks?.status} reasons={eks?.reasons} errors={eks?.errors}>
           <div className="grid-3" style={{ marginBottom: 14 }}>
             <Metric label="EKS nodes" value={`${eks?.nodes?.ready ?? 0}/${eks?.nodes?.total ?? 0}`} sub={eks?.cluster?.status ?? 'unknown'} />
             <Metric label="Pods running" value={eks?.pods?.running ?? 0} sub={`failed ${eks?.pods?.failed ?? 0}`} />
@@ -635,7 +672,7 @@ export function CloudInfraPage() {
           </table>
         </SectionCard>
 
-        <SectionCard title="Storage Freshness" status={storage?.status} reasons={storage?.reasons} errors={storage?.errors}>
+        <SectionCard title="스토리지 최신성" status={storage?.status} reasons={storage?.reasons} errors={storage?.errors}>
           <table className="tbl">
             <thead><tr><th>Factory</th><th>Raw</th><th>Processed</th><th>Aggregate</th></tr></thead>
             <tbody>
@@ -656,7 +693,7 @@ export function CloudInfraPage() {
         <div style={{ padding: 16 }}>
           <div>
             <div className="h2">최근 1시간 상태 흐름</div>
-            <div className="micro" style={{ marginTop: 4, marginBottom: 12 }}>최근 fast history를 시간순 segment로 표시합니다.</div>
+            <StatusLegend />
           </div>
           <StatusHistoryBar items={history.data} />
         </div>

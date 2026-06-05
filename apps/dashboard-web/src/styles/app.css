@@ -1462,6 +1462,33 @@ input { font-family: inherit; }
   font-family: inherit;
   font-size: 11px;
 }
+.status-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 7px;
+  margin-bottom: 12px;
+  color: var(--ink-4);
+  font-size: 11px;
+}
+.status-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.status-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ink-5);
+  flex-shrink: 0;
+}
+.status-legend i.safe { background: var(--safe); }
+.status-legend i.warn { background: var(--warn); }
+.status-legend i.crit { background: var(--crit); }
+.status-legend i.unk { background: var(--ink-5); }
 .status-seg {
   display: block;
   min-width: 4px;
@@ -1527,8 +1554,11 @@ input { font-family: inherit; }
   height: 100%;
   min-width: 2px;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--safe), var(--warn));
+  background: var(--ink-5);
 }
+.capacity-bar.safe span { background: var(--safe); }
+.capacity-bar.warn span { background: var(--warn); }
+.capacity-bar.crit span { background: var(--crit); }
 .datastore-resource-metrics {
   margin-top: 10px;
   align-items: stretch;
