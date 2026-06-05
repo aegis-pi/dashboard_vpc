@@ -214,7 +214,7 @@ function FleetPulse({ factories }: { factories: ReturnType<typeof normalizeFacto
                     display: 'inline-block',
                     transform: 'scaleY(0.84) scaleX(1.06)',
                     transformOrigin: 'center bottom',
-                  }}>{f.riskScore ?? '—'}</span>
+                  }}>{f.riskScore ?? ''}</span>
                   <span className="mono" style={{
                     fontSize: 11.5, color: 'var(--ink-2)',
                     letterSpacing: '.03em', marginTop: 4, fontWeight: 500,
@@ -290,7 +290,7 @@ function FactoryCard({
       type="button"
       className="card factory-card"
       onClick={onClick}
-      aria-label={`${f.factory_id} 공장 상세 보기, 현재 점수 ${score ?? '—'}`}
+      aria-label={score == null ? `${f.factory_id} 공장 상세 보기` : `${f.factory_id} 공장 상세 보기, 현재 점수 ${score}`}
     >
       <div className="factory-card-accent" style={{ background: color }} />
 
@@ -307,14 +307,14 @@ function FactoryCard({
 
         <div className="factory-card-score-row">
           <div className="factory-score-block">
-            <span className="tnum factory-score" style={{ color }}>{score ?? '—'}</span>
+            <span className="tnum factory-score" style={{ color }}>{score ?? ''}</span>
             <span className="factory-score-label">/100 안전 점수</span>
           </div>
           <div className="factory-meta-stack">
             <div className="factory-meta-line">
               <span>node</span>
               <strong className="tnum">
-                {f.nodeReady != null && f.nodeTotal != null ? `${f.nodeReady}/${f.nodeTotal}` : '—'}
+                {f.nodeReady != null && f.nodeTotal != null ? `${f.nodeReady}/${f.nodeTotal}` : ''}
               </strong>
             </div>
             <PipelineBadge status={f.pipeline} />
@@ -333,7 +333,7 @@ function FactoryCard({
         <div className="factory-card-trend">
           <div className="factory-trend-head">
             <span className="eyebrow">10m trend</span>
-            <span className="mono tnum" style={{ color }}>{trendScore ?? '—'}</span>
+            <span className="mono tnum" style={{ color }}>{trendScore ?? ''}</span>
           </div>
           <CompactTrendChart data={sparkData} color={color} />
         </div>

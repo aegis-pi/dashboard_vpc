@@ -34,7 +34,7 @@ export function cloudInfraStatusLabel(status?: CloudInfraStatusValue | string): 
 }
 
 export function secondsLabel(seconds?: number | null): string {
-  if (seconds == null) return '—'
+  if (seconds == null) return ''
   if (seconds < 60) return `${seconds}s`
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
   return `${Math.floor(seconds / 3600)}h`

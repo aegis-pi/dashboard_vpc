@@ -1,5 +1,5 @@
 export function relTime(ts?: string): string {
-  if (!ts) return '—'
+  if (!ts) return ''
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
   if (diff < 5) return '방금'
   if (diff < 60) return `${diff}초 전`

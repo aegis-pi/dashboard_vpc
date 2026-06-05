@@ -75,7 +75,7 @@ function FactoryHeader({
         </div>
         <h1 className="factory-hero-title">{f.factory_id}</h1>
         <p className="factory-hero-summary">
-          {f.dashboard?.summary ?? '실시간 상태를 표시 중입니다.'}
+          {f.dashboard?.summary ?? ''}
         </p>
       </div>
 
@@ -83,7 +83,7 @@ function FactoryHeader({
         <div className="factory-hero-score-block">
           <span className="eyebrow">safety score</span>
           <div className="factory-hero-score-row">
-            <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? '—'}</span>
+            <span className="tnum factory-hero-score" style={{ color }}>{riskScore ?? ''}</span>
             {riskScore != null && <span className="mono tnum factory-hero-score-unit">/100</span>}
           </div>
         </div>
@@ -99,7 +99,7 @@ function FactoryHeader({
           <div className="factory-hero-meta">
             <span className="mono">
               node <span className="tnum" style={{ color: 'var(--ink)' }}>
-                {ns ? `${ns.ready}/${ns.total}` : '—'}
+                {ns ? `${ns.ready}/${ns.total}` : ''}
               </span>
             </span>
             <span className="mono">{relTime(f.updated_at)}</span>
@@ -269,7 +269,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
                 textTransform: 'uppercase', minWidth: 110, fontWeight: 600,
               }}>abnormal_sound</span>
               <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
-                {ai.abnormal_sound ?? <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                {ai.abnormal_sound ?? <span style={{ color: 'var(--ink-4)' }} />}
               </span>
             </div>
           </div>
@@ -287,13 +287,13 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
             <div className="grid row2" style={{ gap: 10 }}>
               <SummaryLine
                 label="Node Ready"
-                value={ns ? `${ns.ready} / ${ns.total}` : '—'}
+                value={ns ? `${ns.ready} / ${ns.total}` : ''}
                 tone={ns ? (ns.not_ready ?? 0) > 0 ? 'warn' : 'safe' : 'unk'}
                 sub={ns ? (ns.not_ready ?? 0) > 0 ? `${ns.not_ready} NotReady` : 'all ready' : undefined}
               />
               <SummaryLine
                 label="Workload Running"
-                value={ws ? `${ws.running} / ${ws.total}` : '—'}
+                value={ws ? `${ws.running} / ${ws.total}` : ''}
                 tone={ws ? ws.not_running > 0 ? 'warn' : 'safe' : 'unk'}
                 sub={ws ? ws.not_running > 0 ? `${ws.not_running} NotRunning` : 'all running' : undefined}
               />
@@ -311,7 +311,7 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
                 <DeviceStatusChip label="Microphone" available={devices.microphone?.available} lastSeenAt={devices.microphone?.last_seen_at} />
               </div>
             ) : (
-              <EmptyNote text="device 정보 없음" />
+              <div />
             )}
           </div>
         </div>
@@ -381,7 +381,7 @@ function MetricLine({ label, value, unit }: { label: string; value: number | nul
       <span className="eyebrow">{label}</span>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
         {formatted == null
-          ? <span style={{ fontSize: 14, color: 'var(--ink-4)' }}>—</span>
+          ? <span style={{ fontSize: 14, color: 'var(--ink-4)' }} />
           : <>
               <span className="tnum" style={{
                 fontSize: 26, fontWeight: 500, color: 'var(--ink)',
@@ -458,7 +458,7 @@ function DeviceStatusChip({
   label, available, lastSeenAt,
 }: { label: string; available?: boolean | null; lastSeenAt?: string | null }) {
   const tone = available === true ? 'safe' : available === false ? 'warn' : 'unk'
-  const text = available === true ? '정상' : available === false ? '확인 필요' : '—'
+  const text = available === true ? '정상' : available === false ? '확인 필요' : ''
   const dotColor = `var(--${tone})`
   return (
     <div style={{
@@ -664,10 +664,10 @@ function SensorPanel({
         fontSize: 10.5, color: 'var(--ink-3)',
       }}>
         <span>min <span className="mono tnum" style={{ color: 'var(--ink-2)', marginLeft: 4 }}>
-          {lo == null ? '—' : lo.toFixed(1)}
+          {lo == null ? '' : lo.toFixed(1)}
         </span></span>
         <span>max <span className="mono tnum" style={{ color: 'var(--ink-2)', marginLeft: 4 }}>
-          {hi == null ? '—' : hi.toFixed(1)}
+          {hi == null ? '' : hi.toFixed(1)}
         </span></span>
       </div>
     </div>
@@ -682,7 +682,7 @@ function MiniSparkline({ data, color, height = 60 }: { data: (number | null)[]; 
         height, display: 'flex', alignItems: 'center', justifyContent: 'center',
         border: '1px dashed var(--line-3)', borderRadius: 6, background: 'var(--surface-2)',
       }}>
-        <span className="micro">데이터 없음</span>
+        <span className="micro" />
       </div>
     )
   }
@@ -801,7 +801,7 @@ function AIScoreThresholdLegend({ bucketed = false }: { bucketed?: boolean }) {
 
 // ─── Infrastructure tab ───────────────────────────────────────────────
 function NetReachCell({ value }: { value?: string | null }) {
-  if (value == null) return <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>—</span>
+  if (value == null) return <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }} />
   if (value === 'unknown') {
     return (
       <span className="pill unk" style={{ padding: '3px 6px', fontSize: 10.5 }}>
@@ -851,7 +851,7 @@ function HeartbeatCard({ hb }: { hb: NonNullable<FactoryDetail['infra_state']>['
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: agentColor, flexShrink: 0 }} />
             <span style={{ fontSize: 18, color: 'var(--ink)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
-              {hb.agent_status ?? '—'}
+              {hb.agent_status ?? ''}
             </span>
           </div>
           <span className="micro">edge agent 상태</span>
@@ -861,7 +861,7 @@ function HeartbeatCard({ hb }: { hb: NonNullable<FactoryDetail['infra_state']>['
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: spoolColor, flexShrink: 0 }} />
             <span style={{ fontSize: 18, color: 'var(--ink)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
-              {hb.last_spool_write_status ?? '—'}
+              {hb.last_spool_write_status ?? ''}
             </span>
           </div>
           <span className="micro">spool write 마지막 시도 결과</span>
@@ -877,7 +877,7 @@ function HeartbeatCard({ hb }: { hb: NonNullable<FactoryDetail['infra_state']>['
             </>
           ) : (
             <>
-              <span className="mono" style={{ fontSize: 14, color: 'var(--ink-4)' }}>—</span>
+              <span className="mono" style={{ fontSize: 14, color: 'var(--ink-4)' }} />
               <span className="micro">spool write 기록 없음</span>
             </>
           )}
@@ -932,12 +932,12 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
             <span className="micro">
               {nodes.length > 0
                 ? `infra_state.nodes · ${nodes.length}개`
-                : '데이터 없음'}
+                : ''}
             </span>
           </div>
         </div>
         {nodes.length === 0
-          ? <EmptyNote text="infra_state 데이터 없음." />
+          ? <div className="card-bd" />
           : (
             <table className="tbl">
               <thead>
@@ -966,7 +966,7 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
                             padding: '2px 6px', border: '1px solid var(--line-2)',
                             borderRadius: 4, background: 'var(--surface-2)',
                           }}>{n.role}</span>
-                        : <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>—</span>
+                        : <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }} />
                       }
                     </td>
                     <td>
@@ -1058,24 +1058,24 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
                     <tr key={i} style={hot ? { background: 'var(--warn-tint-2)' } : undefined}>
                       <td>
                         <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-                          {w.namespace ?? '—'}
+                          {w.namespace ?? ''}
                         </span>
                       </td>
                       <td><span style={{ fontSize: 12.5, color: 'var(--ink)' }}>{w.name}</span></td>
                       <td>
                         <span className={`pill ${tone}`} style={{ padding: '3px 6px', fontSize: 10.5 }}>
-                          <span className="dot" />{w.status ?? '—'}
+                          <span className="dot" />{w.status ?? ''}
                         </span>
                       </td>
                       <td>
                         {w.ready == null
-                          ? <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>—</span>
+                          ? <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }} />
                           : <span style={{ fontSize: 11.5, color: w.ready ? 'var(--safe)' : 'var(--crit)', fontWeight: 500 }}>
                               {w.ready ? 'true' : 'false'}
                             </span>
                         }
                       </td>
-                      <td><span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{w.node_id ?? '—'}</span></td>
+                      <td><span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{w.node_id ?? ''}</span></td>
                       <td style={{ textAlign: 'right' }}><RestartCount value={w.restart_count} /></td>
                     </tr>
                   )
@@ -1108,7 +1108,7 @@ function InfraTab({ data, factoryId, refreshSignalKey }: { data: FactoryDetail; 
 
 function UsageCell({ value }: { value?: number | null }) {
   if (value == null) {
-    return <span style={{ color: 'var(--ink-4)', fontSize: 11.5, whiteSpace: 'nowrap' }}>—</span>
+    return <span style={{ color: 'var(--ink-4)', fontSize: 11.5, whiteSpace: 'nowrap' }} />
   }
   const tone = value >= 85 ? 'crit' : value >= 70 ? 'warn' : 'ink'
   const color = tone === 'crit' ? 'var(--crit)' : tone === 'warn' ? 'var(--warn)' : 'var(--ink-2)'
@@ -1148,7 +1148,7 @@ function PipelineAge({ label, seconds, warn, crit }: {
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span className="tnum" style={{ fontSize: 26, color, fontWeight: 500, letterSpacing: '-0.015em', lineHeight: 1 }}>
-          {seconds ?? '—'}
+          {seconds ?? ''}
         </span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>초</span>
       </div>
@@ -1162,7 +1162,7 @@ function PipelineAge({ label, seconds, warn, crit }: {
 }
 
 function RestartCount({ value }: { value?: number | null }) {
-  if (value == null) return <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>—</span>
+  if (value == null) return <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }} />
   const tone = value >= 10 ? 'crit' : value >= 5 ? 'warn' : value > 0 ? 'ink' : 'mute'
   const color =
     tone === 'crit' ? 'var(--crit)' : tone === 'warn' ? 'var(--warn)' :
