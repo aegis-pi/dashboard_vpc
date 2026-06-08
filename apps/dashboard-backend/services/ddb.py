@@ -108,6 +108,30 @@ def _from_ddb(obj):
     return obj
 
 
+def _number_or_none(value) -> float | None:
+    """Convert API numeric fields to finite floats, dropping invalid values."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        result = float(value)
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            result = float(text)
+        except ValueError:
+            return None
+    else:
+        return None
+    return result if result == result and result not in (float("inf"), float("-inf")) else None
+
+
+def _count_or_none(value) -> int | None:
+    number = _number_or_none(value)
+    return int(number) if number is not None else None
+
+
 def _factory_ids() -> list[str]:
     configured = get_settings().dashboard_factory_ids
     return [factory_id.strip() for factory_id in configured.split(",") if factory_id.strip()]
@@ -336,11 +360,11 @@ def _extract_infra_nodes_mean(infra: dict) -> list[dict] | None:
         disk_field = n.get("disk_usage_percent") or {}
         result.append({
             "node_id": node_id,
-            "cpu_usage_percent": cpu_field.get("mean") if isinstance(cpu_field, dict) else cpu_field,
-            "memory_usage_percent": mem_field.get("mean") if isinstance(mem_field, dict) else mem_field,
+            "cpu_usage_percent": _number_or_none(cpu_field.get("mean") if isinstance(cpu_field, dict) else cpu_field),
+            "memory_usage_percent": _number_or_none(mem_field.get("mean") if isinstance(mem_field, dict) else mem_field),
             "disk_usage_percent": (
-                disk_field.get("last") or disk_field.get("mean")
-                if isinstance(disk_field, dict) else disk_field
+                _number_or_none(disk_field.get("last") or disk_field.get("mean"))
+                if isinstance(disk_field, dict) else _number_or_none(disk_field)
             ),
         })
     return result if result else None
@@ -405,8 +429,8 @@ def _extract_graph_5m(item: dict) -> dict:
     risk_mean = risk_score.get("mean")
     risk_min = risk_score.get("min")
     risk_max = risk_score.get("max")
-    source_count = quality.get("source_count")
-    sample_count = source_count if source_count is not None else risk_score.get("count")
+    source_count = _count_or_none(quality.get("source_count"))
+    sample_count = source_count if source_count is not None else _count_or_none(risk_score.get("count"))
     is_empty_bucket = sample_count == 0
 
     ai_fire = ai_by_type.get("fire_score") or {}
@@ -421,33 +445,33 @@ def _extract_graph_5m(item: dict) -> dict:
         "is_bucket": True,
         "sample_count": sample_count,
         # risk
-        "risk_score": None if is_empty_bucket else risk_mean,
-        "risk_score_avg": None if is_empty_bucket else risk_mean,
-        "risk_score_min": None if is_empty_bucket else risk_min,
-        "risk_score_max": None if is_empty_bucket else risk_max,
+        "risk_score": None if is_empty_bucket else _number_or_none(risk_mean),
+        "risk_score_avg": None if is_empty_bucket else _number_or_none(risk_mean),
+        "risk_score_min": None if is_empty_bucket else _number_or_none(risk_min),
+        "risk_score_max": None if is_empty_bucket else _number_or_none(risk_max),
         # sensor avg
-        "temperature_celsius_avg": temp.get("mean"),
-        "humidity_percent_avg": humidity.get("mean"),
-        "pressure_hpa_avg": pressure.get("mean"),
+        "temperature_celsius_avg": _number_or_none(temp.get("mean")),
+        "humidity_percent_avg": _number_or_none(humidity.get("mean")),
+        "pressure_hpa_avg": _number_or_none(pressure.get("mean")),
         # sensor min/max (for range/volatility bands in charts)
-        "temperature_celsius_min": temp.get("min"),
-        "humidity_percent_min": humidity.get("min"),
-        "pressure_hpa_min": pressure.get("min"),
-        "temperature_celsius_max": temp.get("max"),
-        "humidity_percent_max": humidity.get("max"),
-        "pressure_hpa_max": pressure.get("max"),
+        "temperature_celsius_min": _number_or_none(temp.get("min")),
+        "humidity_percent_min": _number_or_none(humidity.get("min")),
+        "pressure_hpa_min": _number_or_none(pressure.get("min")),
+        "temperature_celsius_max": _number_or_none(temp.get("max")),
+        "humidity_percent_max": _number_or_none(humidity.get("max")),
+        "pressure_hpa_max": _number_or_none(pressure.get("max")),
         # AI — mean for line chart, max for spike markers (≥0.8)
-        "fire_score": ai_fire.get("mean"),
-        "fall_score": ai_fall.get("mean"),
-        "bend_score": ai_bend.get("mean"),
-        "fire_score_max": ai_fire.get("max"),
-        "fall_score_max": ai_fall.get("max"),
-        "bend_score_max": ai_bend.get("max"),
-        "ai_max_score": ai.get("max_score"),
+        "fire_score": _number_or_none(ai_fire.get("mean")),
+        "fall_score": _number_or_none(ai_fall.get("mean")),
+        "bend_score": _number_or_none(ai_bend.get("mean")),
+        "fire_score_max": _number_or_none(ai_fire.get("max")),
+        "fall_score_max": _number_or_none(ai_fall.get("max")),
+        "bend_score_max": _number_or_none(ai_bend.get("max")),
+        "ai_max_score": _number_or_none(ai.get("max_score")),
         # infra aggregates
-        "cpu_usage_percent_mean": cpu.get("mean"),
-        "memory_usage_percent_mean": memory.get("mean"),
-        "disk_usage_percent_last": disk.get("last"),
+        "cpu_usage_percent_mean": _number_or_none(cpu.get("mean")),
+        "memory_usage_percent_mean": _number_or_none(memory.get("mean")),
+        "disk_usage_percent_last": _number_or_none(disk.get("last")),
         # per-node means (when aggregator writes infra.nodes)
         "nodes_mean": _extract_infra_nodes_mean(infra),
         "quality": quality if quality else None,
@@ -488,9 +512,9 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
 
     def _wavg(field: str) -> float | None:
         values = [
-            (g[field], g.get("sample_count") or 0)
+            (_number_or_none(g.get(field)), _count_or_none(g.get("sample_count")) or 0)
             for g in group
-            if g.get(field) is not None and (g.get("sample_count") or 0) > 0
+            if _number_or_none(g.get(field)) is not None and (_count_or_none(g.get("sample_count")) or 0) > 0
         ]
         total = sum(sample_count for _, sample_count in values)
         if not total:
@@ -498,15 +522,15 @@ def _merge_extracted_group(group: list[dict], n: int) -> dict:
         return sum(value * sample_count for value, sample_count in values) / total
 
     def _fmax(field: str) -> float | None:
-        vals = [g[field] for g in group if g.get(field) is not None]
+        vals = [_number_or_none(g.get(field)) for g in group if _number_or_none(g.get(field)) is not None]
         return max(vals) if vals else None
 
     def _fmin(field: str) -> float | None:
-        vals = [g[field] for g in group if g.get(field) is not None]
+        vals = [_number_or_none(g.get(field)) for g in group if _number_or_none(g.get(field)) is not None]
         return min(vals) if vals else None
 
     def _fsum(field: str) -> int | None:
-        vals = [g[field] for g in group if g.get(field) is not None]
+        vals = [_count_or_none(g.get(field)) for g in group if _count_or_none(g.get(field)) is not None]
         return sum(vals) if vals else None
 
     risk_avg = _wavg("risk_score_avg")
@@ -585,6 +609,10 @@ def _coalesce_fs(fs: dict, *dot_paths: str):
     return None
 
 
+def _coalesce_fs_number(fs: dict, *dot_paths: str) -> float | None:
+    return _number_or_none(_coalesce_fs(fs, *dot_paths))
+
+
 def _extract(item: dict) -> dict:
     """Extract risk / factory_state / infra_state from a HISTORY#STATE item
     and also promote flat fields for chart consumption.
@@ -613,23 +641,23 @@ def _extract(item: dict) -> dict:
         "factory_state": fs if fs else None,
         "infra_state": infra if infra else None,
         # ── flattened risk ───────────────────────────────────────────────
-        "risk_score": risk.get("score"),
+        "risk_score": _number_or_none(risk.get("score")),
         "risk_level": risk.get("level"),
         "top_cause_names": top_cause_names,
         # ── flattened sensor (flat / avg / sensor.* nested) ──────────────
-        "temperature_celsius_avg": _coalesce_fs(
+        "temperature_celsius_avg": _coalesce_fs_number(
             fs, "temperature_celsius", "temperature_celsius_avg", "sensor.temperature_celsius_avg"
         ),
-        "humidity_percent_avg": _coalesce_fs(
+        "humidity_percent_avg": _coalesce_fs_number(
             fs, "humidity_percent", "humidity_percent_avg", "sensor.humidity_percent_avg"
         ),
-        "pressure_hpa_avg": _coalesce_fs(
+        "pressure_hpa_avg": _coalesce_fs_number(
             fs, "pressure_hpa", "pressure_hpa_avg", "sensor.pressure_hpa_avg"
         ),
         # ── flattened AI scores (flat / ai_result.* nested) ──────────────
-        "fire_score": _coalesce_fs(fs, "fire_score", "ai_result.fire_score"),
-        "fall_score": _coalesce_fs(fs, "fall_score", "ai_result.fall_score"),
-        "bend_score": _coalesce_fs(fs, "bend_score", "ai_result.bend_score"),
+        "fire_score": _coalesce_fs_number(fs, "fire_score", "ai_result.fire_score"),
+        "fall_score": _coalesce_fs_number(fs, "fall_score", "ai_result.fall_score"),
+        "bend_score": _coalesce_fs_number(fs, "bend_score", "ai_result.bend_score"),
         # ── infra (for NodeResourceChart) ────────────────────────────────
         "node_summary": infra.get("node_summary"),
         "nodes": infra.get("nodes"),

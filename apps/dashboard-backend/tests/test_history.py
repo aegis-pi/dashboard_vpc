@@ -118,6 +118,31 @@ def test_history_items_have_node_summary(client, ddb_mock):
         assert "total" in item["node_summary"]
 
 
+def test_history_extract_coerces_numeric_strings():
+    from services.ddb import _extract
+
+    result = _extract({
+        "sk": "HISTORY#STATE#2026-01-01T00:00:00Z",
+        "risk": {"score": "42.5", "level": "warning"},
+        "factory_state": {
+            "temperature_celsius": "31.2",
+            "humidity_percent": "61",
+            "pressure_hpa": "1008.5",
+            "fire_score": "0.7",
+            "fall_score": "",
+            "bend_score": "not-a-number",
+        },
+    })
+
+    assert result["risk_score"] == 42.5
+    assert result["temperature_celsius_avg"] == 31.2
+    assert result["humidity_percent_avg"] == 61.0
+    assert result["pressure_hpa_avg"] == 1008.5
+    assert result["fire_score"] == 0.7
+    assert result["fall_score"] is None
+    assert result["bend_score"] is None
+
+
 # ── GRAPH#5M window tests ─────────────────────────────────────────────────────
 
 def test_graph_5m_prefix_present_in_code():
@@ -246,6 +271,52 @@ def test_graph_5m_empty_source_count_stays_empty():
     assert result["risk_score_avg"] is None
     assert result["risk_score_min"] is None
     assert result["risk_score_max"] is None
+
+
+def test_graph_5m_extract_coerces_numeric_strings():
+    from services.ddb import _extract_graph_5m
+
+    result = _extract_graph_5m({
+        "sk": "GRAPH#5M#2026-06-01T23:50:00Z",
+        "bucket_start": "2026-06-01T23:50:00Z",
+        "bucket_end": "2026-06-01T23:54:59.999Z",
+        "quality": {"source_count": "12"},
+        "risk": {"score": {"mean": "88.5", "min": "72", "max": "93", "count": "12"}},
+        "sensor": {
+            "temperature_celsius": {"mean": "24.5", "min": "23.5", "max": "25.5"},
+            "humidity_percent": {"mean": "52", "min": "49", "max": "55"},
+            "pressure_hpa": {"mean": "1009.25", "min": "1008", "max": "1010"},
+        },
+        "ai_detection": {
+            "max_score": "0.9",
+            "by_type": {
+                "fire_score": {"mean": "0.3", "max": "0.8"},
+                "fall_score": {"mean": "0.2", "max": "0.4"},
+                "bend_score": {"mean": "0.1", "max": "0.2"},
+            },
+        },
+        "infra": {
+            "cpu_usage_percent": {"mean": "35"},
+            "memory_usage_percent": {"mean": "64.5"},
+            "disk_usage_percent": {"last": "71"},
+            "nodes": [
+                {
+                    "node_id": "factory-a-master",
+                    "cpu_usage_percent": {"mean": "31.5"},
+                    "memory_usage_percent": {"mean": "58.5"},
+                    "disk_usage_percent": {"last": "66.5"},
+                },
+            ],
+        },
+    })
+
+    assert result["sample_count"] == 12
+    assert result["risk_score_avg"] == 88.5
+    assert result["risk_score_min"] == 72.0
+    assert result["temperature_celsius_avg"] == 24.5
+    assert result["fire_score_max"] == 0.8
+    assert result["cpu_usage_percent_mean"] == 35.0
+    assert result["nodes_mean"][0]["disk_usage_percent"] == 66.5
 
 
 def test_graph_reaggregate_does_not_average_missing_metric_as_zero():
