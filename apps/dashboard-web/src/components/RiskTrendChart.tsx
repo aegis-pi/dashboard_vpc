@@ -1,4 +1,8 @@
-export function CompactTrendChart({ data, color }: { data: number[]; color: string }) {
+import type { TrendPoint } from '../utils/trend'
+
+const TREND_WINDOW_MS = 10 * 60 * 1000
+
+export function CompactTrendChart({ data, color }: { data: TrendPoint[]; color: string }) {
   const VW = 260, VH = 86
   const pL = 26, pR = 12, pT = 12, pB = 20
   const cW = VW - pL - pR
@@ -6,17 +10,25 @@ export function CompactTrendChart({ data, color }: { data: number[]; color: stri
 
   const hasData = data.length >= 1
   const hasLine = data.length >= 2
-  const xOf = (i: number) => pL + (data.length < 2 ? cW : (i / (data.length - 1)) * cW)
+  const now = Date.now()
+  const start = now - TREND_WINDOW_MS
+  const xOf = (timestamp: string) => {
+    const ts = Date.parse(timestamp)
+    if (!Number.isFinite(ts)) return pL + cW
+    const ratio = Math.max(0, Math.min(1, (ts - start) / TREND_WINDOW_MS))
+    return pL + ratio * cW
+  }
   const yOf = (v: number) => pT + cH - (Math.max(0, Math.min(100, v)) / 100) * cH
 
-  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
+  const pts = data.map((p) => `${xOf(p.timestamp).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(' ')
   const areaD = hasLine
-    ? `M ${xOf(0).toFixed(1)},${pT + cH} L ${
-        data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' L ')
-      } L ${xOf(data.length - 1).toFixed(1)},${pT + cH} Z`
+    ? `M ${xOf(data[0]!.timestamp).toFixed(1)},${pT + cH} L ${
+        data.map((p) => `${xOf(p.timestamp).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(' L ')
+      } L ${xOf(data[data.length - 1]!.timestamp).toFixed(1)},${pT + cH} Z`
     : ''
-  const lastV = hasData ? data[data.length - 1]! : null
-  const lastX = hasData ? xOf(data.length - 1) : 0
+  const last = hasData ? data[data.length - 1]! : null
+  const lastV = last?.value ?? null
+  const lastX = last ? xOf(last.timestamp) : 0
   const lastY = lastV != null ? yOf(lastV) : 0
 
   return (

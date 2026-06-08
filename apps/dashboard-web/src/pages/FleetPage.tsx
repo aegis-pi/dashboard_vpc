@@ -5,7 +5,7 @@ import { Shell } from '../components/Layout'
 import { LevelBadge, PipelineBadge, StaleBadge } from '../components/Badge'
 import { relTime, riskColor } from '../utils/format'
 import { CompactTrendChart } from '../components/RiskTrendChart'
-import { recentRiskScores } from '../utils/trend'
+import { recentRiskPoints } from '../utils/trend'
 
 import { useFactories } from '../hooks/useFactories'
 import { useFleetRecentChanges, type RecentChange } from '../hooks/useFleetRecentChanges'
@@ -280,9 +280,9 @@ function FactoryCard({
 }: { f: ReturnType<typeof normalizeFactory>; onClick: () => void; history1h: HistoryItem[] }) {
   const color = riskColor(f.riskLevel)
   const causes = Array.isArray(f.topCauses) ? f.topCauses : []
-  const sparkData = recentRiskScores(history1h)
+  const sparkData = recentRiskPoints(history1h)
   const score = f.riskScore ?? null
-  const trendScore = sparkData.length > 0 ? sparkData[sparkData.length - 1]! : score
+  const trendScore = sparkData.length > 0 ? sparkData[sparkData.length - 1]!.value : score
   const markerLeft = score == null ? 0 : Math.max(0, Math.min(100, score))
 
   return (

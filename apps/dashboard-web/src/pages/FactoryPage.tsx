@@ -8,7 +8,7 @@ import { extractSensor, extractAI } from '../utils/normalize'
 import { RiskScoreChart, AIScoreChart, NodeResourceChart, SensorChart } from '../components/Chart'
 import { ConnStatus } from '../components/ConnStatus'
 import { CompactTrendChart } from '../components/RiskTrendChart'
-import { recentRiskScores } from '../utils/trend'
+import { recentRiskPoints, type TrendPoint } from '../utils/trend'
 import {
   TIMELINE_MAX_RANGE_MS,
   TIMELINE_PRESETS,
@@ -48,7 +48,7 @@ const TABS: { id: TabId; label: string }[] = [
 // ─── Factory hero header ──────────────────────────────────────────────
 function FactoryHeader({
   f, trendData,
-}: { f: FactoryDetail; trendData: number[] }) {
+}: { f: FactoryDetail; trendData: TrendPoint[] }) {
   const riskLevel = f.risk?.level
   const riskScore = f.risk?.score
   const ns = resolveNodeSummary(f.infra_state)
@@ -1504,14 +1504,14 @@ export function FactoryPage() {
     refresh: refreshHistory10m,
     append: appendHistory10m,
   } = useFactoryHistory(factoryId, '10m', true, HISTORY_LIMIT_10M)
-  const [trendData, setTrendData] = useState<number[]>([])
+  const [trendData, setTrendData] = useState<TrendPoint[]>([])
 
   useEffect(() => {
     setLiveData(data)
   }, [data])
 
   useEffect(() => {
-    setTrendData(recentRiskScores(history10m))
+    setTrendData(recentRiskPoints(history10m))
   }, [history10m])
 
   useEffect(() => {

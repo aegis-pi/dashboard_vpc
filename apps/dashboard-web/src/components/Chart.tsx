@@ -68,6 +68,11 @@ const BUCKET_WINDOW_MS: Partial<Record<HistoryWindow, number>> = {
   '24h': 24 * 60 * 60 * 1000,
 }
 
+const RAW_WINDOW_MS: Partial<Record<HistoryWindow, number>> = {
+  '10m': 10 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+}
+
 type BucketAxis = {
   windowStartMs: number
   windowEndMs: number
@@ -127,7 +132,41 @@ function resolveBucketAxis(items: HistoryItem[], window?: HistoryWindow): Bucket
   }
 }
 
+function resolveRawAxis(window?: HistoryWindow): BucketAxis | null {
+  const durationMs = window ? RAW_WINDOW_MS[window] : undefined
+  if (!durationMs) return null
+  const windowEndMs = Date.now()
+  const windowStartMs = windowEndMs - durationMs
+  const tickStepMs = window === '10m' ? 2 * 60 * 1000 : 10 * 60 * 1000
+  const ticks = [windowStartMs]
+  for (let value = windowStartMs + tickStepMs; value < windowEndMs; value += tickStepMs) {
+    ticks.push(value)
+  }
+  ticks.push(windowEndMs)
+  return {
+    windowStartMs,
+    windowEndMs,
+    firstDataMs: windowStartMs,
+    bucketMs: tickStepMs,
+    ticks,
+  }
+}
+
 function bucketXAxisProps(axis: BucketAxis | null) {
+  return {
+    dataKey: 'x',
+    type: 'number' as const,
+    scale: 'time' as const,
+    domain: axis ? [axis.windowStartMs, axis.windowEndMs] : ['dataMin', 'dataMax'],
+    ticks: axis?.ticks,
+    allowDataOverflow: true,
+    tickFormatter: (value: number) => fmtTimeShort(new Date(value).toISOString()),
+    tick: { fontSize: 10, fill: 'var(--ink-4)' },
+    interval: 'preserveStartEnd' as const,
+  }
+}
+
+function timeXAxisProps(axis: BucketAxis | null) {
   return {
     dataKey: 'x',
     type: 'number' as const,
@@ -232,8 +271,8 @@ function NoDataAreas({ rows, axis }: { rows: BucketChartRow[]; axis: BucketAxis 
 // window=1h  → LineChart (raw snapshots)
 // window=6h/12h/24h → ComposedChart: avg solid + min dashed/dots + avg-to-min band
 export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window?: HistoryWindow }) {
-  const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
+  const sampledItems = isBucket ? subsampleData(items) : items
 
   if (isBucket) {
     const axis = resolveBucketAxis(items, window)
@@ -312,12 +351,14 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
   }
 
   // window=1h: raw LineChart
-  const data = sampledItems
+  const axis = resolveRawAxis(window)
+  const data = items
     .map((it) => ({
+      x: toTimeMs(extractTimestamp(it)),
       ts: fmtTime(extractTimestamp(it)),
       score: it.risk_score ?? (it.payload as Record<string, unknown> | undefined)?.['risk_score'],
     }))
-    .filter((d) => d.score != null)
+    .filter((d) => d.x != null && d.score != null)
 
   if (data.length === 0) {
     return <EmptyChart message="선택한 시간 범위에 Risk 데이터가 없습니다" />
@@ -328,7 +369,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
-          <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+          <XAxis {...timeXAxisProps(axis)} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
           <Tooltip
             contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
@@ -344,6 +385,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
             strokeWidth={1.8}
             dot={false}
             activeDot={{ r: 4 }}
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -520,8 +562,8 @@ export function SensorChart({ items, field, label, unit, window }: {
   unit: string
   window?: HistoryWindow
 }) {
-  const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
+  const sampledItems = isBucket ? subsampleData(items) : items
   const minField = SENSOR_MIN_FIELD[field]
   const maxField = SENSOR_MAX_FIELD[field]
   const bucketMinutes = isBucket ? (items[0]?.bucket_minutes ?? 5) : null
@@ -674,12 +716,14 @@ export function SensorChart({ items, field, label, unit, window }: {
   }
 
   // window=1h: raw LineChart (avg only, no max available)
-  const data = sampledItems
+  const axis = resolveRawAxis(window)
+  const data = items
     .map((it) => ({
+      x: toTimeMs(extractTimestamp(it)),
       ts: fmtTime(extractTimestamp(it)),
       avg: (it[field] as number | null | undefined) ?? null,
     }))
-    .filter((d) => d.avg != null)
+    .filter((d) => d.x != null && d.avg != null)
 
   if (data.length === 0) return <EmptyChart message={`${label} 데이터 없음`} />
 
@@ -688,7 +732,7 @@ export function SensorChart({ items, field, label, unit, window }: {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
-          <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+          <XAxis {...timeXAxisProps(axis)} />
           <YAxis tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
           <Tooltip
             contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
@@ -698,6 +742,7 @@ export function SensorChart({ items, field, label, unit, window }: {
             type="monotone" dataKey="avg" name={label}
             stroke="var(--accent)" strokeWidth={1.8}
             dot={false} activeDot={{ r: 4 }}
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -765,8 +810,8 @@ function AIScoreBucketTooltip({ active, payload }: { active?: boolean; payload?:
 // window=1h  → LineChart (raw snapshots, instant values)
 // window=6h/12h/24h → ComposedChart: mean lines + spike dot markers (max ≥ 0.8)
 export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?: HistoryWindow }) {
-  const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
+  const sampledItems = isBucket ? subsampleData(items) : items
 
   if (isBucket) {
     const axis = resolveBucketAxis(items, window)
@@ -847,14 +892,16 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
   }
 
   // window=1h: raw LineChart
-  const data = sampledItems
+  const axis = resolveRawAxis(window)
+  const data = items
     .map((it) => ({
+      x: toTimeMs(extractTimestamp(it)),
       ts: fmtTime(extractTimestamp(it)),
       fire:  it.fire_score ?? null,
       fall:  it.fall_score ?? null,
       bend:  it.bend_score ?? null,
     }))
-    .filter((d) => d.fire != null || d.fall != null || d.bend != null)
+    .filter((d) => d.x != null && (d.fire != null || d.fall != null || d.bend != null))
 
   if (data.length === 0) {
     return <EmptyChart message="AI Score 데이터 없음" />
@@ -865,7 +912,7 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
-          <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />
+          <XAxis {...timeXAxisProps(axis)} />
           <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
           <Tooltip
             contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
@@ -873,9 +920,9 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           <ReferenceLine y={0.8} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
           <ReferenceLine y={0.3} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
-          <Line type="monotone" dataKey="fire" name="화재" stroke="var(--crit)" strokeWidth={1.6} dot={false} />
-          <Line type="monotone" dataKey="fall" name="넘어짐" stroke="var(--warn)" strokeWidth={1.6} dot={false} />
-          <Line type="monotone" dataKey="bend" name="굽힘" stroke="var(--accent)" strokeWidth={1.6} dot={false} />
+          <Line type="monotone" dataKey="fire" name="화재" stroke="var(--crit)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="fall" name="넘어짐" stroke="var(--warn)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="bend" name="굽힘" stroke="var(--accent)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -891,9 +938,10 @@ export function NodeResourceChart({ items, field, label, window }: {
   label: string
   window?: HistoryWindow
 }) {
-  const sampledItems = subsampleData(items)
   const isBucket = items.length > 0 && items[0]?.is_bucket === true
+  const sampledItems = isBucket ? subsampleData(items) : items
   const axis = isBucket ? resolveBucketAxis(items, window) : null
+  const rawAxis = isBucket ? null : resolveRawAxis(window)
 
   // HISTORY#STATE (1h): per-node raw series
   const nodeIds = new Set<string>()
@@ -921,14 +969,14 @@ export function NodeResourceChart({ items, field, label, window }: {
 
     const aggRows = sampledItems
       .map((it) => ({
-        x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
+        x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : toTimeMs(extractTimestamp(it)),
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         value: !isBucket || hasBucketSamples(it) ? (it[aggField] as number | null | undefined) ?? null : null,
         sample_count: it.sample_count ?? null,
         bucket_start: it.bucket_start,
         bucket_end: it.bucket_end,
       }))
-      .filter((d) => (isBucket ? d.x != null : d.value != null))
+      .filter((d) => d.x != null && (isBucket || d.value != null))
     const aggData = isBucket ? withBucketAxisGaps(aggRows, axis) : aggRows
 
     if (!aggRows.some((d) => (!isBucket || hasBucketSamples(d)) && d.value != null)) {
@@ -942,7 +990,7 @@ export function NodeResourceChart({ items, field, label, window }: {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
             {isBucket
               ? <XAxis {...bucketXAxisProps(axis)} />
-              : <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />}
+              : <XAxis {...timeXAxisProps(rawAxis)} />}
             <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30}
               tickFormatter={(v: number) => `${v}%`} />
             <Tooltip
@@ -957,6 +1005,7 @@ export function NodeResourceChart({ items, field, label, window }: {
               stroke={NODE_COLORS[0]}
               strokeWidth={1.6}
               dot={false}
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -973,7 +1022,7 @@ export function NodeResourceChart({ items, field, label, window }: {
     .map((it) => {
       const hasSamples = !isBucket || hasBucketSamples(it)
       const row: NodeChartRow = {
-        x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : null,
+        x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : toTimeMs(extractTimestamp(it)),
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         sample_count: it.sample_count ?? null,
         bucket_start: it.bucket_start,
@@ -996,7 +1045,7 @@ export function NodeResourceChart({ items, field, label, window }: {
       })
       return row
     })
-    .filter((row) => !isBucket || row.x != null)
+    .filter((row) => row.x != null)
   const data = isBucket ? withBucketAxisGaps(rows, axis) : rows
 
   if (!rows.some((row) => (!isBucket || hasBucketSamples(row)) && activeNodeIds.some((nid) => row[nid] != null))) {
@@ -1010,7 +1059,7 @@ export function NodeResourceChart({ items, field, label, window }: {
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
           {isBucket
             ? <XAxis {...bucketXAxisProps(axis)} />
-            : <XAxis dataKey="ts" tick={{ fontSize: 10, fill: 'var(--ink-4)' }} interval="preserveStartEnd" />}
+            : <XAxis {...timeXAxisProps(rawAxis)} />}
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30}
             tickFormatter={(v: number) => `${v}%`} />
           <Tooltip
@@ -1028,6 +1077,7 @@ export function NodeResourceChart({ items, field, label, window }: {
               stroke={colorForNode(nid)}
               strokeWidth={1.6}
               dot={false}
+              isAnimationActive={false}
             />
           ))}
         </LineChart>
