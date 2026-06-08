@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-08
 수정 이력:
+  - 2026-06-08 v3.4  Cloud Infra 일간 보고서 접근 제어와 Reports selector 운영 배포 완료. `factory_id=cloud-infra` 보고서는 공장 권한 대신 system-view 권한으로 list/get 접근을 허용. backend image `sha-71bbe1d`, ECS task definition revision 40, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-08 v3.3  Dashboard history/report export numeric string 정규화와 Reports Word `.docx` 내보내기 운영 배포 완료. backend image `sha-199cb52`, ECS task definition revision 39, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-08 v3.2  Dashboard history delta refresh 최적화 운영 배포 완료. `/factories/{factory_id}/history`에 `since` query와 window별 기본 limit(10m=250, 1h=2000, 그 외 500)을 반영하고 frontend 자동 refresh는 신규분만 merge/dedupe. backend image `sha-9c28603`, ECS task definition revision 38, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-04 v3.1  삭제 이전 구현으로 남은 `disabled` RDS 사용자 row 때문에 같은 이메일 재생성 시 409가 나는 문제 보정. 생성 시 stale disabled 계정은 Cognito 잔여 username을 best-effort 삭제하고 RDS row를 제거한 뒤 신규 생성하도록 변경. backend image `sha-e96bf81`, ECS task definition revision 37, desired/running 2, `/healthz`와 `/readyz` 정상, Terraform post-apply plan No changes.
@@ -173,11 +174,11 @@ dependencies.redis = ok
 dependencies.rds_metadata = ok
 ```
 
-2026-06-08 history/report export 정규화 및 Word `.docx` 내보내기 배포 확인:
+2026-06-08 Cloud Infra 일간 보고서 접근 제어/selector 배포 확인:
 
 ```text
-backend image tag = sha-199cb52
-ECS task definition revision = 39
+backend image tag = sha-71bbe1d
+ECS task definition revision = 40
 ECS desired/running = 2/2
 ECS task health = HEALTHY across ap-south-1a and ap-south-1c
 /healthz = ok
