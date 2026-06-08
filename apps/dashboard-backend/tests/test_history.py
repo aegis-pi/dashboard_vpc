@@ -44,6 +44,25 @@ def test_history_returns_only_history_state_count(client, ddb_mock):
     assert len(items) == 2
 
 
+def test_history_since_returns_only_newer_items(client, ddb_mock):
+    items = client.get("/factories/factory-a/history?window=1h").json()
+
+    r = client.get(f"/factories/factory-a/history?window=1h&since={items[0]['timestamp']}")
+
+    assert r.status_code == 200
+    delta = r.json()
+    assert len(delta) == 1
+    assert delta[0]["timestamp"] == items[1]["timestamp"]
+
+
+def test_history_window_default_limits():
+    from routers.factories import _default_history_limit
+
+    assert _default_history_limit("10m") == 250
+    assert _default_history_limit("1h") == 2000
+    assert _default_history_limit("6h") == 500
+
+
 def test_history_items_have_required_fields(client, ddb_mock):
     items = client.get("/factories/factory-a/history?window=1h").json()
     for item in items:

@@ -10,6 +10,11 @@ router = APIRouter(prefix="/factories", tags=["factories"])
 _factories_cache: list | None = None
 _factories_cache_at: float = 0.0
 _FACTORIES_TTL = 10.0
+_HISTORY_DEFAULT_LIMIT = 500
+_HISTORY_WINDOW_LIMITS = {
+    "10m": 250,
+    "1h": 2000,
+}
 
 
 def _ddb_gateway_timeout() -> HTTPException:
@@ -52,6 +57,10 @@ def _normalize_factories(items: list) -> list:
     return result
 
 
+def _default_history_limit(window: str) -> int:
+    return _HISTORY_WINDOW_LIMITS.get(window, _HISTORY_DEFAULT_LIMIT)
+
+
 @router.get("")
 async def list_factories(
     principal: Principal = Depends(get_current_principal),
@@ -92,16 +101,23 @@ async def get_factory(
 async def get_factory_history(
     factory_id: str,
     window: str = Query(default="1h", pattern=r"^\d+[hmd]$"),
-    limit: int = Query(default=500, ge=1, le=2000),
+    limit: int | None = Query(default=None, ge=1, le=2000),
+    since: str | None = Query(default=None, min_length=1, max_length=40),
     principal: Principal = Depends(get_current_principal),
 ):
     """Return the most recent HISTORY#STATE items (newest-first cap, returned ascending).
 
     window examples: 1h, 2h, 24h, 7d, 30m
-    limit: hard cap on items returned (default 500, max 2000).
+    limit: hard cap on items returned (default is window-aware, max 2000).
+    since: optional ISO timestamp; returns only items newer than this timestamp.
     """
     require_factory_access(principal, factory_id)
     try:
-        return await ddb.get_factory_history(factory_id, window, limit)
+        return await ddb.get_factory_history(
+            factory_id,
+            window,
+            limit or _default_history_limit(window),
+            since=since,
+        )
     except ddb.DynamoDBUnavailableError as exc:
         raise _ddb_gateway_timeout() from exc

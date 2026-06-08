@@ -270,7 +270,10 @@ async def list_factories() -> list[dict]:
 
 
 async def get_factory_history(
-    factory_id: str, window: str = "1h", max_items: int = 500
+    factory_id: str,
+    window: str = "1h",
+    max_items: int = 500,
+    since: str | None = None,
 ) -> list[dict]:
     """Return history items for chart consumption.
 
@@ -280,18 +283,20 @@ async def get_factory_history(
     window=24h → GRAPH#5M# re-aggregated to 20-min buckets (4×5min, up to 72 pts)
     """
     table_name = get_settings().ddb_table_status
-    since = _since_iso(window)
+    query_since = since or _since_iso(window)
 
     if _parse_window(window) <= timedelta(hours=1):
-        since_sk = f"{HISTORY_STATE_PREFIX}{since}"
+        since_sk = f"{HISTORY_STATE_PREFIX}{query_since}"
         raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items)
-        return [_extract(i) for i in raw]
+        extracted = [_extract(i) for i in raw]
+        return _filter_after_since(extracted, since) if since else extracted
 
-    since_sk = f"{GRAPH_5M_PREFIX}{since}"
+    since_sk = f"{GRAPH_5M_PREFIX}{query_since}"
     raw = await _run_ddb(_get_graph_5m_sync, table_name, factory_id, since_sk)
     extracted = [_extract_graph_5m(i) for i in raw]
     n = _bucket_size_for_window(window)
-    return _reaggregate_extracted(extracted, n) if n > 1 else extracted
+    result = _reaggregate_extracted(extracted, n) if n > 1 else extracted
+    return _filter_after_since(result, since) if since else result
 
 
 async def get_cloud_infra_history(
@@ -558,6 +563,12 @@ def _parse_window(window: str) -> timedelta:
 def _since_iso(window: str) -> str:
     dt = datetime.now(timezone.utc) - _parse_window(window)
     return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def _filter_after_since(items: list[dict], since: str | None) -> list[dict]:
+    if not since:
+        return items
+    return [item for item in items if str(item.get("timestamp") or "") > since]
 
 
 def _coalesce_fs(fs: dict, *dot_paths: str):
