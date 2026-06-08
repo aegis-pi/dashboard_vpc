@@ -26,7 +26,13 @@ import {
 } from '../utils/timeline'
 import { useFactory } from '../hooks/useFactory'
 import { useFactories } from '../hooks/useFactories'
-import { useFactoryHistory, type HistoryWindow } from '../hooks/useFactoryHistory'
+import {
+  HISTORY_LIMIT_10M,
+  HISTORY_LIMIT_1H,
+  historyItemFromLatest,
+  useFactoryHistory,
+  type HistoryWindow,
+} from '../hooks/useFactoryHistory'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { FactoryDetail, NodeStatus, WorkloadStatus, DeviceEntry } from '../api/types'
 
@@ -496,7 +502,8 @@ const HISTORY_WINDOWS: HistoryWindow[] = ['1h', '6h', '12h', '24h']
 
 function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refreshSignalKey: number }) {
   const [win, setWin] = useState<HistoryWindow>('1h')
-  const { data: history, loading, refresh } = useFactoryHistory(factoryId, win)
+  const limit = win === '1h' ? HISTORY_LIMIT_1H : undefined
+  const { data: history, loading, refresh } = useFactoryHistory(factoryId, win, true, limit)
 
   useEffect(() => {
     if (refreshSignalKey === 0) return
@@ -1218,7 +1225,8 @@ function TimelineTab({ factoryId, refreshSignalKey }: { factoryId: string; refre
 
   const customRange = resolveTimelineRange(customStart, customEnd, nowTick)
   const queryWindow = mode === 'custom' ? customRange.window : win
-  const { data: history, loading, error, refresh } = useFactoryHistory(factoryId, queryWindow, true, TIMELINE_RAW_LIMIT)
+  const timelineLimit = queryWindow === '10m' ? HISTORY_LIMIT_10M : TIMELINE_RAW_LIMIT
+  const { data: history, loading, error, refresh } = useFactoryHistory(factoryId, queryWindow, true, timelineLimit)
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 60_000)
@@ -1488,21 +1496,39 @@ export function FactoryPage() {
   const hasFactoryData = data !== null
   const { status: wsStatus, lastMessage } = useWebSocket(factoryId)
   const { data: fleetData, refresh: refreshFleet } = useFactories()
+  const [liveData, setLiveData] = useState<FactoryDetail | null>(null)
 
-  // 1h history is enough to derive the header's 10m trend.
-  const { data: history1h, refresh: refreshHistory1h } = useFactoryHistory(factoryId, '1h')
+  // Header trend uses a dedicated 10m window instead of pulling the full 1h chart data.
+  const {
+    data: history10m,
+    refresh: refreshHistory10m,
+    append: appendHistory10m,
+  } = useFactoryHistory(factoryId, '10m', true, HISTORY_LIMIT_10M)
   const [trendData, setTrendData] = useState<number[]>([])
 
   useEffect(() => {
-    setTrendData(recentRiskScores(history1h))
-  }, [history1h])
+    setLiveData(data)
+  }, [data])
+
+  useEffect(() => {
+    setTrendData(recentRiskScores(history10m))
+  }, [history10m])
+
+  useEffect(() => {
+    if (!lastMessage) return
+    const messageFactoryId = lastMessage.factory_id
+    if (typeof messageFactoryId === 'string' && messageFactoryId !== factoryId) return
+    const next = lastMessage as unknown as FactoryDetail
+    setLiveData(next)
+    appendHistory10m(historyItemFromLatest(lastMessage))
+  }, [appendHistory10m, factoryId, lastMessage])
 
   const refreshPageData = useCallback(() => {
     void refresh()
-    void refreshHistory1h()
+    void refreshHistory10m()
     void refreshFleet()
     setRefreshSignalKey((k) => k + 1)
-  }, [refresh, refreshHistory1h, refreshFleet])
+  }, [refresh, refreshHistory10m, refreshFleet])
 
   useEffect(() => {
     if (refreshInterval <= 0) return
@@ -1524,13 +1550,14 @@ export function FactoryPage() {
 
   // Use all factories for the sidebar. If fleet data hasn't loaded yet (direct
   // URL access, no cache), show the current factory so the section stays visible.
+  const currentData = liveData ?? data
   const sidebarFactories = (fleetData?.factories
     ? fleetData.factories.map((f) => ({
         factory_id: f.factory_id,
         risk_level: f.risk_level ?? f.risk?.level,
         risk_score: f.risk_score ?? f.risk?.score,
       }))
-    : [{ factory_id: factoryId, risk_level: data?.risk?.level, risk_score: data?.risk?.score }]
+    : [{ factory_id: factoryId, risk_level: currentData?.risk?.level, risk_score: currentData?.risk?.score }]
   ).sort((a, b) => a.factory_id.localeCompare(b.factory_id))
 
   return (
@@ -1567,9 +1594,9 @@ export function FactoryPage() {
         </div>
       )}
 
-      {data && (
+      {currentData && (
         <>
-          <FactoryHeader f={data} trendData={trendData} />
+          <FactoryHeader f={currentData} trendData={trendData} />
 
           <div className="factory-tabs-panel">
             <div className="tabs factory-tabs">
@@ -1585,7 +1612,7 @@ export function FactoryPage() {
             </div>
           </div>
 
-          {activeTab === 'overview' && <OverviewTab data={data} />}
+          {activeTab === 'overview' && <OverviewTab data={currentData} />}
 
           {/* History tabs: mounted on first visit, hidden (not unmounted) on tab switch
               so cached data survives without re-fetch on return visits. */}
@@ -1596,7 +1623,7 @@ export function FactoryPage() {
           )}
           {visitedTabs.has('infrastructure') && (
             <div style={{ display: activeTab === 'infrastructure' ? 'block' : 'none' }}>
-              <InfraTab data={data} factoryId={factoryId} refreshSignalKey={refreshSignalKey} />
+              <InfraTab data={currentData} factoryId={factoryId} refreshSignalKey={refreshSignalKey} />
             </div>
           )}
           {visitedTabs.has('timeline') && (

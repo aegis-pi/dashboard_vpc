@@ -107,9 +107,11 @@ export async function fetchFactoryHistory(
   factoryId: string,
   window: string = '1h',
   limit?: number,
+  since?: string,
 ): Promise<HistoryItem[]> {
   const params = new URLSearchParams({ window })
   if (limit != null) params.set('limit', String(limit))
+  if (since) params.set('since', since)
   const raw = await apiFetch<unknown>(`/factories/${factoryId}/history?${params.toString()}`)
 
   if (Array.isArray(raw)) return raw as HistoryItem[]

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchFactoryHistory } from '../api/client'
 import { normalizeHistoryItem } from '../utils/normalize'
 import type { HistoryItem, RiskLevel } from '../api/types'
+import { HISTORY_LIMIT_10M, mergeHistoryItems } from './useFactoryHistory'
 
 export interface RecentChange {
   factory_id: string
@@ -14,7 +15,7 @@ export interface RecentChange {
 
 const RECENT_WINDOW_MS = 10 * 60 * 1000
 
-// Fetches HISTORY#STATE (1h) for all factories in one pass.
+// Fetches HISTORY#STATE (10m) for all factories in one pass.
 // Returns both derived recent-change events and raw history keyed by factory_id
 // so callers can pass it down to cards without re-fetching.
 // Stale-while-revalidate: previous results stay visible during background refresh.
@@ -25,6 +26,7 @@ export function useFleetRecentChanges(factoryIds: string[]) {
   const [refreshing, setRefreshing] = useState(false)
   const requestSeq = useRef(0)
   const mounted = useRef(true)
+  const historyRef = useRef<Record<string, HistoryItem[]>>({})
   const key = [...factoryIds].sort().join(',')
   const hasDataRef = useRef(false)
   hasDataRef.current = events.length > 0
@@ -54,7 +56,11 @@ export function useFleetRecentChanges(factoryIds: string[]) {
     }
 
     try {
-      const results = await Promise.all(ids.map((id) => fetchFactoryHistory(id, '1h')))
+      const results = await Promise.all(ids.map((id) => {
+        const existing = historyRef.current[id] ?? []
+        const latest = latestTimestamp(existing)
+        return fetchFactoryHistory(id, '10m', HISTORY_LIMIT_10M, latest)
+      }))
       if (!mounted.current || requestSeq.current !== seq) return
 
       const byFactory: Record<string, HistoryItem[]> = {}
@@ -63,7 +69,13 @@ export function useFleetRecentChanges(factoryIds: string[]) {
 
       ids.forEach((factoryId, idx) => {
         const raw = results[idx] ?? []
-        const history = raw.map(normalizeHistoryItem)
+        const existing = historyRef.current[factoryId] ?? []
+        const history = mergeHistoryItems(
+          existing,
+          raw.map(normalizeHistoryItem),
+          '10m',
+          HISTORY_LIMIT_10M,
+        )
         byFactory[factoryId] = history
 
         for (let i = 1; i < history.length; i++) {
@@ -85,6 +97,7 @@ export function useFleetRecentChanges(factoryIds: string[]) {
       })
 
       all.sort((a, b) => b.ts - a.ts)
+      historyRef.current = byFactory
       setEvents(all)
       setHistoryByFactory(byFactory)
     } catch {
@@ -102,4 +115,12 @@ export function useFleetRecentChanges(factoryIds: string[]) {
   }, [refresh])
 
   return { events, historyByFactory, loading, refreshing, refresh }
+}
+
+function latestTimestamp(items: HistoryItem[]): string | undefined {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const ts = items[i]?.timestamp
+    if (typeof ts === 'string' && ts) return ts
+  }
+  return undefined
 }
