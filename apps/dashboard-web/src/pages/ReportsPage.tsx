@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { fetchReport } from '../api/client'
 import { recentDates, todayStr } from '../adapters/reports'
 import { adaptSidebarFactory } from '../adapters/factory'
@@ -184,6 +185,14 @@ const TODAY = todayStr()
 const REPORT_DATES = recentDates(7, 1)
 const DEFAULT_REPORT_DATE = REPORT_DATES[0] ?? TODAY
 
+// Cloud infra reports share the factory report storage (factory_id === this id)
+// but are gated by system-view permission, so they get their own selector.
+const CLOUD_INFRA_ID = 'cloud-infra'
+
+function targetLabel(id: string): string {
+  return id === CLOUD_INFRA_ID ? '클라우드 인프라' : id
+}
+
 function unique<T>(items: T[]): T[] {
   return Array.from(new Set(items))
 }
@@ -197,6 +206,8 @@ function sortIds(ids: string[]): string[] {
 
 export function ReportsPage() {
   const { data: fleetData } = useFactories()
+  const currentUser = useCurrentUser()
+  const canViewSystem = currentUser.data?.can_view_system === true
   const factories = useMemo(() => (
     [...(fleetData?.factories ?? [])]
       .sort((a, b) => a.factory_id.localeCompare(b.factory_id, undefined, {
@@ -283,7 +294,7 @@ export function ReportsPage() {
         <div className="eyebrow page-eyebrow">Risk Twin · Reports</div>
         <h1 className="page-title">일간 보고서</h1>
         <p className="page-desc">
-          공장과 날짜를 선택해 S3 reports prefix에 저장된 Markdown 일간 보고서를 확인합니다.{' '}
+          공장(또는 클라우드 인프라)과 날짜를 선택해 S3 reports prefix에 저장된 Markdown 일간 보고서를 확인합니다.{' '}
           <span className="mono" style={{ whiteSpace: 'nowrap' }}>FR-DASH-06 · FR-DATA-07/08</span>
         </p>
       </div>
@@ -307,6 +318,21 @@ export function ReportsPage() {
                     {fid}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cloud infra report selector */}
+          {canViewSystem && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
+              <span className="eyebrow">클라우드 인프라</span>
+              <div className="seg">
+                <button
+                  aria-pressed={activeFactory === CLOUD_INFRA_ID}
+                  onClick={() => setSelectedFactory(CLOUD_INFRA_ID)}
+                >
+                  {CLOUD_INFRA_ID}
+                </button>
               </div>
             </div>
           )}
@@ -411,7 +437,7 @@ export function ReportsPage() {
           icon={FileText}
           tone="unk"
           title="보고서가 없습니다."
-          detail={`${activeFactory} · ${date} 일자 보고서가 아직 생성되지 않았습니다.`}
+          detail={`${targetLabel(activeFactory)} · ${date} 일자 보고서가 아직 생성되지 않았습니다.`}
         >
           <button className="btn primary" onClick={() => void fetchReportData(activeFactory, date)}>
             <Plus size={13} />재시도
@@ -436,7 +462,7 @@ export function ReportsPage() {
         <div className="card">
           <div className="card-hd">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
-              <h2 className="h2" style={{ whiteSpace: 'nowrap' }}>{activeFactory} · {date}</h2>
+              <h2 className="h2" style={{ whiteSpace: 'nowrap' }}>{targetLabel(activeFactory)} · {date}</h2>
             </div>
           </div>
           <div className="card-bd">
