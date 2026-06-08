@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-08
 수정 이력:
+  - 2026-06-08  history endpoint delta refresh 계약(`since`)과 window별 기본 limit 현행화: 10m=250, 1h=2000, 그 외 기본 500.
   - 2026-06-04  Auth/RBAC Endpoint 섹션 추가(`/auth/me`, `/admin/users` CRUD, ADR 0031 구현·배포 완료). 공장별 인가 note 반영. Cloud Infra collector(write)도 본 환경 구현·배포 완료로 정정(`apps/cloud-infra-collector/`).
   - 2026-06-02  `/reports` · `/reports/{date}/{factory_id}` endpoint를 skeleton/DDB 기준에서 S3 `reports/daily/` 기반 구현 완료로 현행화. 응답 필드/IAM/경로 note 추가(ADR 0029). `/cloud-infra` · `/cloud-infra/history` Backend/Frontend read 화면 구현·배포 완료 상태로 현행화.
   - 2026-06-01  history endpoint의 `window<=1h` HISTORY#STATE 조회 기준과 Timeline `10m/custom` 사용 범위 반영.
@@ -90,7 +91,7 @@ Authorization: Bearer <Cognito Access Token>
 | GET | `/healthz` | 없음 | liveness | `{"status":"ok"}` | 구현 완료 |
 | GET | `/factories` | Cognito JWT | 공장 목록 + latest 요약 | DDB Query (pk=FACTORY#*, sk=LATEST) | 구현 완료 |
 | GET | `/factories/{factory_id}` | Cognito JWT | 단일 공장 latest 전체 | DDB GetItem | 구현 완료 |
-| GET | `/factories/{factory_id}/history?window=10m\|1h` | Cognito JWT | 원시 시계열 (risk/factory_state/infra_state 통합, Timeline 원인 표시 포함) | DDB Query (`sk BETWEEN HISTORY#STATE#`, `limit` cap) | 구현 완료 |
+| GET | `/factories/{factory_id}/history?window=10m\|1h[&limit=N][&since=<iso>]` | Cognito JWT | 원시 시계열 (risk/factory_state/infra_state 통합, Timeline 원인 표시 포함), `since` 지정 시 신규분만 반환 | DDB Query (`sk BETWEEN HISTORY#STATE#`, `limit` cap) | 구현 완료 |
 | GET | `/factories/{factory_id}/history?window=>1h` (`6h\|12h\|24h` 등) | Cognito JWT | 5분 avg/min/max 집계 시계열 | DDB Query (`sk BETWEEN GRAPH#5M#`, 24h 기준 최대 288 items) | **구현 완료** (ADR 0025) |
 | GET | `/reports` | Cognito JWT | 일간 Markdown 보고서 목록 | S3 ListObjectsV2 (`reports/daily/` prefix) | 구현 완료 |
 | GET | `/reports/{report_date}/{factory_id}` | Cognito JWT | 공장별 Markdown 보고서 본문 (`text/markdown`) | S3 GetObject (`reports/daily/yyyy=…/{factory_id}/report.md`) | 구현 완료 |
@@ -129,7 +130,8 @@ Authorization: Bearer <Cognito Access Token>
 - 응답 본문(`fast`/`slow`/`reasons[]`/`errors[]`)은 `docs/planning/29`의 `CLOUD#infra` 스키마 그대로.
 
 **Note**: history endpoint sk prefix 규칙 (ADR 0022 + ADR 0025):
-- `HISTORY#STATE#*`: `window<=1h` 전용. 기본 `limit=500`, Timeline은 필요 시 `limit=2000`까지 요청 가능.
+- `HISTORY#STATE#*`: `window<=1h` 전용. window별 기본 limit은 `10m=250`, `1h=2000`, 그 외 `500`이다. `limit` query는 최대 2000까지 명시 가능하다.
+- `since=<iso timestamp>`가 있으면 해당 timestamp보다 최신 item만 반환한다. Dashboard 자동 refresh는 첫 로드 후 이 delta 조회를 사용해 브라우저 state에 append/merge한다.
 - `GRAPH#5M#*`: `window>1h` 전용. 5분 집계, 24h 기준 최대 288 items/factory.
 - `HISTORY#RISK`, `HISTORY#FACTORY`, `HISTORY#INFRA` prefix는 사용하지 않는다.
 - Timeline의 원인 설명은 현재 `HISTORY#STATE.risk.top_causes`에서 추출한 `top_cause_names`만 사용한다. `GRAPH#5M` 집계 item에는 원인 설명 필드가 없다.

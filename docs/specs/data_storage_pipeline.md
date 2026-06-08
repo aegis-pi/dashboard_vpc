@@ -1,8 +1,9 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-06-02
+기준일: 2026-06-08
 수정 이력:
+  - 2026-06-08  Dashboard history 조회 기준 현행화: 10m trend 기본 limit 250, 1h 기본 limit 2000, 자동 refresh는 `since` delta merge 사용.
   - 2026-06-02  S3 Reports Path 섹션 추가. `reports/daily/yyyy=…/{factory_id}/report.md` 경로와 Dashboard Backend S3 조회 기준(ADR 0029) 반영.
   - 2026-06-01  GRAPH#5M Dashboard 응답에 센서 min 필드와 AI mean/max 분리 기준 추가. Environment History 6h/12h/24h 렌더링 기준 현행화.
   - 2026-05-29  안전 점수 그래프용 `risk_score_max` 추출/응답 기준 추가.
@@ -602,15 +603,22 @@ infra_state
 | 현재 노드 상태 | `DynamoDB LATEST.infra_state` | Ready, CPU, memory, disk |
 | 현재 pipeline 상태 | `DynamoDB LATEST.pipeline_status` | normal/warning/critical |
 | 24h header sparkline | `DynamoDB GRAPH#5M` | window=24h, risk_score (mean) |
-| 최근 그래프 window=1h | `DynamoDB HISTORY#STATE` | raw snapshot, max_items=500 cap |
+| 10m trend | `DynamoDB HISTORY#STATE` | raw snapshot, 기본 limit 250, refresh 시 `since` delta merge |
+| 최근 그래프 window=1h | `DynamoDB HISTORY#STATE` | raw snapshot, 기본 limit 2000, refresh 시 `since` delta merge |
 | 최근 그래프 window=6h/12h/24h | `DynamoDB GRAPH#5M` | 5분 avg/min/max 집계, 최대 288 items |
 | 장기 이력/감사 | `S3 processed`, `S3 raw` | 장기 조회, 재처리, 리포트 |
 
 Dashboard API:
 
 ```text
+GET /factories/{factory_id}/history?window=10m
+  -> DynamoDB HISTORY#STATE query (기본 limit 250, ScanIndexForward=False)
+  -> 자동 refresh 시 since=<last_timestamp>로 신규분만 조회
+  -> 응답: timestamp, risk_score, temperature_celsius_avg, fire_score, nodes[], ...
+
 GET /factories/{factory_id}/history?window=1h
-  -> DynamoDB HISTORY#STATE query (max_items=500 cap, ScanIndexForward=False)
+  -> DynamoDB HISTORY#STATE query (기본 limit 2000, ScanIndexForward=False)
+  -> 자동 refresh 시 since=<last_timestamp>로 신규분만 조회
   -> 응답: timestamp, risk_score, temperature_celsius_avg, fire_score, nodes[], ...
 
 GET /factories/{factory_id}/history?window=6h|12h|24h
