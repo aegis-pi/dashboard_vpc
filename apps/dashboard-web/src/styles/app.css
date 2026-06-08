@@ -718,12 +718,12 @@ input { font-family: inherit; }
 }
 .factory-hero-dot { color: var(--ink-5); }
 .factory-hero-title {
-  font-family: var(--font-mono);
-  font-size: 24px;
+  font-family: var(--font-sans);
+  font-size: 26px;
   line-height: 1.1;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--ink);
-  letter-spacing: 0;
+  letter-spacing: -0.005em;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -870,7 +870,7 @@ input { font-family: inherit; }
     font-size: 190px;
   }
   .factory-hero-title {
-    font-size: 21px;
+    font-size: 23px;
     white-space: normal;
   }
   .factory-hero-summary {
