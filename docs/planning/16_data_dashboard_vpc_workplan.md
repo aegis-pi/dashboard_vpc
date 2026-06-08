@@ -494,13 +494,13 @@ RDS 미영구화 결정:
 - scripts/build/build-data-dashboard.sh (Terraform apply 순서 자동화) ✅ 구현 완료
 - scripts/destroy/destroy-data-dashboard.sh (RDS PostgreSQL snapshot → destroy 순서) ✅ 구현 완료
 - scripts/ops/data-dashboard-port-forward.sh (필요 시 로컬 fallback) — 미작성 (필요 시 추가)
-- docs/architecture/drawio/ 신규 다이어그램 (03_re6 갱신) — agiespi_architecture_overview_final.drawio 존재, Phase 1 운영 반영 갱신 잔여
+- docs/architecture/drawio/ 신규 다이어그램 ✅ 완료 — `agiespi_architecture_overview_final1.drawio` / `images/agiespi_architecture_overview_final3.drawio.png` 단일 overview로 통합. Cloud Infra Collector·notifier DLQ·OIDC 웹배포·RBAC·`CLOUD#infra`·`GRAPH#5M`·ECS Auto Scaling 반영 (ADR 0032)
 - docs/architecture/01_target_architecture.md 갱신 ✅ 완료
 - docs/ops/22_data_dashboard_vpc_runbook.md (build/destroy 사이클 + 도메인/ACM/Cognito + 트러블슈팅) ✅ 작성 완료
 - docs/ops/15_aws_cost_baseline.md 실측 후 재갱신 ✅ v3.4까지 갱신 완료
 ```
 
-남은 Step 10 작업: drawio 다이어그램 Phase 1 운영 상태 반영 갱신, (필요 시) port-forward 스크립트, 데모 시나리오/리허설 최종 정리.
+남은 Step 10 작업: (필요 시) port-forward 스크립트, 데모 시나리오/리허설 최종 정리.
 
 ## 합류 지점 운영 규칙
 

@@ -86,7 +86,7 @@
 - `docs/changes/0012~0017` (Phase 1 결정 ADR 6종)
 - `docs/planning/17_expansion_roadmap.md` (Phase 1~4 트리거)
 - `docs/architecture/01_target_architecture.md`
-- `docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio`
+- `docs/architecture/drawio/agiespi_architecture_overview_final1.drawio` / `images/agiespi_architecture_overview_final3.drawio.png` (overview source of truth, ADR 0032)
 
 > Step 번호 정정: `docs/planning/16_data_dashboard_vpc_workplan.md`가 source of truth이며, 실제 진행 중 Step 8=운영 Frontend Vite 마이그레이션, Step 9=S3+CloudFront 배포 CI/CD + e2e 검증, Step 9.5=permanent resource split으로 재정의됐다. 아래 체크박스는 그 정정 기준으로 표기한다.
 

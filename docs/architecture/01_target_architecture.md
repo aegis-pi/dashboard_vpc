@@ -366,9 +366,9 @@ docs/planning/07_dashboard_vpc_extension_plan.md   보안 경계와 지연 기�
 docs/specs/data_storage_pipeline.md                저장 모델 / DDB schema
 docs/changes/0006~0011                               이전 결정 ADR
 docs/changes/0012~0017                               Phase 1 통합 결정 ADR
-docs/architecture/drawio/02_re5_two_vpc_target.drawio   2 VPC overview (pre-Phase 1)
-docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio  Phase 1 Workstream B 시각화 (예정)
-docs/architecture/drawio/01_re4.drawio                  pre-2VPC 단일 VPC historical reference
+docs/changes/0032                                     overview 다이어그램 확정 ADR
+docs/architecture/drawio/agiespi_architecture_overview_final1.drawio   현재 overview source of truth (ADR 0032)
+docs/architecture/images/agiespi_architecture_overview_final3.drawio.png  overview PNG export
 ```
 
 ## 목표 Hub Namespace

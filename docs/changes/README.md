@@ -46,11 +46,12 @@
 | 0024 | Permanent resource split: CloudFront/Cognito/ECR/S3-web 영구 root 분리 | accepted | 2026-05-26 | Phase 1 Step 9.5, infra/data-dashboard-permanent/, Terraform state |
 | 0025 | Multi-resolution history storage: history_raw TTL 2h + GRAPH#5M 5분 집계 | accepted | 2026-05-29 | Phase 1 data pipeline, DynamoDB HISTORY/GRAPH#5M, Lambda Aggregator(팀원 배포), Dashboard Backend/Frontend |
 | 0026 | DynamoDB key model: FACTORY pk + LATEST/HISTORY#STATE/GRAPH#5M sk 운영 확인 | accepted | 2026-05-29 | AEGIS-DynamoDB-FactoryStatus, Dashboard Backend, data pipeline |
-| 0027 | Cloud infra metrics collector: Container Insights 상시 수집 대신 Fast(1m)/Slow(5m) collector read model | proposed | 2026-06-01 | M4/M6 데이터 플레인, Dashboard BE/FE, CLOUD#infra, EKS/ArgoCD 합류 지점, 비용 |
+| 0027 | Cloud infra metrics collector: Container Insights 상시 수집 대신 Fast(1m)/Slow(5m) collector read model | accepted | 2026-06-01 | M4/M6 데이터 플레인, Dashboard BE/FE, CLOUD#infra, EKS/ArgoCD 합류 지점, 비용 |
 | 0028 | Dashboard staleness threshold: infra 지연 표시와 pipeline_status 60/120초 통일 | accepted | 2026-06-02 | M4/M6, apps/data-processor, apps/dashboard-web, stale 표시 |
 | 0029 | Dashboard 보고서 조회: DynamoDB `aegis-daily-report` 대신 S3 `reports/daily/` Markdown read | accepted | 2026-06-02 | M6, apps/dashboard-backend/web, S3 reports prefix, ECS IAM |
 | 0030 | ECS backend right-sizing(0.5→1 vCPU) + Application Auto Scaling(min 2, ALBRequestCountPerTarget 40 + CPU 50%) | accepted | 2026-06-04 | M6, infra/data-dashboard ECS, 비용 baseline |
 | 0031 | Dashboard RBAC 사용자 관리: Cognito 로그인 + RDS 권한 모델 | accepted | 2026-06-04 | M6, apps/dashboard-backend/web, Cognito, RDS PostgreSQL |
+| 0032 | 아키텍처 Overview 다이어그램 확정: `re4~re7` 통합 → 단일 overview, Phase 1 Step 0~10 반영 | accepted | 2026-06-08 | docs/architecture overview, M4/M6 시각화, ADR 0016~0031 매핑 |
 
 ## 파일 형식
 
