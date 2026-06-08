@@ -8,6 +8,7 @@ import { CloudInfraPage } from './pages/CloudInfraPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { LoginPage } from './pages/LoginPage'
 import { CallbackPage } from './pages/CallbackPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false)
@@ -38,17 +39,19 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/callback" element={<CallbackPage />} />
-        <Route path="/" element={<RequireAuth><FleetPage /></RequireAuth>} />
-        <Route path="/factory/:factoryId" element={<RequireAuth><FactoryPage /></RequireAuth>} />
-        <Route path="/cloud-infra" element={<RequireAuth><CloudInfraPage /></RequireAuth>} />
-        <Route path="/admin/users" element={<RequireAuth><AdminUsersPage /></RequireAuth>} />
-        <Route path="/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/callback" element={<CallbackPage />} />
+          <Route path="/" element={<RequireAuth><FleetPage /></RequireAuth>} />
+          <Route path="/factory/:factoryId" element={<RequireAuth><FactoryPage /></RequireAuth>} />
+          <Route path="/cloud-infra" element={<RequireAuth><CloudInfraPage /></RequireAuth>} />
+          <Route path="/admin/users" element={<RequireAuth><AdminUsersPage /></RequireAuth>} />
+          <Route path="/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

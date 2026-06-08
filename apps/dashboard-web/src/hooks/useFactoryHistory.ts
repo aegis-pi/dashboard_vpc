@@ -85,12 +85,25 @@ export function useFactoryHistory(
   const [loading, setLoading] = useState(!fresh)
   const [error, setError] = useState<Error | null>(null)
   const dataRef = useRef(data)
+  const requestSeq = useRef(0)
 
   useEffect(() => {
     dataRef.current = data
   }, [data])
 
+  useEffect(() => {
+    requestSeq.current += 1
+    const cached = _cache.get(key)
+    const next = cached && Date.now() - cached.ts < CACHE_TTL_MS ? cached.data : []
+    dataRef.current = next
+    setData(next)
+    setLoading(enabled && next.length === 0)
+    setError(null)
+  }, [key, enabled])
+
   const load = useCallback(async (force = false) => {
+    const seq = requestSeq.current + 1
+    requestSeq.current = seq
     const cached = _cache.get(key)
     if (!force && cached && Date.now() - cached.ts < CACHE_TTL_MS) {
       setData(cached.data)
@@ -106,12 +119,14 @@ export function useFactoryHistory(
       const normalized = res.map(normalizeHistoryItem)
       const merged = since ? mergeHistoryItems(base, normalized, window, limit) : normalized
       _cache.set(key, { data: merged, ts: Date.now() })
+      if (requestSeq.current !== seq) return
       dataRef.current = merged
       setData(merged)
     } catch (e) {
+      if (requestSeq.current !== seq) return
       setError(e instanceof Error ? e : new Error(String(e)))
     } finally {
-      setLoading(false)
+      if (requestSeq.current === seq) setLoading(false)
     }
   }, [key, factoryId, window, limit])
 
