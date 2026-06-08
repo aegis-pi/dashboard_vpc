@@ -9,88 +9,25 @@ import { fetchReport } from '../api/client'
 import { recentDates, todayStr } from '../adapters/reports'
 import { adaptSidebarFactory } from '../adapters/factory'
 import { classifyReportError } from '../utils/reportError'
+import { parseInline, parseMarkdown, type MdBlock } from '../utils/markdown'
+import { downloadReportDocx } from '../utils/reportDocx'
 
-// ─── Markdown parser (no external deps) ────────────────────────────────
-
-interface MdBlock {
-  kind: 'h' | 'p' | 'list' | 'table'
-  level?: number
-  text?: string
-  ordered?: boolean
-  items?: string[]
-  head?: string[]
-  rows?: string[][]
-}
-
-function splitRow(line: string): string[] {
-  return line.replace(/^\|/, '').replace(/\|$/, '').split('|').map((s) => s.trim())
-}
-
-function parseMarkdown(text: string): MdBlock[] {
-  const lines = text.split('\n')
-  const blocks: MdBlock[] = []
-  let i = 0
-  while (i < lines.length) {
-    const line = lines[i]!
-    if (!line.trim()) { i++; continue }
-    const h = /^(#{1,3})\s+(.*)$/.exec(line)
-    if (h) { blocks.push({ kind: 'h', level: h[1]!.length, text: h[2] }); i++; continue }
-    if (line.startsWith('|') && lines[i + 1]?.match(/^\|\s*[:-]+/)) {
-      const head = splitRow(line)
-      i += 2
-      const rows: string[][] = []
-      while (i < lines.length && lines[i]!.startsWith('|')) { rows.push(splitRow(lines[i]!)); i++ }
-      blocks.push({ kind: 'table', head, rows })
-      continue
-    }
-    if (/^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
-      const ordered = /^\s*\d+\.\s+/.test(line)
-      const items: string[] = []
-      while (i < lines.length && (
-        (ordered && /^\s*\d+\.\s+/.test(lines[i]!)) ||
-        (!ordered && /^\s*[-*]\s+/.test(lines[i]!))
-      )) { items.push(lines[i]!.replace(/^\s*(?:\d+\.|[-*])\s+/, '')); i++ }
-      blocks.push({ kind: 'list', ordered, items })
-      continue
-    }
-    const para = [line]; i++
-    while (i < lines.length && lines[i]!.trim() && !/^(#|\||[-*]\s|\d+\.\s)/.test(lines[i]!)) {
-      para.push(lines[i]!); i++
-    }
-    blocks.push({ kind: 'p', text: para.join(' ') })
-  }
-  return blocks
-}
+// ─── Markdown rendering (parser lives in utils/markdown) ───────────────
 
 function inlineMd(text: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = []
-  let i = 0; let key = 0
-  while (i < text.length) {
-    if (text[i] === '*' && text[i + 1] === '*') {
-      const end = text.indexOf('**', i + 2)
-      if (end > -1) {
-        parts.push(<strong key={key++} style={{ color: 'var(--ink)' }}>{text.slice(i + 2, end)}</strong>)
-        i = end + 2; continue
-      }
+  return parseInline(text).map((s, key) => {
+    if (s.bold) return <strong key={key} style={{ color: 'var(--ink)' }}>{s.text}</strong>
+    if (s.code) {
+      return (
+        <code key={key} className="mono" style={{
+          fontSize: '0.92em', padding: '1px 5px',
+          background: 'var(--surface-2)', border: '1px solid var(--line-2)',
+          borderRadius: 4, color: 'var(--ink-2)',
+        }}>{s.text}</code>
+      )
     }
-    if (text[i] === '`') {
-      const end = text.indexOf('`', i + 1)
-      if (end > -1) {
-        parts.push(
-          <code key={key++} className="mono" style={{
-            fontSize: '0.92em', padding: '1px 5px',
-            background: 'var(--surface-2)', border: '1px solid var(--line-2)',
-            borderRadius: 4, color: 'var(--ink-2)',
-          }}>{text.slice(i + 1, end)}</code>
-        )
-        i = end + 1; continue
-      }
-    }
-    let j = i + 1
-    while (j < text.length && text[j] !== '*' && text[j] !== '`') j++
-    parts.push(text.slice(i, j)); i = j
-  }
-  return parts
+    return <span key={key}>{s.text}</span>
+  })
 }
 
 function renderBlock(b: MdBlock, key: number): React.ReactNode {
@@ -149,10 +86,12 @@ function escapeHtml(s: string): string {
 }
 
 function inlineMdHtml(text: string): string {
-  let s = escapeHtml(text)
-  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  s = s.replace(/`(.+?)`/g, '<code>$1</code>')
-  return s
+  return parseInline(text).map((sp) => {
+    const t = escapeHtml(sp.text)
+    if (sp.bold) return `<strong>${t}</strong>`
+    if (sp.code) return `<code>${t}</code>`
+    return t
+  }).join('')
 }
 
 function markdownToHtml(text: string): string {
@@ -199,32 +138,6 @@ function openPrintWindow(factoryId: string, date: string, markdown: string) {
   <script>window.onload=()=>{setTimeout(()=>window.print(),250);};</script>
 </body></html>`)
   w.document.close()
-}
-
-function downloadAsWord(factoryId: string, date: string, markdown: string) {
-  const bodyHtml = markdownToHtml(markdown)
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
-      xmlns:w="urn:schemas-microsoft-com:office:word"
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>${factoryId} ${date}</title>
-<style>
-  body{font-family:Calibri,sans-serif;font-size:11pt;color:#14181F;}
-  h1{font-size:22pt;margin-bottom:12pt;} h2{font-size:16pt;margin:18pt 0 8pt;}
-  h3{font-size:13pt;margin:14pt 0 6pt;}
-  table{border-collapse:collapse;margin:8pt 0;} td,th{border:1px solid #ccc;padding:6pt 10pt;font-size:10pt;}
-  th{background:#f5f5f5;} code{font-family:Consolas,monospace;background:#f5f5f5;padding:1pt 4pt;}
-  li{margin-bottom:4pt;}
-</style></head><body>
-  <p style="font-size:9pt;color:#56606E;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:8pt;margin-bottom:16pt">
-    Aegis-π Risk Twin · ${factoryId} · ${date} 일간 보고서</p>
-  ${bodyHtml}
-</body></html>`
-  const blob = new Blob(['﻿', html], { type: 'application/msword' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = `${factoryId}_${date}.doc`
-  document.body.appendChild(a); a.click(); document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ─── Report state display ──────────────────────────────────────────────
@@ -301,6 +214,8 @@ export function ReportsPage() {
   const [reportLoading, setReportLoading] = useState(false)
   const [reportContent, setReportContent] = useState<string | null>(null)
   const [reportError, setReportError] = useState<'not_found' | 'error' | null>(null)
+  const [wordExporting, setWordExporting] = useState(false)
+  const [wordError, setWordError] = useState(false)
 
   const factoryIds = useMemo(() => (
     sortIds(unique(factories.map((f) => f.factory_id)))
@@ -346,8 +261,16 @@ export function ReportsPage() {
   const canExport = reportContent != null
   const doExport = (kind: 'pdf' | 'word') => {
     if (!canExport || !activeFactory) return
-    if (kind === 'pdf') openPrintWindow(activeFactory, date, reportContent!)
-    if (kind === 'word') downloadAsWord(activeFactory, date, reportContent!)
+    if (kind === 'pdf') {
+      openPrintWindow(activeFactory, date, reportContent!)
+      return
+    }
+    if (wordExporting) return
+    setWordExporting(true)
+    setWordError(false)
+    void downloadReportDocx(activeFactory, date, reportContent!)
+      .catch((e) => { console.error('Word 내보내기 실패', e); setWordError(true) })
+      .finally(() => setWordExporting(false))
   }
 
   return (
@@ -437,6 +360,11 @@ export function ReportsPage() {
 
           {/* Export buttons */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', alignSelf: 'center' }}>
+            {wordError && (
+              <span className="micro" style={{ color: 'var(--crit)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <AlertTriangle size={12} />Word 생성 실패
+              </span>
+            )}
             <button
               className="btn"
               onClick={() => doExport('pdf')}
@@ -449,11 +377,11 @@ export function ReportsPage() {
             <button
               className="btn"
               onClick={() => doExport('word')}
-              disabled={!canExport}
-              title={canExport ? 'Word(.doc) 다운로드' : 'ready 상태의 보고서가 없습니다'}
-              style={{ opacity: canExport ? 1 : 0.5 }}
+              disabled={!canExport || wordExporting}
+              title={canExport ? 'Word(.docx) 다운로드' : 'ready 상태의 보고서가 없습니다'}
+              style={{ opacity: canExport && !wordExporting ? 1 : 0.5 }}
             >
-              <FileText size={13} />Word
+              <FileText size={13} />{wordExporting ? '생성 중…' : 'Word'}
             </button>
             <button
               className="btn"

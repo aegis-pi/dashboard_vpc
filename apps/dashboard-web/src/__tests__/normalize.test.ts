@@ -45,6 +45,20 @@ describe('extractSensor', () => {
     }
     expect(extractSensor(fs).temperature).toBe(30.0)
   })
+
+  it('coerces numeric strings from API payloads', () => {
+    const fs = {
+      temperature_celsius: '30.5',
+      humidity_percent: '61',
+      pressure_hpa: '1009.25',
+    } as unknown as Parameters<typeof extractSensor>[0]
+
+    expect(extractSensor(fs)).toEqual({
+      temperature: 30.5,
+      humidity: 61,
+      pressure: 1009.25,
+    })
+  })
 })
 
 // ─── extractAI ────────────────────────────────────────────────────────────────
@@ -85,6 +99,22 @@ describe('extractAI', () => {
       ai_result: { fire_score: 0.9 },
     }
     expect(extractAI(fs).fire).toBe(0.5)
+  })
+
+  it('coerces numeric string scores and drops invalid scores', () => {
+    const fs = {
+      fire_score: '0.8',
+      fall_score: '',
+      bend_score: 'bad',
+      abnormal_sound: 'none',
+    } as unknown as Parameters<typeof extractAI>[0]
+
+    expect(extractAI(fs)).toEqual({
+      fire: 0.8,
+      fall: null,
+      bend: null,
+      abnormal_sound: 'none',
+    })
   })
 })
 
@@ -131,5 +161,52 @@ describe('normalizeHistoryItem', () => {
     }
     const result = normalizeHistoryItem(item)
     expect(result.temperature_celsius_avg).toBe(30.0)
+  })
+
+  it('coerces string metrics to numbers before chart rendering', () => {
+    const item = {
+      timestamp: '2026-01-01T00:00:00Z',
+      risk_score: '91.5',
+      risk_score_avg: '90.5',
+      risk_score_min: '75',
+      risk_score_max: '99',
+      temperature_celsius_avg: '27.5',
+      humidity_percent_avg: '58',
+      pressure_hpa_avg: '1008.5',
+      fire_score: '0.2',
+      fall_score: '',
+      bend_score: 'invalid',
+      fire_score_max: '0.9',
+      bucket_minutes: '5',
+      sample_count: '42',
+    } as unknown as Parameters<typeof normalizeHistoryItem>[0]
+
+    const result = normalizeHistoryItem(item)
+
+    expect(result.risk_score).toBe(91.5)
+    expect(result.risk_score_avg).toBe(90.5)
+    expect(result.risk_score_min).toBe(75)
+    expect(result.risk_score_max).toBe(99)
+    expect(result.temperature_celsius_avg).toBe(27.5)
+    expect(result.humidity_percent_avg).toBe(58)
+    expect(result.pressure_hpa_avg).toBe(1008.5)
+    expect(result.fire_score).toBe(0.2)
+    expect(result.fall_score).toBeNull()
+    expect(result.bend_score).toBeNull()
+    expect(result.fire_score_max).toBe(0.9)
+    expect(result.bucket_minutes).toBe(5)
+    expect(result.sample_count).toBe(42)
+  })
+
+  it('promotes numeric string risk score from nested risk', () => {
+    const item = {
+      timestamp: '2026-01-01T00:00:00Z',
+      risk: { score: '55.5', level: 'warning' },
+    } as unknown as Parameters<typeof normalizeHistoryItem>[0]
+
+    const result = normalizeHistoryItem(item)
+
+    expect(result.risk_score).toBe(55.5)
+    expect(result.risk_level).toBe('warning')
   })
 })
