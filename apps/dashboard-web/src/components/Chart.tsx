@@ -355,6 +355,7 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
   const data = items
     .map((it) => ({
       x: toTimeMs(extractTimestamp(it)),
+      timestamp: extractTimestamp(it),
       ts: fmtTime(extractTimestamp(it)),
       score: it.risk_score ?? (it.payload as Record<string, unknown> | undefined)?.['risk_score'],
     }))
@@ -371,10 +372,10 @@ export function RiskScoreChart({ items, window }: { items: HistoryItem[]; window
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
           <XAxis {...timeXAxisProps(axis)} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
-          <Tooltip
-            contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-            labelStyle={{ color: 'var(--ink-3)' }}
-          />
+          <Tooltip content={(props) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <RawTimeTooltip {...props as any} />
+          )} />
           <ReferenceLine y={85} stroke="var(--safe)" strokeDasharray="4 2" strokeWidth={1} />
           <ReferenceLine y={50} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
           <Line
@@ -488,7 +489,51 @@ function RiskBandTooltip({ active, payload }: { active?: boolean; payload?: any[
 }
 
 type TooltipPayloadItem = {
+  name?: string
+  value?: number | string | null
+  dataKey?: string
+  color?: string
   payload?: Record<string, unknown>
+}
+
+function RawTimeTooltip({ active, payload, unit = '' }: {
+  active?: boolean
+  payload?: TooltipPayloadItem[]
+  unit?: string
+}) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload as Record<string, unknown> | undefined
+  const timeStr = typeof d?.timestamp === 'string'
+    ? fmtTime(d.timestamp)
+    : typeof d?.ts === 'string'
+      ? d.ts
+      : ''
+  const rows = payload.filter((row) => row.value != null)
+  if (rows.length === 0) return null
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--line)',
+      borderRadius: 8, padding: '8px 12px', fontSize: 12,
+      minWidth: 150,
+    }}>
+      <div style={{ color: 'var(--ink-3)', marginBottom: 6, fontSize: 11 }}>{timeStr}</div>
+      {rows.map((row) => {
+        const value = typeof row.value === 'number' ? row.value.toFixed(2) : row.value
+        return (
+          <div key={row.dataKey ?? row.name} style={{ color: 'var(--ink-2)' }}>
+            <span style={{ color: row.color ?? 'var(--ink-3)', fontWeight: 600 }}>
+              {row.name ?? row.dataKey}
+            </span>
+            &nbsp;<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)' }}>
+              {value}
+            </span>
+            {unit && <span style={{ color: 'var(--ink-4)' }}>&nbsp;{unit}</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function SensorBandTooltip({ active, payload, unit }: {
@@ -720,6 +765,7 @@ export function SensorChart({ items, field, label, unit, window }: {
   const data = items
     .map((it) => ({
       x: toTimeMs(extractTimestamp(it)),
+      timestamp: extractTimestamp(it),
       ts: fmtTime(extractTimestamp(it)),
       avg: (it[field] as number | null | undefined) ?? null,
     }))
@@ -734,10 +780,10 @@ export function SensorChart({ items, field, label, unit, window }: {
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
           <XAxis {...timeXAxisProps(axis)} />
           <YAxis tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={40} />
-          <Tooltip
-            contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-            formatter={(v: number) => [`${v.toFixed(2)} ${unit}`, label]}
-          />
+          <Tooltip content={(props) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <RawTimeTooltip {...props as any} unit={unit} />
+          )} />
           <Line
             type="monotone" dataKey="avg" name={label}
             stroke="var(--accent)" strokeWidth={1.8}
@@ -896,6 +942,7 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
   const data = items
     .map((it) => ({
       x: toTimeMs(extractTimestamp(it)),
+      timestamp: extractTimestamp(it),
       ts: fmtTime(extractTimestamp(it)),
       fire:  it.fire_score ?? null,
       fall:  it.fall_score ?? null,
@@ -914,9 +961,10 @@ export function AIScoreChart({ items, window }: { items: HistoryItem[]; window?:
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line-2)" />
           <XAxis {...timeXAxisProps(axis)} />
           <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30} />
-          <Tooltip
-            contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-          />
+          <Tooltip content={(props) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <RawTimeTooltip {...props as any} />
+          )} />
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           <ReferenceLine y={0.8} stroke="var(--crit)" strokeDasharray="4 2" strokeWidth={1} />
           <ReferenceLine y={0.3} stroke="var(--warn)" strokeDasharray="4 2" strokeWidth={1} />
@@ -970,6 +1018,7 @@ export function NodeResourceChart({ items, field, label, window }: {
     const aggRows = sampledItems
       .map((it) => ({
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : toTimeMs(extractTimestamp(it)),
+        timestamp: extractTimestamp(it),
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         value: !isBucket || hasBucketSamples(it) ? (it[aggField] as number | null | undefined) ?? null : null,
         sample_count: it.sample_count ?? null,
@@ -993,10 +1042,10 @@ export function NodeResourceChart({ items, field, label, window }: {
               : <XAxis {...timeXAxisProps(rawAxis)} />}
             <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30}
               tickFormatter={(v: number) => `${v}%`} />
-            <Tooltip
-              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-              formatter={(v: number) => [`${v?.toFixed(1)}%`, aggLabel]}
-            />
+            <Tooltip content={(props) => (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <RawTimeTooltip {...props as any} unit="%" />
+            )} />
             {isBucket && <NoDataAreas rows={aggData} axis={axis} />}
             <Line
               type="monotone"
@@ -1023,6 +1072,7 @@ export function NodeResourceChart({ items, field, label, window }: {
       const hasSamples = !isBucket || hasBucketSamples(it)
       const row: NodeChartRow = {
         x: isBucket ? toTimeMs(it.bucket_start || it.timestamp || extractTimestamp(it)) : toTimeMs(extractTimestamp(it)),
+        timestamp: extractTimestamp(it),
         ts: isBucket ? fmtTimeShort(it.bucket_start || it.timestamp) : fmtTime(extractTimestamp(it)),
         sample_count: it.sample_count ?? null,
         bucket_start: it.bucket_start,
@@ -1062,10 +1112,10 @@ export function NodeResourceChart({ items, field, label, window }: {
             : <XAxis {...timeXAxisProps(rawAxis)} />}
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--ink-4)' }} width={30}
             tickFormatter={(v: number) => `${v}%`} />
-          <Tooltip
-            contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-            formatter={(v: number) => [`${v?.toFixed(1)}%`, label]}
-          />
+          <Tooltip content={(props) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <RawTimeTooltip {...props as any} unit="%" />
+          )} />
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           {isBucket && <NoDataAreas rows={data} axis={axis} />}
           {activeNodeIds.map((nid) => (
