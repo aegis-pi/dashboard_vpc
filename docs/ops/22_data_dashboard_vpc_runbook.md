@@ -1,8 +1,9 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-08
 수정 이력:
+  - 2026-06-08 v3.2  Dashboard history delta refresh 최적화 운영 배포 완료. `/factories/{factory_id}/history`에 `since` query와 window별 기본 limit(10m=250, 1h=2000, 그 외 500)을 반영하고 frontend 자동 refresh는 신규분만 merge/dedupe. backend image `sha-9c28603`, ECS task definition revision 38, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-04 v3.1  삭제 이전 구현으로 남은 `disabled` RDS 사용자 row 때문에 같은 이메일 재생성 시 409가 나는 문제 보정. 생성 시 stale disabled 계정은 Cognito 잔여 username을 best-effort 삭제하고 RDS row를 제거한 뒤 신규 생성하도록 변경. backend image `sha-e96bf81`, ECS task definition revision 37, desired/running 2, `/healthz`와 `/readyz` 정상, Terraform post-apply plan No changes.
   - 2026-06-04 v3.0  사용자 관리 삭제/정렬/수정 UX 보정 운영 배포 완료. 삭제는 Cognito `AdminDeleteUser` + RDS row 삭제로 변경, 목록은 active 사용자만 역할 우선 정렬. backend image `sha-813f7ed`, ECS task definition revision 36, desired/running 2, `/healthz`와 `/readyz` 정상, 비인증 `/admin/users` 401, Terraform post-apply plan No changes.
   - 2026-06-04 v2.9  Dashboard RBAC 사용자 관리 운영 배포 완료 기준 추가. backend image `sha-abb81ed`, ECS task definition revision 33, desired/running 2, `/readyz` `rds_metadata=ok`, `/admin/users` API 인증 보호 및 SPA route 응답 확인.
@@ -171,17 +172,18 @@ dependencies.redis = ok
 dependencies.rds_metadata = ok
 ```
 
-2026-06-04 stale disabled 사용자 재생성 보정 배포 확인:
+2026-06-08 history delta refresh 최적화 배포 확인:
 
 ```text
-backend image tag = sha-e96bf81
-ECS task definition revision = 37
+backend image tag = sha-9c28603
+ECS task definition revision = 38
 ECS desired/running = 2/2
 ECS task health = HEALTHY across ap-south-1a and ap-south-1c
 /healthz = ok
 /readyz = dynamodb:ok, redis:ok, rds_metadata:ok
-GET /admin/users without Bearer token = 401
+dashboard web = HTTP 200
 dashboard-backend workflow = success
+dashboard-web workflow = success
 post-apply terraform plan = No changes
 ```
 
