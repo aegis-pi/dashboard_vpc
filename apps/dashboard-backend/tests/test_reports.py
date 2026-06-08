@@ -1,4 +1,23 @@
+import deps.rbac as rbac_module
+from main import app
 from services import s3
+
+
+def _override_principal(**overrides):
+    base = dict(
+        user_id="u-1",
+        cognito_sub="u-1",
+        email="op@example.com",
+        display_name="Operator",
+        global_role="factory_operator",
+        can_view_system=False,
+        status="active",
+        allowed_factory_ids=frozenset({"factory-a"}),
+    )
+    base.update(overrides)
+    app.dependency_overrides[rbac_module.get_current_principal] = (
+        lambda: rbac_module.Principal(**base)
+    )
 
 
 def test_s3_client_uses_explicit_timeouts():
@@ -94,3 +113,86 @@ def test_get_report_s3_timeout_returns_504(client, monkeypatch):
 
     assert r.status_code == 504
     assert r.json()["detail"] == "S3 request timed out"
+
+
+# ─── Cloud-infra reports (system-view gated) ────────────────────────────────
+
+
+def _cloud_infra_and_factory_reports():
+    return [
+        {
+            "report_date": "2026-06-07",
+            "factory_id": "cloud-infra",
+            "s3_key": "reports/daily/yyyy=2026/mm=06/dd=07/cloud-infra/report.md",
+            "last_modified": "2026-06-08T00:31:22+00:00",
+            "size_bytes": 7119,
+        },
+        {
+            "report_date": "2026-06-07",
+            "factory_id": "factory-a",
+            "s3_key": "reports/daily/yyyy=2026/mm=06/dd=07/factory-a/report.md",
+            "last_modified": "2026-06-08T00:31:17+00:00",
+            "size_bytes": 6093,
+        },
+        {
+            "report_date": "2026-06-07",
+            "factory_id": "factory-b",
+            "s3_key": "reports/daily/yyyy=2026/mm=06/dd=07/factory-b/report.md",
+            "last_modified": "2026-06-08T00:42:08+00:00",
+            "size_bytes": 9193,
+        },
+    ]
+
+
+def test_list_reports_includes_cloud_infra_for_system_user(client, monkeypatch):
+    async def _list_reports():
+        return _cloud_infra_and_factory_reports()
+
+    monkeypatch.setattr(s3, "list_daily_reports", _list_reports)
+
+    # Default client fixture principal is super_admin + can_view_system.
+    r = client.get("/reports")
+
+    assert r.status_code == 200
+    factory_ids = {item["factory_id"] for item in r.json()}
+    assert "cloud-infra" in factory_ids
+
+
+def test_list_reports_hides_cloud_infra_from_non_system_user(client, monkeypatch):
+    async def _list_reports():
+        return _cloud_infra_and_factory_reports()
+
+    monkeypatch.setattr(s3, "list_daily_reports", _list_reports)
+    _override_principal(can_view_system=False, allowed_factory_ids=frozenset({"factory-a"}))
+
+    r = client.get("/reports")
+
+    assert r.status_code == 200
+    factory_ids = {item["factory_id"] for item in r.json()}
+    assert factory_ids == {"factory-a"}
+
+
+def test_get_cloud_infra_report_allowed_for_system_user(client, monkeypatch):
+    async def _get_markdown(report_date, factory_id):
+        assert factory_id == "cloud-infra"
+        return "# Cloud Infra"
+
+    monkeypatch.setattr(s3, "get_report_markdown", _get_markdown)
+    _override_principal(can_view_system=True, allowed_factory_ids=frozenset())
+
+    r = client.get("/reports/2026-06-07/cloud-infra")
+
+    assert r.status_code == 200
+    assert r.text == "# Cloud Infra"
+
+
+def test_get_cloud_infra_report_denied_for_non_system_user(client, monkeypatch):
+    async def _get_markdown(report_date, factory_id):  # pragma: no cover
+        raise AssertionError("S3 should not be hit when access is denied")
+
+    monkeypatch.setattr(s3, "get_report_markdown", _get_markdown)
+    _override_principal(can_view_system=False, allowed_factory_ids=frozenset({"cloud-infra"}))
+
+    r = client.get("/reports/2026-06-07/cloud-infra")
+
+    assert r.status_code == 403
