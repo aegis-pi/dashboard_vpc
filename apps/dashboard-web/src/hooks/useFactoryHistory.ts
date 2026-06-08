@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchFactoryHistory } from '../api/client'
 import { normalizeHistoryItem } from '../utils/normalize'
 import type { HistoryItem } from '../api/types'
@@ -84,6 +84,11 @@ export function useFactoryHistory(
   const [data, setData] = useState<HistoryItem[]>(fresh ? hit.data : [])
   const [loading, setLoading] = useState(!fresh)
   const [error, setError] = useState<Error | null>(null)
+  const dataRef = useRef(data)
+
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
 
   const load = useCallback(async (force = false) => {
     const cached = _cache.get(key)
@@ -92,15 +97,16 @@ export function useFactoryHistory(
       setLoading(false)
       return
     }
-    setLoading(true)
+    const base = cached?.data ?? dataRef.current
+    setLoading(base.length === 0)
     setError(null)
     try {
-      const base = _cache.get(key)?.data ?? []
       const since = force ? latestTimestamp(base) : undefined
       const res = await fetchFactoryHistory(factoryId, window, limit, since)
       const normalized = res.map(normalizeHistoryItem)
       const merged = since ? mergeHistoryItems(base, normalized, window, limit) : normalized
       _cache.set(key, { data: merged, ts: Date.now() })
+      dataRef.current = merged
       setData(merged)
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)))
@@ -114,6 +120,7 @@ export function useFactoryHistory(
     const current = _cache.get(key)?.data ?? []
     const merged = mergeHistoryItems(current, [item], window, limit)
     _cache.set(key, { data: merged, ts: Date.now() })
+    dataRef.current = merged
     setData(merged)
   }, [key, window, limit])
 
