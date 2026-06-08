@@ -718,18 +718,16 @@ input { font-family: inherit; }
 }
 .factory-hero-dot { color: var(--ink-5); }
 .factory-hero-title {
-  font-family: var(--font-serif);
-  font-size: 42px;
-  line-height: .9;
-  font-weight: 400;
+  font-family: var(--font-sans);
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 650;
   color: var(--ink);
   letter-spacing: 0;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transform: scaleY(.76) scaleX(1.08);
-  transform-origin: left center;
 }
 .factory-hero-summary {
   margin: 0;
@@ -765,12 +763,11 @@ input { font-family: inherit; }
   gap: 8px;
 }
 .factory-hero-score {
-  font-family: var(--font-serif);
-  font-size: 72px;
-  line-height: .78;
-  font-weight: 400;
+  font-family: var(--font-sans);
+  font-size: 60px;
+  line-height: .86;
+  font-weight: 650;
   display: inline-block;
-  transform: scaleY(.84);
   transform-origin: left bottom;
 }
 .factory-hero-score-unit {
@@ -872,7 +869,7 @@ input { font-family: inherit; }
     font-size: 190px;
   }
   .factory-hero-title {
-    font-size: 36px;
+    font-size: 24px;
     white-space: normal;
   }
   .factory-hero-summary {
@@ -1171,22 +1168,16 @@ input { font-family: inherit; }
 }
 
 /* ─── Page header ───────────────────────────────────────────────── */
-.page-header { margin-bottom: 22px; }
-.page-eyebrow { margin-bottom: 6px; }
-.page-title {
-  font-family: var(--font-serif);
-  font-size: 32px;
-  line-height: 1.05;
-  font-weight: 400;
-  color: var(--ink);
-  letter-spacing: -0.01em;
+.page-head {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-.page-desc {
-  margin-top: 8px;
-  font-size: 12.5px;
-  color: var(--ink-3);
-  max-width: 600px;
-}
+.page-head .eyebrow { margin-bottom: 8px; }
+.page-head .sub { margin-top: 6px; }
 
 /* ─── Skeleton placeholder ──────────────────────────────────────── */
 .skeleton {
@@ -1762,9 +1753,6 @@ input { font-family: inherit; }
 }
 .page-head.compact h1 {
   margin: 4px 0 0;
-  font-size: 24px;
-  line-height: 1.1;
-  color: var(--ink);
 }
 .admin-users-alert {
   border: 1px solid var(--line-2);
@@ -2222,7 +2210,6 @@ textarea:focus-visible,
 
 @media (max-width: 420px) {
   .content { padding: 14px 12px 42px; }
-  .page-title { font-size: 28px; }
   .factory-card-grid { grid-template-columns: minmax(0, 1fr); }
   .factory-card-main { padding: 14px 14px 12px 18px; }
   .factory-card-footer {

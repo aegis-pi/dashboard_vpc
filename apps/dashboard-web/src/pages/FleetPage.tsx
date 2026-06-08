@@ -593,15 +593,11 @@ export function FleetPage() {
       refreshInterval={refreshInterval}
       onIntervalChange={setRefreshInterval}
     >
-      {/* Page header */}
-      <div className="page-header">
-        <div className="eyebrow page-eyebrow">Risk Twin · Fleet</div>
-        <h1 className="page-title">전체 개요</h1>
-        <p className="page-desc">
-          공장별 LATEST 상태 — risk · pipeline · infra 요약.{' '}
-          <span className="mono">factory_state</span> 3초,{' '}
-          <span className="mono">infra_state</span> 20초 주기로 갱신.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Risk Twin · Fleet</div>
+          <h1 className="h1">전체 개요</h1>
+        </div>
       </div>
 
       {loading && !hasFleetData && (

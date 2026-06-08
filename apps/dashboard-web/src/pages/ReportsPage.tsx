@@ -289,14 +289,11 @@ export function ReportsPage() {
       factories={factories}
       crumbs={[{ label: 'Aegis-π' }, { label: '일간 보고서' }]}
     >
-      {/* Page header */}
-      <div className="page-header">
-        <div className="eyebrow page-eyebrow">Risk Twin · Reports</div>
-        <h1 className="page-title">일간 보고서</h1>
-        <p className="page-desc">
-          공장(또는 클라우드 인프라)과 날짜를 선택해 S3 reports prefix에 저장된 Markdown 일간 보고서를 확인합니다.{' '}
-          <span className="mono" style={{ whiteSpace: 'nowrap' }}>FR-DASH-06 · FR-DATA-07/08</span>
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Risk Twin · Reports</div>
+          <h1 className="h1">일간 보고서</h1>
+        </div>
       </div>
 
       {/* Selectors card */}

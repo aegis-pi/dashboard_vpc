@@ -195,7 +195,7 @@ export function AdminUsersPage() {
         <div className="page-head compact">
           <div>
             <div className="eyebrow">Access Control</div>
-            <h1>사용자 관리</h1>
+            <h1 className="h1">사용자 관리</h1>
           </div>
           <button className="btn" onClick={() => setForm(emptyForm())}>
             <Plus size={15} />

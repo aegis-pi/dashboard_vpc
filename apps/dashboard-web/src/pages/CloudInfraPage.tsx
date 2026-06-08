@@ -597,14 +597,7 @@ export function CloudInfraPage() {
       refreshInterval={refreshInterval}
       onIntervalChange={setRefreshInterval}
     >
-      <div className="cloud-page-head" style={{
-        marginBottom: 18,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        gap: 16,
-        flexWrap: 'wrap',
-      }}>
+      <div className="page-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>Cloud Infra</div>
           <h1 className="h1">클라우드 인프라 상태</h1>
