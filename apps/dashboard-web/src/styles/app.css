@@ -718,9 +718,9 @@ input { font-family: inherit; }
 }
 .factory-hero-dot { color: var(--ink-5); }
 .factory-hero-title {
-  font-family: var(--font-sans);
-  font-size: 28px;
-  line-height: 1.05;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  line-height: 1.1;
   font-weight: 650;
   color: var(--ink);
   letter-spacing: 0;
@@ -763,11 +763,12 @@ input { font-family: inherit; }
   gap: 8px;
 }
 .factory-hero-score {
-  font-family: var(--font-sans);
-  font-size: 60px;
-  line-height: .86;
-  font-weight: 650;
+  font-family: var(--font-serif);
+  font-size: 72px;
+  line-height: .78;
+  font-weight: 400;
   display: inline-block;
+  transform: scaleY(.84);
   transform-origin: left bottom;
 }
 .factory-hero-score-unit {
@@ -869,7 +870,7 @@ input { font-family: inherit; }
     font-size: 190px;
   }
   .factory-hero-title {
-    font-size: 24px;
+    font-size: 21px;
     white-space: normal;
   }
   .factory-hero-summary {
