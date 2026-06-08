@@ -1,7 +1,7 @@
 # 트러블슈팅
 
 상태: source of truth
-기준일: 2026-05-26
+기준일: 2026-06-08
 원본: `/home/vicbear/Aegis/safe-edge/troubleshooting.md`
 
 ## 목적
@@ -2335,3 +2335,113 @@ aws logs filter-log-events \
   --query 'events[*].message' \
   --output text
 ```
+
+## 43. Dashboard Factory 화면 자동 refresh 지연/깜빡임 및 흰 화면
+
+날짜: 2026-06-08
+
+증상/상황
+
+Dashboard Web의 Fleet/Factory 화면에서 5s~10s 자동 refresh를 켜면 다음 문제가 발생했다.
+
+- 10m trend와 1h 그래프를 위해 refresh마다 1h history를 다시 읽어 화면이 느리게 뜸.
+- 그래프가 refresh 때 spinner로 바뀌며 깜빡임.
+- 신규 포인트가 자연스럽게 추가되지 않고 전체 그래프가 다시 그려지는 것처럼 보임.
+- Factory 화면 진입 또는 빠른 factory 이동 중 흰색 바탕 화면만 남는 현상이 발생.
+- 1h 그래프 tooltip이 시간 대신 숫자 timestamp label을 표시함.
+
+원인
+
+초기 구현은 10m trend도 `/factories/{factory_id}/history?window=1h` 응답을 받아 브라우저에서 최근 10분만 필터링했다. `useFactoryHistory.refresh()`는 브라우저 cache를 강제 우회하면서 `loading=true`로 바꿨기 때문에 자동 refresh 때 기존 그래프를 유지하지 못하고 spinner로 교체됐다.
+
+또한 1h raw chart를 시간축으로 바꾸기 전에는 Recharts category/index 축과 subsampling이 섞여 새 포인트가 들어올 때 기존 점의 x좌표와 샘플링 대상이 재계산됐다. 이 때문에 데이터가 바뀌는 것처럼 보였다.
+
+Factory 화면 흰 화면은 React render 중 예외가 발생했을 때 앱 전체를 보호하는 ErrorBoundary가 없어 발생할 수 있었다. `/factory/:factoryId`는 같은 `FactoryPage` 컴포넌트 인스턴스에서 `factoryId`만 바뀌므로, 이전 factory의 async API 응답이나 history 응답이 새 factory 화면 state를 덮는 race 가능성도 있었다.
+
+확인/판단 기준
+
+```bash
+# Backend history API 계약 검증
+cd apps/dashboard-backend
+pytest -q tests/test_history.py
+
+# Dashboard Web 타입/렌더 회귀 검증
+cd apps/dashboard-web
+npm run lint
+npm test -- --run
+npm run build
+```
+
+브라우저에서 흰 화면이 보이면 DevTools Console에 React runtime error가 남는다. ErrorBoundary 적용 후에는 흰 화면 대신 오류 카드와 실제 error message가 표시되어야 한다.
+
+해결
+
+Backend history API:
+
+- `window=10m` 기본 limit을 250으로 지정.
+- `window=1h` 기본 limit을 2000으로 지정.
+- `since=<iso timestamp>` query를 추가해 자동 refresh 때 마지막 timestamp 이후 신규 item만 반환.
+
+Frontend history 조회:
+
+- Factory header 10m trend는 `window=10m&limit=250` 전용 조회로 분리.
+- 1h 그래프는 `window=1h&limit=2000` 기준 유지.
+- `useFactoryHistory`를 stale-while-revalidate 방식으로 변경해 기존 그래프를 유지하면서 delta fetch 결과만 merge.
+- WebSocket LATEST 메시지는 Factory 화면 현재 상태와 10m trend buffer에 append.
+- Fleet 카드 trend도 10m history 기준으로 delta merge.
+
+Frontend chart 렌더링:
+
+- 10m compact trend는 배열 index가 아니라 실제 timestamp 기반 x좌표로 렌더링.
+- 1h raw Risk/Sensor/AI/Node 그래프는 category axis 대신 time scale 사용.
+- 1h raw 그래프는 전체 포인트를 그대로 표시하고, line animation을 꺼 refresh 때 선이 morphing되는 느낌을 줄임.
+- 1h raw tooltip은 커스텀 tooltip으로 교체해 `HH:MM:SS`와 값/단위를 표시.
+
+Factory 화면 안정화:
+
+- `ErrorBoundary` 추가: render error 발생 시 흰 화면 대신 오류 카드와 새로고침 버튼 표시.
+- `useFactory`에 request sequence guard 추가: 이전 factory 응답이 현재 factory state를 덮지 않음.
+- `useFactoryHistory`에 key 변경 reset과 request sequence guard 추가: 이전 history 응답이 현재 그래프 state에 섞이지 않음.
+
+수정 파일
+
+```text
+apps/dashboard-backend/routers/factories.py
+apps/dashboard-backend/services/ddb.py
+apps/dashboard-backend/tests/test_history.py
+apps/dashboard-web/src/api/client.ts
+apps/dashboard-web/src/components/Chart.tsx
+apps/dashboard-web/src/components/ErrorBoundary.tsx
+apps/dashboard-web/src/components/RiskTrendChart.tsx
+apps/dashboard-web/src/hooks/useFactories.ts
+apps/dashboard-web/src/hooks/useFactory.ts
+apps/dashboard-web/src/hooks/useFactoryHistory.ts
+apps/dashboard-web/src/hooks/useFleetRecentChanges.ts
+apps/dashboard-web/src/pages/FactoryPage.tsx
+apps/dashboard-web/src/pages/FleetPage.tsx
+apps/dashboard-web/src/utils/trend.ts
+docs/specs/data_storage_pipeline.md
+docs/specs/monitoring_dashboard/02_api_spec.md
+docs/specs/monitoring_dashboard/05_screen_data_mapping.md
+```
+
+검증 결과
+
+2026-06-08 로컬 검증:
+
+```text
+apps/dashboard-backend: pytest -q tests/test_history.py → 35 passed
+apps/dashboard-backend: pytest -q → 100 passed
+apps/dashboard-web: npm run lint → 통과
+apps/dashboard-web: npm test -- --run → 59 passed
+apps/dashboard-web: npm run build → 통과
+repo root: git diff --check → 통과
+```
+
+재발 방지/주의
+
+- 10m trend를 위해 1h history를 재사용하지 않는다.
+- 자동 refresh는 full reload가 아니라 `since` delta fetch + client merge를 기본으로 한다.
+- Factory route처럼 URL 파라미터만 바뀌는 화면은 async 응답 race를 막기 위해 request sequence guard를 둔다.
+- Recharts time scale을 사용할 때 기본 tooltip label은 raw numeric x값이 될 수 있으므로, 사용자 화면에는 custom tooltip을 사용한다.
+- React SPA에는 route 전체를 보호하는 ErrorBoundary를 유지한다.
