@@ -89,6 +89,7 @@ def test_time_point_yesterday_afternoon():
     assert ts.target_kst.year == 2026 and ts.target_kst.month == 6
     assert ts.target_kst.day == 7 and ts.target_kst.hour == 15
     assert ts.window == "24h"
+    assert ts.end_utc - ts.start_utc == chat.timedelta(minutes=10)
 
 
 def test_time_point_no_day_assumes_recent_past():
@@ -97,6 +98,38 @@ def test_time_point_no_day_assumes_recent_past():
     assert ts.kind == "point"
     assert ts.assumed is True
     assert ts.target_kst.day == 7 and ts.target_kst.hour == 15
+
+
+def test_time_point_no_ampm_chooses_recent_past_pm_when_closer():
+    # 2026-06-08T07:00:00Z == 2026-06-08 16:00 KST.
+    now = datetime(2026, 6, 8, 7, 0, 0, tzinfo=timezone.utc)
+    ts = chat.parse_time("3시 상태 어땠어?", now)
+    assert ts.kind == "point"
+    assert ts.assumed is True
+    assert ts.target_kst.day == 8 and ts.target_kst.hour == 15
+
+
+def test_time_point_no_ampm_keeps_am_when_pm_is_future():
+    ts = chat.parse_time("3시 상태 어땠어?", NOW)
+    assert ts.kind == "point"
+    assert ts.assumed is True
+    assert ts.target_kst.day == 8 and ts.target_kst.hour == 3
+
+
+def test_time_point_parses_minute_and_uses_tight_window():
+    ts = chat.parse_time("오늘 오후 3시 20분 상태", NOW)
+    assert ts.target_kst.hour == 15
+    assert ts.target_kst.minute == 20
+    assert ts.end_utc - ts.start_utc == chat.timedelta(minutes=10)
+
+
+def test_time_scope_dict_includes_kst_range_for_llm_display():
+    ts = chat.parse_time("최근 1시간 추이", NOW)
+    data = ts.to_dict()
+    assert data["start"] == "2026-06-08T00:00:00.000Z"
+    assert data["end"] == "2026-06-08T01:00:00.000Z"
+    assert data["start_kst"].startswith("2026-06-08T09:00:00")
+    assert data["end_kst"].startswith("2026-06-08T10:00:00")
 
 
 def test_time_fallback_assumed_now():
@@ -152,6 +185,22 @@ def test_summarize_history_min_max_avg_delta():
     assert ev.confirmed["risk_score_min_level"] == "danger"
     assert ev.confirmed["risk_score_delta"] == 10.0
     assert ev.inferred  # delta reasoning, marked 추정
+
+
+def test_summarize_history_includes_kst_range_label():
+    ev = chat.summarize_history(
+        [
+            {"timestamp": "t1", "risk_score": 10.0},
+            {"timestamp": "t2", "risk_score": 20.0},
+        ],
+        chat.TimeScope(
+            kind="range",
+            window="1h",
+            start_utc=datetime(2026, 6, 8, 1, 10, 0, tzinfo=timezone.utc),
+            end_utc=datetime(2026, 6, 8, 2, 10, 0, tzinfo=timezone.utc),
+        ),
+    )
+    assert ev.confirmed["time_range_kst"] == "2026-06-08 10:10~11:10 KST"
 
 
 def test_summarize_history_includes_ai_detection_spike():

@@ -107,6 +107,8 @@ export interface ChatTimeScope {
   target_kst?: string | null
   start?: string | null
   end?: string | null
+  start_kst?: string | null
+  end_kst?: string | null
   assumed?: boolean
   note?: string
 }

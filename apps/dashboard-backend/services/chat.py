@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 # ─── Constants ────────────────────────────────────────────────────────────────
 
 KST = timezone(timedelta(hours=9))
-_POINT_HALF_WINDOW = timedelta(minutes=10)
+_POINT_HALF_WINDOW = timedelta(minutes=5)
 # Staleness threshold aligned with ADR 0028 (pipeline_status 120s).
 _STALE_AFTER_SECONDS = 120
 
@@ -76,12 +76,16 @@ class TimeScope:
     note: str = ""
 
     def to_dict(self) -> dict:
+        start_kst = self.start_utc.astimezone(KST) if self.start_utc else None
+        end_kst = self.end_utc.astimezone(KST) if self.end_utc else None
         return {
             "kind": self.kind,
             "window": self.window,
             "target_kst": self.target_kst.isoformat() if self.target_kst else None,
             "start": _iso(self.start_utc) if self.start_utc else None,
             "end": _iso(self.end_utc) if self.end_utc else None,
+            "start_kst": start_kst.isoformat() if start_kst else None,
+            "end_kst": end_kst.isoformat() if end_kst else None,
             "assumed": self.assumed,
             "note": self.note,
         }
@@ -159,7 +163,7 @@ _STATUS_KEYWORDS = ("상태", "지금", "현재", "위험", "어때", "어떤가
 _FACTORY_RE = re.compile(r"factory[-\s]?([a-zA-Z])\b")
 _FACTORY_KO_RE = re.compile(r"(?:공장\s*([a-zA-Z])|([a-zA-Z])\s*공장)")
 
-_HOUR_RE = re.compile(r"(오전|오후|새벽|아침|저녁|밤|정오|자정)?\s*(\d{1,2})\s*시")
+_HOUR_RE = re.compile(r"(오전|오후|새벽|아침|저녁|밤|정오|자정)?\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?")
 _RECENT_RE = re.compile(r"(?:최근|지난|직전)\s*(\d+)\s*(시간|분|일)")
 _NOW_KEYWORDS = ("지금", "현재", "실시간", "now")
 
@@ -203,6 +207,21 @@ def _resolve_hour(marker: str | None, hour: int) -> int:
     return hour % 24
 
 
+def _resolve_unmarked_past_time(now_kst: datetime, hour: int, minute: int) -> datetime:
+    """Resolve "3시" to the nearest past occurrence, considering PM for 1~11."""
+    base = now_kst.date()
+    hours = [hour % 24]
+    if 1 <= hour <= 11:
+        hours.append(hour + 12)
+    candidates = []
+    for day_offset in (0, -1):
+        day = base + timedelta(days=day_offset)
+        for h in hours:
+            candidates.append(datetime(day.year, day.month, day.day, h, minute, 0, tzinfo=KST))
+    past = [dt for dt in candidates if dt <= now_kst]
+    return max(past) if past else min(candidates)
+
+
 def parse_time(text: str, now_utc: datetime) -> TimeScope:
     now_kst = now_utc.astimezone(KST)
 
@@ -222,26 +241,33 @@ def parse_time(text: str, now_utc: datetime) -> TimeScope:
     # 2) specific past instant: optional day word + "N시"
     hm = _HOUR_RE.search(text)
     if hm:
-        marker, hour = hm.group(1), int(hm.group(2))
-        resolved = _resolve_hour(marker, hour)
+        marker, hour, minute = hm.group(1), int(hm.group(2)), int(hm.group(3) or 0)
         assumed = False
         note = ""
+        explicit_day = False
         if "그저께" in text or "엊그제" in text:
             base_day = (now_kst - timedelta(days=2)).date()
+            explicit_day = True
         elif "어제" in text:
             base_day = (now_kst - timedelta(days=1)).date()
+            explicit_day = True
         elif "오늘" in text:
             base_day = now_kst.date()
+            explicit_day = True
         else:
             base_day = now_kst.date()
             assumed = True
-        target_kst = datetime(
-            base_day.year, base_day.month, base_day.day, resolved, 0, 0, tzinfo=KST
-        )
-        # No explicit day word and the time is still in the future today →
-        # assume the most recent past occurrence (yesterday).
-        if assumed and target_kst > now_kst:
-            target_kst -= timedelta(days=1)
+        if assumed and marker is None:
+            target_kst = _resolve_unmarked_past_time(now_kst, hour, minute)
+        else:
+            resolved = _resolve_hour(marker, hour)
+            target_kst = datetime(
+                base_day.year, base_day.month, base_day.day, resolved, minute, 0, tzinfo=KST
+            )
+            # No explicit day word and the time is still in the future today →
+            # assume the most recent past occurrence (yesterday).
+            if assumed and not explicit_day and target_kst > now_kst:
+                target_kst -= timedelta(days=1)
         if assumed:
             note = "날짜가 명시되지 않아 가장 가까운 과거 시점으로 해석했습니다."
         start_utc = target_kst.astimezone(timezone.utc) - _POINT_HALF_WINDOW
@@ -365,6 +391,11 @@ def summarize_history(items: list[dict], scope: TimeScope) -> Evidence:
         ev.missing.append("해당 구간 위험도 데이터 없음")
         return ev
 
+    if scope.start_utc and scope.end_utc:
+        ev.confirmed["time_range_kst"] = (
+            f"{scope.start_utc.astimezone(KST).strftime('%Y-%m-%d %H:%M')}"
+            f"~{scope.end_utc.astimezone(KST).strftime('%H:%M')} KST"
+        )
     ev.confirmed["sample_count"] = len(items)
     ev.confirmed["risk_score_min"] = _round(min(risks))
     ev.confirmed["risk_score_max"] = _round(max(risks))

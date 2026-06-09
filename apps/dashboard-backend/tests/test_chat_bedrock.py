@@ -48,6 +48,18 @@ def test_build_user_message_is_evidence_grounded():
     assert payload["evidence"]["confirmed"]["risk_score"] == 27.6
 
 
+def test_build_user_message_includes_kst_time_fields():
+    import json
+    from datetime import datetime, timezone
+
+    parsed = chat.parse_query("factory-a 최근 1시간 추이", None, datetime(2026, 6, 8, 2, 10, tzinfo=timezone.utc))
+    payload = json.loads(bedrock.build_user_message(parsed, chat.Evidence()))
+    assert payload["time_scope"]["start"] == "2026-06-08T01:10:00.000Z"
+    assert payload["time_scope"]["end"] == "2026-06-08T02:10:00.000Z"
+    assert payload["time_scope"]["start_kst"].startswith("2026-06-08T10:10:00")
+    assert payload["time_scope"]["end_kst"].startswith("2026-06-08T11:10:00")
+
+
 # ─── Endpoint: Bedrock path ───────────────────────────────────────────────────
 
 def test_chat_uses_bedrock_when_enabled(client, ddb_mock, bedrock_on, monkeypatch):
