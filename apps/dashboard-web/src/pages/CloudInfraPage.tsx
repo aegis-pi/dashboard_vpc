@@ -407,18 +407,11 @@ function SectionCard({
 }) {
   return (
     <div className="card factory-section-card">
-      <div style={{
-        padding: '14px 16px',
-        borderBottom: '1px solid var(--line-2)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 12,
-      }}>
+      <div className="cloud-section-head">
         <div className="h2">{title}</div>
         <StatusPill status={status} />
       </div>
-      <div style={{ padding: 16 }}>
+      <div className="cloud-section-body">
         <SectionMeta status={status} reasons={reasons} errors={errors} />
         {children}
       </div>
@@ -597,15 +590,16 @@ export function CloudInfraPage() {
       refreshInterval={refreshInterval}
       onIntervalChange={setRefreshInterval}
     >
-      <div className="page-head">
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>Cloud Infra</div>
+      <div className="cloud-infra-page">
+      <div className="page-head cloud-infra-head">
+        <div className="cloud-infra-title">
+          <div className="eyebrow">Cloud Infra</div>
           <h1 className="h1">클라우드 인프라 상태</h1>
-          <div className="sub" style={{ marginTop: 6 }}>
+          <div className="sub">
             수집 상태와 장애 신호를 먼저 보고, 아래에서 컴포넌트별 원인을 확인합니다.
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="cloud-infra-actions">
           <StatusPill status={data.overall_status} />
           {data.fast_stale && <span className="pill warn"><span className="dot" />fast 수집 지연</span>}
           {data.slow_stale && <span className="pill warn"><span className="dot" />slow 수집 지연</span>}
@@ -620,7 +614,7 @@ export function CloudInfraPage() {
       <ComponentMatrix rows={componentRows} />
       <DependencyRail rows={railRows} />
 
-      <div className="grid-2" style={{ marginBottom: 16 }}>
+      <div className="grid-2 cloud-infra-grid">
         <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
           <div className="runtime-list">
             <RuntimeRow
@@ -683,7 +677,7 @@ export function CloudInfraPage() {
         </SectionCard>
       </div>
 
-      <div className="grid-2" style={{ marginBottom: 16 }}>
+      <div className="grid-2 cloud-infra-grid">
         <SectionCard title="데이터 저장소" status={datastores?.status} reasons={datastores?.reasons} errors={datastores?.errors}>
           {datastores ? (
             <div className="datastore-resource-list">
@@ -719,7 +713,7 @@ export function CloudInfraPage() {
 
         <SectionCard title="공장 최신성" status={freshness?.status} reasons={freshness?.reasons} errors={freshness?.errors}>
           <table className="tbl">
-            <thead><tr><th>공장</th><th>파이프라인</th><th>인프라 지연</th><th>마지막 인프라</th><th>위험도</th></tr></thead>
+            <thead><tr><th>공장</th><th>파이프라인</th><th>인프라 지연</th><th>마지막 인프라</th><th>안전 점수</th></tr></thead>
             <tbody>
               {(freshness?.factories ?? []).map((factory) => (
                 <tr key={factory.factory_id}>
@@ -735,7 +729,7 @@ export function CloudInfraPage() {
         </SectionCard>
       </div>
 
-      <div className="grid-2" style={{ marginBottom: 16 }}>
+      <div className="grid-2 cloud-infra-grid">
         <SectionCard title="관리 플레인" status={eks?.status} reasons={eks?.reasons} errors={eks?.errors}>
           <table className="tbl">
             <thead><tr><th>노드</th><th>Ready</th><th>CPU</th><th>Memory</th></tr></thead>
@@ -774,14 +768,15 @@ export function CloudInfraPage() {
         </SectionCard>
       </div>
 
-      <div className="card">
-        <div style={{ padding: 16 }}>
+      <div className="card cloud-history-card">
+        <div className="cloud-section-body">
           <div>
             <div className="h2">최근 1시간 상태 흐름</div>
             <StatusLegend />
           </div>
           <StatusHistoryBar items={history.data} />
         </div>
+      </div>
       </div>
     </Shell>
   )

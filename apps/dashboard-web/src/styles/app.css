@@ -1318,6 +1318,50 @@ input { font-family: inherit; }
 .tbl tr:hover td { background: var(--surface-2); }
 
 /* ─── Cloud infra overview ──────────────────────────────────────── */
+.cloud-infra-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cloud-infra-head {
+  align-items: center;
+  margin-bottom: 0;
+  padding: 2px 0 4px;
+}
+.cloud-infra-title {
+  min-width: 260px;
+  flex: 1;
+}
+.cloud-infra-title .h1 {
+  font-size: 22px;
+  line-height: 1.18;
+  font-weight: 600;
+}
+.cloud-infra-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 240px;
+}
+.cloud-infra-grid {
+  margin-bottom: 0;
+}
+.cloud-section-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.cloud-section-body {
+  padding: 16px;
+}
+.cloud-history-card {
+  margin-bottom: 0;
+}
 .cloud-health-strip {
   display: grid;
   grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(130px, 1fr));
@@ -1327,7 +1371,7 @@ input { font-family: inherit; }
   overflow: hidden;
   background: var(--line);
   box-shadow: var(--shadow-card);
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 .cloud-health-main,
 .cloud-health-stat {
@@ -1387,7 +1431,7 @@ input { font-family: inherit; }
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
-.cloud-matrix-card { margin-bottom: 14px; }
+.cloud-matrix-card { margin-bottom: 0; }
 .cloud-matrix td { vertical-align: middle; }
 .cloud-matrix .strong {
   font-weight: 650;
@@ -1403,7 +1447,7 @@ input { font-family: inherit; }
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-card);
-  margin-bottom: 16px;
+  margin-bottom: 0;
   overflow: hidden;
 }
 .cloud-rail-head {
@@ -1709,6 +1753,11 @@ input { font-family: inherit; }
   .cloud-health-main { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
+  .cloud-infra-head { align-items: flex-start; }
+  .cloud-infra-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
   .cloud-health-strip { grid-template-columns: 1fr; }
   .cloud-health-main { grid-column: auto; }
   .cloud-health-title { font-size: 21px; }

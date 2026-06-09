@@ -44,6 +44,7 @@ def test_build_user_message_is_evidence_grounded():
     ev = chat.Evidence(confirmed={"risk_score": 27.6}, inferred=["추정 사유"], missing=[])
     payload = json.loads(bedrock.build_user_message(parsed, ev))
     assert payload["factory_id"] == "factory-a"
+    assert payload["risk_score_policy"]["safe"] == "100~85"
     assert payload["evidence"]["confirmed"]["risk_score"] == 27.6
 
 
@@ -98,7 +99,7 @@ def test_chat_falls_back_to_rule_on_bedrock_error(client, ddb_mock, bedrock_on, 
     assert r.status_code == 200
     data = r.json()
     assert data["generator"] == "rule"      # graceful degradation
-    assert "위험도" in data["answer"]         # deterministic template
+    assert "안전 점수" in data["answer"]       # deterministic template
     assert data["evidence"]["confirmed"]["risk_score"] == 27.6
 
 

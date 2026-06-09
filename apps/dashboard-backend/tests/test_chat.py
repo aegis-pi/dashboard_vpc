@@ -123,6 +123,21 @@ def test_summarize_latest_confirmed_and_stale():
     assert any("지연" in m for m in ev.missing)
 
 
+def test_risk_score_policy_high_score_is_safe_even_if_question_says_danger():
+    ev = chat.summarize_history(
+        [
+            {"timestamp": "t1", "risk_score": 100.0},
+            {"timestamp": "t2", "risk_score": 100.0},
+        ],
+        chat.TimeScope(kind="range", window="1h"),
+    )
+    parsed = chat.parse_query("factory-a 왜 위험해?", None, NOW)
+    answer = chat.render_answer(parsed, ev)
+    assert ev.confirmed["risk_score_avg_level"] == "safe"
+    assert "100.0점(안전)" in answer
+    assert "최고위험" not in answer
+
+
 def test_summarize_history_min_max_avg_delta():
     items = [
         {"timestamp": "t1", "risk_score": 10.0, "temperature_celsius_avg": 22.0,
@@ -134,8 +149,22 @@ def test_summarize_history_min_max_avg_delta():
     assert ev.confirmed["risk_score_min"] == 10.0
     assert ev.confirmed["risk_score_max"] == 20.0
     assert ev.confirmed["risk_score_avg"] == 15.0
+    assert ev.confirmed["risk_score_min_level"] == "danger"
     assert ev.confirmed["risk_score_delta"] == 10.0
     assert ev.inferred  # delta reasoning, marked 추정
+
+
+def test_summarize_history_includes_ai_detection_spike():
+    ev = chat.summarize_history(
+        [
+            {"timestamp": "t1", "risk_score": 88.0, "ai_max_score": 0.1},
+            {"timestamp": "t2", "risk_score": 42.0, "fire_score_max": 0.93},
+        ],
+        chat.TimeScope(kind="range", window="10m"),
+    )
+    assert ev.confirmed["risk_score_min"] == 42.0
+    assert ev.confirmed["risk_score_min_level"] == "danger"
+    assert ev.confirmed["ai_detection_max_score"] == 0.93
 
 
 def test_summarize_history_empty_marks_missing():
@@ -154,7 +183,7 @@ def test_chat_current_status(client, ddb_mock):
     assert data["factory_id"] == "factory-a"
     assert data["generator"] == "rule"
     assert data["evidence"]["confirmed"]["risk_score"] == 27.6
-    assert "위험도" in data["answer"]
+    assert "안전 점수" in data["answer"]
 
 
 def test_chat_cause_analysis_uses_history(client, ddb_mock):
@@ -175,6 +204,29 @@ def test_chat_trend_recent_hour(client, ddb_mock):
     assert conf["risk_score_avg"] == 15.0
     assert conf["risk_score_min"] == 10.0
     assert conf["risk_score_max"] == 20.0
+
+
+def test_chat_range_fetches_low_risk_and_high_ai_scores(client, monkeypatch):
+    called = {"history": False}
+
+    async def _fake_history(factory_id, window, max_items, since=None):
+        called["history"] = True
+        assert factory_id == "factory-a"
+        return [
+            {"timestamp": "2026-06-08T00:50:00.000Z", "risk_score": 91.0, "ai_max_score": 0.2},
+            {"timestamp": "2026-06-08T00:55:00.000Z", "risk_score": 37.0, "fire_score_max": 0.96},
+        ]
+
+    monkeypatch.setattr(ddb, "get_factory_history", _fake_history)
+    r = client.post("/chat/query", json={"question": "factory-a 최근 10분 왜 위험해?"})
+    assert r.status_code == 200
+    data = r.json()
+    assert called["history"] is True
+    conf = data["evidence"]["confirmed"]
+    assert conf["risk_score_min"] == 37.0
+    assert conf["risk_score_min_level"] == "danger"
+    assert conf["ai_detection_max_score"] == 0.96
+    assert "AI 탐지 최대 점수" in data["answer"]
 
 
 def test_chat_explicit_factory_id_field(client, ddb_mock):

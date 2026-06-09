@@ -31,6 +31,11 @@ _POINT_HALF_WINDOW = timedelta(minutes=10)
 # Staleness threshold aligned with ADR 0028 (pipeline_status 120s).
 _STALE_AFTER_SECONDS = 120
 
+RISK_SCORE_POLICY = (
+    "Risk Score는 안전 점수다. 100~85=안전, 84~50=주의, 49~0=위험. "
+    "점수가 높을수록 안전하고 낮을수록 위험하다."
+)
+
 
 class Intent:
     CURRENT_STATUS = "current_status"
@@ -127,6 +132,21 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 def _round(value, digits: int = 1):
     return round(value, digits) if isinstance(value, (int, float)) else value
+
+
+def risk_level_from_score(score) -> str | None:
+    """Map the canonical Risk Score policy to a level label."""
+    if not isinstance(score, (int, float)) or isinstance(score, bool):
+        return None
+    if score >= 85:
+        return "safe"
+    if score >= 50:
+        return "warning"
+    return "danger"
+
+
+def risk_level_kr(level: str | None) -> str:
+    return {"safe": "안전", "warning": "주의", "danger": "위험"}.get(level or "", level or "미확인")
 
 
 # ─── Intent / factory / time parsing ──────────────────────────────────────────
@@ -295,7 +315,8 @@ def summarize_latest(item: dict, now_utc: datetime) -> Evidence:
 
     ev.confirmed["factory_id"] = item.get("factory_id")
     ev.confirmed["risk_score"] = _round(risk.get("score"))
-    ev.confirmed["risk_level"] = risk.get("level")
+    ev.confirmed["risk_level"] = risk_level_from_score(risk.get("score")) or risk.get("level")
+    ev.confirmed["risk_score_policy"] = RISK_SCORE_POLICY
     ev.confirmed["pipeline_status"] = ps.get("status")
     ev.confirmed["updated_at"] = updated_at
     temp = _first_number(fs, "temperature_celsius", "temperature_celsius_avg")
@@ -325,6 +346,20 @@ def summarize_history(items: list[dict], scope: TimeScope) -> Evidence:
     ev = Evidence()
     risks = [i["risk_score"] for i in items if i.get("risk_score") is not None]
     temps = [i["temperature_celsius_avg"] for i in items if i.get("temperature_celsius_avg") is not None]
+    ai_scores = [
+        v
+        for i in items
+        for v in (
+            i.get("ai_max_score"),
+            i.get("fire_score_max"),
+            i.get("fall_score_max"),
+            i.get("bend_score_max"),
+            i.get("fire_score"),
+            i.get("fall_score"),
+            i.get("bend_score"),
+        )
+        if isinstance(v, (int, float)) and not isinstance(v, bool)
+    ]
 
     if not items or not risks:
         ev.missing.append("해당 구간 위험도 데이터 없음")
@@ -334,14 +369,22 @@ def summarize_history(items: list[dict], scope: TimeScope) -> Evidence:
     ev.confirmed["risk_score_min"] = _round(min(risks))
     ev.confirmed["risk_score_max"] = _round(max(risks))
     ev.confirmed["risk_score_avg"] = _round(sum(risks) / len(risks))
+    ev.confirmed["risk_score_min_level"] = risk_level_from_score(min(risks))
+    ev.confirmed["risk_score_max_level"] = risk_level_from_score(max(risks))
+    ev.confirmed["risk_score_avg_level"] = risk_level_from_score(sum(risks) / len(risks))
+    ev.confirmed["risk_score_policy"] = RISK_SCORE_POLICY
     if temps:
         ev.confirmed["temperature_avg"] = _round(sum(temps) / len(temps))
+    if ai_scores:
+        ev.confirmed["ai_detection_max_score"] = _round(max(ai_scores), 3)
 
     first, last = items[0], items[-1]
     risk_delta = (last.get("risk_score") or 0) - (first.get("risk_score") or 0)
     ev.confirmed["risk_score_start"] = _round(first.get("risk_score"))
     ev.confirmed["risk_score_end"] = _round(last.get("risk_score"))
     ev.confirmed["risk_score_delta"] = _round(risk_delta)
+    ev.confirmed["risk_score_start_level"] = risk_level_from_score(first.get("risk_score"))
+    ev.confirmed["risk_score_end_level"] = risk_level_from_score(last.get("risk_score"))
 
     causes = last.get("top_cause_names") or []
     if causes:
@@ -349,8 +392,8 @@ def summarize_history(items: list[dict], scope: TimeScope) -> Evidence:
 
     # Inferred reasoning — explicitly marked as 추정, never asserted as fact.
     if abs(risk_delta) >= 1:
-        direction = "상승" if risk_delta > 0 else "하락"
-        reason = f"구간 내 위험도가 {abs(_round(risk_delta))}점 {direction}했습니다."
+        direction = "개선" if risk_delta > 0 else "악화"
+        reason = f"구간 내 안전 점수가 {abs(_round(risk_delta))}점 {direction}되었습니다."
         if causes:
             reason += f" 주요 기여 요인: {', '.join(map(str, causes))}."
         ev.inferred.append(reason)
@@ -393,9 +436,10 @@ def render_answer(parsed: ParsedQuery, ev: Evidence) -> str:
         return f"[{fid}] 요청 구간에서 확인된 데이터가 없습니다.\n" + _fmt_evidence_block(ev)
 
     if parsed.intent == Intent.CURRENT_STATUS:
+        level = risk_level_kr(c.get("risk_level"))
         head = (
-            f"[{fid}] 현재 위험도는 {c.get('risk_score')}점"
-            f"({c.get('risk_level')})입니다."
+            f"[{fid}] 현재 안전 점수는 {c.get('risk_score')}점"
+            f"({level})입니다. 100점에 가까울수록 안전합니다."
         )
         parts = []
         if c.get("pipeline_status"):
@@ -417,17 +461,23 @@ def render_answer(parsed: ParsedQuery, ev: Evidence) -> str:
     if parsed.time.target_kst:
         when = parsed.time.target_kst.strftime("%Y-%m-%d %H:%M KST 무렵 ")
     head = (
-        f"[{fid}] {when}위험도는 평균 {c.get('risk_score_avg')}점"
-        f"(최소 {c.get('risk_score_min')} ~ 최대 {c.get('risk_score_max')})입니다."
+        f"[{fid}] {when}안전 점수는 평균 {c.get('risk_score_avg')}점"
+        f"({risk_level_kr(c.get('risk_score_avg_level'))}), "
+        f"최저 {c.get('risk_score_min')}점({risk_level_kr(c.get('risk_score_min_level'))})"
+        f" ~ 최고 {c.get('risk_score_max')}점({risk_level_kr(c.get('risk_score_max_level'))})입니다."
     )
     delta_line = ""
     if c.get("risk_score_delta") is not None:
         delta_line = (
-            f"구간 시작 {c.get('risk_score_start')} → 종료 {c.get('risk_score_end')}"
+            f"구간 시작 {c.get('risk_score_start')}점({risk_level_kr(c.get('risk_score_start_level'))})"
+            f" → 종료 {c.get('risk_score_end')}점({risk_level_kr(c.get('risk_score_end_level'))})"
             f" (변화 {c.get('risk_score_delta')})."
         )
+    ai_line = ""
+    if c.get("ai_detection_max_score") is not None:
+        ai_line = f"AI 탐지 최대 점수는 {c.get('ai_detection_max_score')}입니다."
     tail = ("\n" + _fmt_evidence_block(ev)) if (ev.inferred or ev.missing) else ""
-    return "\n".join(filter(None, [head, delta_line])) + tail
+    return "\n".join(filter(None, [head, delta_line, ai_line])) + tail
 
 
 def needs_factory(intent: str) -> bool:

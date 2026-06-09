@@ -1,8 +1,9 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-06-08
+기준일: 2026-06-09
 수정 이력:
+  - 2026-06-09 v3.5  Dashboard backend ECR image를 ECS service에 반영하는 운영 스크립트 `scripts/ops/deploy-dashboard-backend.sh` 추가. GitHub Actions가 push한 `sha-<7char>` 태그를 입력하면 ECR 확인, Terraform task definition 등록, ECS service update, health check, post-apply plan 확인을 수행한다.
   - 2026-06-08 v3.4  Cloud Infra 일간 보고서 접근 제어와 Reports selector 운영 배포 완료. `factory_id=cloud-infra` 보고서는 공장 권한 대신 system-view 권한으로 list/get 접근을 허용. backend image `sha-71bbe1d`, ECS task definition revision 40, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-08 v3.3  Dashboard history/report export numeric string 정규화와 Reports Word `.docx` 내보내기 운영 배포 완료. backend image `sha-199cb52`, ECS task definition revision 39, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-08 v3.2  Dashboard history delta refresh 최적화 운영 배포 완료. `/factories/{factory_id}/history`에 `since` query와 window별 기본 limit(10m=250, 1h=2000, 그 외 500)을 반영하고 frontend 자동 refresh는 신규분만 merge/dedupe. backend image `sha-9c28603`, ECS task definition revision 38, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
@@ -187,6 +188,62 @@ dashboard web = HTTP 200
 dashboard-backend workflow = success
 dashboard-web workflow = success
 post-apply terraform plan = No changes
+```
+
+## Dashboard Backend Image Rollout
+
+backend 코드가 `main`에 push되면 GitHub Actions `dashboard-backend` workflow가 테스트 후 ECR에 아래 두 태그를 push한다.
+
+```text
+sha-<7-char-git-sha>
+latest
+```
+
+운영 ECS 배포에는 재현 가능한 `sha-*` 태그를 사용한다. `latest`는 사용하지 않는다.
+
+가장 최근 backend workflow의 commit SHA 확인:
+
+```bash
+gh run list -L 5 \
+  --json name,status,conclusion,headSha,createdAt,url
+```
+
+로컬 Git 기준 최신 commit SHA 확인:
+
+```bash
+git rev-parse --short=7 HEAD
+```
+
+ECR에 생성된 backend image 태그 확인:
+
+```bash
+aws ecr describe-images \
+  --region ap-south-1 \
+  --repository-name aegis/dashboard-backend \
+  --query 'reverse(sort_by(imageDetails,& imagePushedAt))[0:10].{pushed:imagePushedAt,tags:imageTags}' \
+  --output table
+```
+
+ECS service에 특정 backend image를 반영:
+
+```bash
+scripts/ops/deploy-dashboard-backend.sh sha-acd6717
+# 또는
+scripts/ops/deploy-dashboard-backend.sh acd6717
+```
+
+스크립트 수행 항목:
+
+```text
+1. ECR에 `sha-*` image tag가 존재하는지 확인
+2. `infra/data-dashboard` Terraform validate
+3. `backend_container_image=<ECR sha tag>`로 Terraform apply
+4. 새 ECS task definition revision 이미지 확인
+5. ECS service `KJW-AEGIS-Data-Service-Backend` rolling update
+6. `services-stable` 대기
+7. running task image/health, ALB target health 확인
+8. `/healthz`, `/readyz`, 비인증 `/chat/query` 401, Dashboard `/chat` 200 확인
+9. 동일 image override 기준 Terraform post-apply plan `No changes` 확인
 ```
 
 ```text

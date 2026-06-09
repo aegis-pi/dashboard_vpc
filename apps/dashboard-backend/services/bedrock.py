@@ -37,7 +37,10 @@ _SYSTEM_PROMPT = (
     "2) inferred 항목은 반드시 '추정:' 접두로 구분해 표현한다.\n"
     "3) missing 항목이 있으면 데이터 한계를 한 줄로 명시한다.\n"
     "4) evidence에 없는 수치나 원인을 지어내지 않는다.\n"
-    "5) 3~5문장 이내로, 관제 담당자에게 보고하듯 답한다."
+    "5) Risk Score는 안전 점수다. 100~85=안전, 84~50=주의, 49~0=위험이며 "
+    "점수가 높을수록 안전하고 낮을수록 위험하다.\n"
+    "6) 사용자가 '왜 위험해?'라고 물어도 evidence의 점수/등급이 안전이면 위험하다고 말하지 않는다.\n"
+    "7) 3~5문장 이내로, 관제 담당자에게 보고하듯 답한다."
 )
 
 
@@ -76,6 +79,12 @@ def build_user_message(parsed, evidence) -> str:
         "intent": parsed.intent,
         "factory_id": parsed.factory_id,
         "time_scope": parsed.time.to_dict(),
+        "risk_score_policy": {
+            "meaning": "Risk Score is a safety score; higher is safer.",
+            "safe": "100~85",
+            "warning": "84~50",
+            "danger": "49~0",
+        },
         "evidence": evidence.to_dict(),
     }
     return json.dumps(payload, ensure_ascii=False)
