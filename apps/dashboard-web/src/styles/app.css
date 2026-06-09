@@ -1318,76 +1318,6 @@ input { font-family: inherit; }
 .tbl tr:hover td { background: var(--surface-2); }
 
 /* ─── Cloud infra overview ──────────────────────────────────────── */
-.cloud-infra-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.cloud-infra-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-}
-.cloud-infra-title {
-  min-width: 260px;
-  flex: 1;
-}
-.cloud-infra-title .eyebrow {
-  margin-bottom: 7px;
-}
-.cloud-infra-title h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 24px;
-  line-height: 1.15;
-  font-weight: 650;
-  letter-spacing: 0;
-}
-.cloud-infra-title .sub {
-  max-width: 560px;
-  margin-top: 7px;
-  line-height: 1.45;
-}
-.cloud-infra-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  max-width: 460px;
-  min-width: 280px;
-}
-.cloud-infra-grid {
-  margin-bottom: 0;
-  align-items: stretch;
-}
-.cloud-section-head {
-  min-height: 50px;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--line-2);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-.cloud-section-body {
-  padding: 16px;
-}
-.cloud-history-card {
-  margin-bottom: 0;
-}
-.cloud-matrix-card,
-.cloud-rail-card,
-.cloud-history-card,
-.cloud-infra-grid > .card {
-  border-radius: 8px;
-}
 .cloud-health-strip {
   display: grid;
   grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(130px, 1fr));
@@ -1397,7 +1327,7 @@ input { font-family: inherit; }
   overflow: hidden;
   background: var(--line);
   box-shadow: var(--shadow-card);
-  margin-bottom: 0;
+  margin-bottom: 14px;
 }
 .cloud-health-main,
 .cloud-health-stat {
@@ -1457,7 +1387,7 @@ input { font-family: inherit; }
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
-.cloud-matrix-card { margin-bottom: 0; }
+.cloud-matrix-card { margin-bottom: 14px; }
 .cloud-matrix td { vertical-align: middle; }
 .cloud-matrix .strong {
   font-weight: 650;
@@ -1473,7 +1403,7 @@ input { font-family: inherit; }
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-card);
-  margin-bottom: 0;
+  margin-bottom: 16px;
   overflow: hidden;
 }
 .cloud-rail-head {
@@ -1775,26 +1705,10 @@ input { font-family: inherit; }
   font-weight: 650;
 }
 @media (max-width: 1100px) {
-  .cloud-infra-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .cloud-infra-actions {
-    justify-content: flex-start;
-    max-width: none;
-    min-width: 0;
-    width: 100%;
-  }
   .cloud-health-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cloud-health-main { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
-  .cloud-infra-head {
-    padding: 15px;
-  }
-  .cloud-infra-title h1 {
-    font-size: 22px;
-  }
   .cloud-health-strip { grid-template-columns: 1fr; }
   .cloud-health-main { grid-column: auto; }
   .cloud-health-title { font-size: 21px; }
