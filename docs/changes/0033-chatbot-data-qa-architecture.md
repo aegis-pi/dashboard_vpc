@@ -118,8 +118,8 @@ image_snapshot/{factory_id}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.jpg
 
 ## 영향
 
-- **apps/dashboard-backend** (Step 3~4 구현 완료): `routers/chat.py`(`POST /chat/query`), `services/chat.py`(intent/time parser + Evidence + rule template), `services/bedrock.py`(Converse 호출, 2-tier, `BedrockUnavailableError` 시 rule fallback), `config.py` Bedrock 설정. RBAC를 도구 실행 레이어에 강제 — **챗봇이 RBAC 우회 통로가 되지 않도록** factory 스코프 필터 필수(데이터 조회·LLM 호출 모두 그 뒤).
-- **apps/dashboard-web**: `/chat` 독립 페이지를 Workspace에 추가. ChatGPT형 thread + 하단 composer, 공장 선택, 추천 질문, answer/evidence 렌더, generator/tier 라벨 표시. (로컬 구현 완료, 운영 배포 대기)
+- **apps/dashboard-backend** (구현/운영 배포 완료): `routers/chat.py`(`POST /chat/query`), `services/chat.py`(intent/time parser + Evidence + rule template), `services/bedrock.py`(Converse 호출, 2-tier, `BedrockUnavailableError` 시 rule fallback), `config.py` Bedrock 설정. RBAC를 도구 실행 레이어에 강제 — **챗봇이 RBAC 우회 통로가 되지 않도록** factory 스코프 필터 필수(데이터 조회·LLM 호출 모두 그 뒤). ECS task definition revision 41, image `sha-990ab6a`.
+- **apps/dashboard-web**: `/chat` 독립 페이지를 Workspace에 추가. ChatGPT형 thread + 하단 composer, 공장 선택, 추천 질문, answer/evidence 렌더, generator/tier 라벨 표시. (운영 배포 완료)
 - **IAM (배포 시 필수, Terraform 구현 + 운영 적용 완료)**: ECS task role에 `bedrock:InvokeModel`/`bedrock:GetInferenceProfile` 추가. inference profile 사용이므로 **profile ARN + 프로파일이 라우팅하는 foundation-model ARN**을 함께 허용한다(`global.` 프로파일은 cross-region 라우팅 가능). 구현: `infra/data-dashboard/ecs.tf` + `variables.tf`, profile/FM resource pattern은 변수로 조정 가능. 2026-06-09 targeted apply로 task role policy 적용, IAM simulation allowed 확인.
 - **네트워크 egress (배포 시 필수, 현 구성 확인 완료)**: ECS는 private app subnet에서 `assign_public_ip=false`로 실행되고, private route table은 NAT Gateway 기본 경로를 보유한다. 따라서 Bedrock 호출은 현 Phase 1 NAT 경유로 가능하다. S3/DynamoDB는 gateway endpoint로 NAT 비용을 줄이고, Bedrock interface endpoint는 별도 비용이 있어 현 단계 비채택. NAT 제거 프로파일로 전환하면 `com.amazonaws.<region>.bedrock-runtime` VPC endpoint를 추가해야 한다.
 - **비용**: 상시 자원 없음(요청 기반 Bedrock 과금, fast=Haiku 4.5 / precise=Sonnet 4.6 token 단가). `docs/ops/15_aws_cost_baseline.md`에 tier별 단가·예상 호출량 항목 반영.
@@ -132,7 +132,7 @@ image_snapshot/{factory_id}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.jpg
 3. ✅ **LLM 없이 rule/template 기반 답변 먼저 구현** — 도구·RBAC·window 해석을 단위 테스트로 확보.
 4. ✅ **Bedrock 호출 추가** — evidence → 자연어(한국어), 추정/확정 분리, intent별 2-tier(fast/precise), 실패 시 rule fallback. (2026-06-08, 라이브 invoke 검증)
 5. ✅ **배포 인프라**: ECS task role IAM(InvokeModel + inference profile/FM ARN) + Bedrock egress(NAT 경유) Terraform 구현. IAM은 2026-06-09 운영 적용 완료. ECS task definition env 반영과 backend image rollout은 `/chat/query` image 배포 단계에서 수행.
-6. ✅ **Dashboard 챗봇 UI**: `/chat` 페이지 + Workspace sidebar 항목 + API client 연결. (로컬 구현 완료, 운영 배포 대기)
+6. ✅ **Dashboard 챗봇 UI**: `/chat` 페이지 + Workspace sidebar 항목 + API client 연결. (운영 배포 완료)
 7. 이미지 snapshot **metadata 조회 + presigned URL**(생산 측 캡처는 워크스트림 A 합의 후).
 8. 문서/보고서 **RAG는 마지막**(S3 reports/운영 문서 한정).
 
@@ -151,4 +151,4 @@ image_snapshot/{factory_id}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.jpg
 - ✅ 라이브 Bedrock invoke (ap-south-1, account 611058323802): fast(Haiku 4.5)·precise(Sonnet 4.6) 두 tier 실제 호출 성공. confirmed 값만 단정, inferred는 "추정:" 분리, missing은 데이터 한계 명시 — 시스템 프롬프트 규칙 준수 확인.
 - ✅ Web (2026-06-09): `/chat` 페이지 렌더/API client/sidebar route 구현. `npm run lint`, `npm test -- --run`(80 passed), `npm run build` 통과(Vite chunk size warning only).
 - ✅ 운영 IAM/egress (2026-06-09): ECS task role policy targeted apply 완료, `bedrock:InvokeModel`/`bedrock:GetInferenceProfile` simulation allowed. ECS private app subnet은 NAT Gateway default route 보유, `/healthz` 200, `/readyz` dynamodb/redis/rds_metadata ok.
-- ⬜ 운영 rollout: `/chat/query` 포함 backend image push, ECS task definition env와 image tag 반영, dashboard-web 배포/CloudFront invalidation 후 화면에서 실제 질의 확인.
+- ✅ 운영 rollout (2026-06-09): dashboard-backend/web GitHub Actions success. Backend image `sha-990ab6a` push, Terraform apply로 ECS task definition revision 41 등록, service rollout COMPLETED, target 2개 HEALTHY, `/healthz` 200, `/readyz` ok. `/chat/query` OpenAPI 노출 및 비인증 401 확인. `/chat` SPA route 200.
