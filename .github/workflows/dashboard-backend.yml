@@ -15,6 +15,7 @@ env:
   ECR_REGISTRY: 611058323802.dkr.ecr.ap-south-1.amazonaws.com
   ECR_REPOSITORY: aegis/dashboard-backend
   AWS_REGION: ap-south-1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   test:
