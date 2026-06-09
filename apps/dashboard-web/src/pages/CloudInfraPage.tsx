@@ -591,91 +591,91 @@ export function CloudInfraPage() {
       onIntervalChange={setRefreshInterval}
     >
       <div className="cloud-infra-page">
-      <div className="page-head cloud-infra-head">
-        <div className="cloud-infra-title">
-          <div className="eyebrow">Cloud Infra</div>
-          <h1 className="h1">클라우드 인프라 상태</h1>
-          <div className="sub">
-            수집 상태와 장애 신호를 먼저 보고, 아래에서 컴포넌트별 원인을 확인합니다.
+        <header className="cloud-infra-head">
+          <div className="cloud-infra-title">
+            <div className="eyebrow">Cloud Infra</div>
+            <h1>클라우드 인프라 상태</h1>
+            <div className="sub">
+              수집 상태와 장애 신호를 먼저 보고, 아래에서 컴포넌트별 원인을 확인합니다.
+            </div>
           </div>
+          <div className="cloud-infra-actions" aria-label="클라우드 인프라 수집 상태">
+            <StatusPill status={data.overall_status} />
+            {data.fast_stale && <span className="pill warn"><span className="dot" />fast 수집 지연</span>}
+            {data.slow_stale && <span className="pill warn"><span className="dot" />slow 수집 지연</span>}
+            <span className="pill info">
+              <span className="dot" />
+              fast {secondsLabel(data.fast_age_seconds)} · slow {secondsLabel(data.slow_age_seconds)}
+            </span>
+          </div>
+        </header>
+
+        <HealthStrip data={data} />
+        <ComponentMatrix rows={componentRows} />
+        <DependencyRail rows={railRows} />
+
+        <div className="grid-2 cloud-infra-grid">
+          <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
+            <div className="runtime-list">
+              <RuntimeRow
+                title="Lambda 처리"
+                status={lambdaErrors > 0 || lambdaThrottles > 0 ? 'warning' : 'normal'}
+                metrics={[
+                  { label: '오류', value: lambdaErrors, sub: '최근 5분' },
+                  { label: 'Throttle', value: lambdaThrottles, sub: '최근 5분' },
+                  { label: '함수', value: pipeline?.lambdas?.length ?? 0 },
+                ]}
+              />
+              <RuntimeRow
+                title="데이터 저장/스케줄"
+                status={ddbThrottleEvents > 0 || (pipeline?.dlq?.messages_visible ?? 0) > 0 || enabledSchedulers < (pipeline?.schedulers?.length ?? 0) ? 'warning' : 'normal'}
+                metrics={[
+                  { label: 'DDB 제한', value: ddbThrottleEvents, sub: 'read + write' },
+                  { label: 'DLQ', value: pipeline?.dlq?.messages_visible ?? '-', sub: `oldest ${secondsLabel(pipeline?.dlq?.oldest_message_age_seconds)}` },
+                  { label: 'Scheduler', value: `${enabledSchedulers}/${pipeline?.schedulers?.length ?? 0}` },
+                ]}
+              />
+            </div>
+            <div className="section-table-block">
+              <table className="tbl">
+                <thead><tr><th>Lambda</th><th>호출</th><th>오류</th><th>p95</th></tr></thead>
+                <tbody>
+                  {(pipeline?.lambdas ?? []).map((fn) => (
+                    <tr key={fn.name}>
+                      <td className="mono">{fn.name}</td>
+                      <td className="tnum">{fn.invocations_5m ?? '-'}</td>
+                      <td className="tnum">{fn.errors_5m ?? '-'}</td>
+                      <td className="tnum">{valueWithUnit(fn.duration_p95_ms, 'ms', 1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Dashboard 런타임" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
+            <div className="runtime-list">
+              <RuntimeRow
+                title="ECS 서비스"
+                status={ecsStatus}
+                metrics={[
+                  { label: '실행/목표', value: `${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}` },
+                  { label: 'CPU 평균', value: `${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%` },
+                  { label: 'Memory 평균', value: `${numberLabel(runtime?.ecs?.memory_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.memory_utilization_max, 1)}%` },
+                ]}
+              />
+              <RuntimeRow
+                title="ALB 진입점"
+                status={runtimeAlbStatus}
+                metrics={[
+                  { label: '정상 target', value: runtime?.alb?.healthy_host_count ?? 0, sub: `unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}` },
+                  { label: '5xx', value: runtime?.alb?.target_5xx_count_5m ?? 0, sub: '최근 5분' },
+                  { label: 'p95 지연', value: valueWithUnit(runtime?.alb?.target_response_time_p95, 's', 3) },
+                ]}
+              />
+            </div>
+          </SectionCard>
         </div>
-        <div className="cloud-infra-actions">
-          <StatusPill status={data.overall_status} />
-          {data.fast_stale && <span className="pill warn"><span className="dot" />fast 수집 지연</span>}
-          {data.slow_stale && <span className="pill warn"><span className="dot" />slow 수집 지연</span>}
-          <span className="pill info">
-            <span className="dot" />
-            fast {secondsLabel(data.fast_age_seconds)} · slow {secondsLabel(data.slow_age_seconds)}
-          </span>
-        </div>
-      </div>
-
-      <HealthStrip data={data} />
-      <ComponentMatrix rows={componentRows} />
-      <DependencyRail rows={railRows} />
-
-      <div className="grid-2 cloud-infra-grid">
-        <SectionCard title="비즈니스 파이프라인" status={pipeline?.status} reasons={pipeline?.reasons} errors={pipeline?.errors}>
-          <div className="runtime-list">
-            <RuntimeRow
-              title="Lambda 처리"
-              status={lambdaErrors > 0 || lambdaThrottles > 0 ? 'warning' : 'normal'}
-              metrics={[
-                { label: '오류', value: lambdaErrors, sub: '최근 5분' },
-                { label: 'Throttle', value: lambdaThrottles, sub: '최근 5분' },
-                { label: '함수', value: pipeline?.lambdas?.length ?? 0 },
-              ]}
-            />
-            <RuntimeRow
-              title="데이터 저장/스케줄"
-              status={ddbThrottleEvents > 0 || (pipeline?.dlq?.messages_visible ?? 0) > 0 || enabledSchedulers < (pipeline?.schedulers?.length ?? 0) ? 'warning' : 'normal'}
-              metrics={[
-                { label: 'DDB 제한', value: ddbThrottleEvents, sub: 'read + write' },
-                { label: 'DLQ', value: pipeline?.dlq?.messages_visible ?? '-', sub: `oldest ${secondsLabel(pipeline?.dlq?.oldest_message_age_seconds)}` },
-                { label: 'Scheduler', value: `${enabledSchedulers}/${pipeline?.schedulers?.length ?? 0}` },
-              ]}
-            />
-          </div>
-          <div className="section-table-block">
-            <table className="tbl">
-              <thead><tr><th>Lambda</th><th>호출</th><th>오류</th><th>p95</th></tr></thead>
-              <tbody>
-                {(pipeline?.lambdas ?? []).map((fn) => (
-                  <tr key={fn.name}>
-                    <td className="mono">{fn.name}</td>
-                    <td className="tnum">{fn.invocations_5m ?? '-'}</td>
-                    <td className="tnum">{fn.errors_5m ?? '-'}</td>
-                    <td className="tnum">{valueWithUnit(fn.duration_p95_ms, 'ms', 1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Dashboard 런타임" status={runtime?.status} reasons={runtime?.reasons} errors={runtime?.errors}>
-          <div className="runtime-list">
-            <RuntimeRow
-              title="ECS 서비스"
-              status={ecsStatus}
-              metrics={[
-                { label: '실행/목표', value: `${runtime?.ecs?.running_count ?? 0}/${runtime?.ecs?.desired_count ?? 0}` },
-                { label: 'CPU 평균', value: `${numberLabel(runtime?.ecs?.cpu_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.cpu_utilization_max, 1)}%` },
-                { label: 'Memory 평균', value: `${numberLabel(runtime?.ecs?.memory_utilization_avg, 1)}%`, sub: `max ${numberLabel(runtime?.ecs?.memory_utilization_max, 1)}%` },
-              ]}
-            />
-            <RuntimeRow
-              title="ALB 진입점"
-              status={runtimeAlbStatus}
-              metrics={[
-                { label: '정상 target', value: runtime?.alb?.healthy_host_count ?? 0, sub: `unhealthy ${runtime?.alb?.unhealthy_host_count ?? 0}` },
-                { label: '5xx', value: runtime?.alb?.target_5xx_count_5m ?? 0, sub: '최근 5분' },
-                { label: 'p95 지연', value: valueWithUnit(runtime?.alb?.target_response_time_p95, 's', 3) },
-              ]}
-            />
-          </div>
-        </SectionCard>
-      </div>
 
       <div className="grid-2 cloud-infra-grid">
         <SectionCard title="데이터 저장소" status={datastores?.status} reasons={datastores?.reasons} errors={datastores?.errors}>
