@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutGrid,
   FileText,
+  MessageSquare,
   LogOut,
   ChevronLeft,
   PanelLeftClose,
@@ -46,6 +47,7 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
   const { data: cloudInfra } = useCloudInfra(canViewSystem)
 
   const isFleet = location.pathname === '/'
+  const isChat = location.pathname === '/chat'
   const isReports = location.pathname === '/reports'
   const isCloudInfra = location.pathname === '/cloud-infra'
   const isAdminUsers = location.pathname === '/admin/users'
@@ -181,6 +183,15 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
         )}
 
         <div className="sidebar-nav-label" style={{ marginTop: 8 }}>Workspace</div>
+        <button
+          className={`nav-item ${isChat ? 'active' : ''}`}
+          onClick={() => go('/chat')}
+          aria-label="AI 채팅"
+          title="AI 채팅"
+        >
+          <MessageSquare size={15} />
+          <span className="nav-item-label" style={{ flex: 1 }}>AI 채팅</span>
+        </button>
         <button
           className={`nav-item ${isReports ? 'active' : ''}`}
           onClick={() => go('/reports')}

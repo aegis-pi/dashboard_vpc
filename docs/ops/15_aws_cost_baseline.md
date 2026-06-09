@@ -4,6 +4,7 @@
 기준일: 2026-06-04
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-06-09 v3.5  ADR 0033 Bedrock 챗봇 backend/배포 인프라 구현 반영. ECS task role `bedrock:InvokeModel`과 backend env 추가는 고정 비용 없음. 현 VPC는 private app subnet → NAT Gateway 기본 경로가 있어 Bedrock egress 가능하며, Bedrock interface endpoint는 비용 대비 현 단계 비채택. 사용량 기준에 fast(Haiku 4.5) `$1/M input + $5/M output`, precise(Sonnet 4.6) `$3/M input + $15/M output` 가정과 월 720회 챗봇 예시 비용 `~$2.88/월` 추가. Phase 1 합계는 v3.4 고정비 기준으로 상시 `~$183.15/월`, 데모 운영 `~$12.53/월`로 보정.
   - 2026-06-04 v3.4  ADR 0030 **apply + 롤아웃 완료**. `terraform apply`(autoscaling target/policy 2 + task def revision 31), `update-service --task-definition kjw-aegis-data-backend:31 --force-new-deployment` → `services-stable` STABLE. 검증: 서비스 desired/running 2, rolloutState COMPLETED, task 2개 cpu 1024/memory 2048/HEALTHY, AZ 1a+1c 분산, scalable target min 2/max 2. 고정 비용 ~$178.35/월(상시) · 데모 ~$7.73/월(16h) 적용 시작. 리소스 상태 표 active 갱신.
   - 2026-06-04 v3.3  ADR 0030 ECS backend right-sizing + Application Auto Scaling 반영(Terraform 구현 + plan 검증 완료, apply 대기 / `terraform plan` = 4 add·0 change·1 destroy). ① task 사양 0.5 vCPU/1 GB → **1 vCPU/2 GB**(512/1024 → 1024/2048): `uvicorn --workers 2`가 0.5 코어를 두고 경쟁하던 oversubscription 해소, GIL-bound history 파싱 가속. 메모리는 1 vCPU의 Fargate 최소치(2 GB)일 뿐 사용량은 ~40%. ② 상시 task 1→**min 2 / max 2 핀**(데모 프로파일: 짧은 버스트엔 반응형 scale 무의미 → 2개 warm 고정, churn 차단), target tracking 2 policy(ALBRequestCountPerTarget 40 + CPU 50%)는 작성하되 min==max 동안 inert(프로덕션 전환 시 max 3~4로 활성). apply 후 고정 비용 상시 가동 ~$123.90→**~$178.35/월**(ECS $18.05→$72.08 = 2×$36.04, + alarm 4개 ~$0.40). 데모 운영(16h/월) ~$6.55→~$7.73/월. max 비용 영향 없음(고정 비용=min 2). 근거: 2026-06-04 incident — 단일 0.5 vCPU task 102 req/min에서 CPU 100%/응답 16s/5xx, 메모리 40%. ※ 서비스 `ignore_changes=[task_definition]` 때문에 apply만으로는 새 사양이 롤아웃되지 않음 → apply 후 `aws ecs update-service --task-definition <family>:<new> --force-new-deployment` 필요.
   - 2026-06-04 v3.2  CloudInfraFastCollector/SlowCollector 실제 배포 반영. 기존 Lambda/Scheduler를 사용해 코드 업데이트, FastCollector IAM에 ElastiCache/RDS read 권한 추가. 신규 고정 시간 비용 없음. 사용량 비용은 v3.1 추정치($0.3~1.0/월, 주로 CloudWatch GetMetricData API) 유지.
@@ -95,6 +96,7 @@
 | Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-3c20ec3` push 확인 |
 | Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 2 running task | active, desired/running 2, task def **revision 31** (1 vCPU/2 GB), AZ 1a+1c 분산, HEALTHY (ADR 0030, 2026-06-04 apply+롤아웃 완료) |
 | Data/Dashboard VPC | ECS backend Application Auto Scaling (target + 2 policy) | target min 2/max 2 핀, policy 2 (inert) | active (ADR 0030). min==max=2 라 현재 inert. 프로덕션 전환 시 max 3~4 로 활성 |
+| Data/Dashboard VPC | Bedrock chatbot `/chat/query` | fast Haiku 4.5 / precise Sonnet 4.6 | Terraform 구현 완료, apply/rollout 대기. 상시 리소스 없음, 요청 기반 과금 |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 | active |
 | Data/Dashboard VPC | IAM OIDC roles (ECR push + web deploy) | 2 roles | active, permanent root. IAM: 무료 |
@@ -107,8 +109,8 @@
 현재 확인된 비활성 또는 미생성 항목:
 
 - NLB 없음
-- 1번 Data/Dashboard VPC Backend는 active. ECS desired/running 1, ECR image `sha-3c20ec3`, `/healthz` 200 확인
-- Lambda report-generator / Bedrock 일간 보고서는 팀원/후속 작업으로 현재 Step 8 범위가 아님
+- 1번 Data/Dashboard VPC Backend는 active. ECS desired/running 2, `/healthz` 200 확인
+- Lambda report-generator는 팀원/후속 작업으로 현재 미배포. Bedrock 챗봇은 backend/Terraform 구현 완료, 운영 apply/rollout 대기
 - Cloud Infra Metrics collector(ADR 0027 / `docs/planning/29`)는 active. 사용량 ~$0.3~1.0/월, 고정 비용 없음. CloudWatch Container Insights는 기본 OFF 유지
 - Resource Groups Tagging API는 삭제 직후 terminated/deleted 리소스나 `PendingDeletion` KMS key를 한동안 반환할 수 있다.
 - EKS managed node group Auto Scaling Group은 직접 비용 리소스가 아니므로 EC2/EBS/NAT/EKS 기준으로 비용 계산
@@ -194,7 +196,7 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | CloudWatch Logs ECS ingest (usage) | usage-based | `$0.76 / GB` | usage | usage |
 | **고정 합계 (상시 가동)** | | | `~$0.2444 / hour` | **`~$178.35 / month`** |
 
-> 상시 가동은 ~$125/월이지만, **데모 운영 패턴(build/destroy 사이클)** 으로 실비를 ~$8~10/월 수준으로 낮출 수 있다.
+> 상시 가동은 ~$178/월이지만, **데모 운영 패턴(build/destroy 사이클)** 으로 고정 실비를 ~$8~10/월 수준으로 낮출 수 있다. Bedrock 챗봇은 상시 비용이 아니라 호출량 기반으로 별도 증가한다.
 
 ### 데모 운영 패턴 비용 (월 2회 × 8h = 16h/월 가동)
 
@@ -221,8 +223,10 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | Lambda notifier invocations (DDB Streams) | `$0.20 / 1M` | < 200k/월 | `~$0.00` |
 | Lambda report-generator invocations | `$0.20 / 1M` | 팀원/후속 LLM 보고서 도입 시 3 호출/일 × 30 = 90/월 | `~$0.00` |
 | Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k 무료) | < 100k GB-sec | `~$0.00` |
-| Bedrock Claude 3 Haiku (input) | `$0.00025 / 1k tokens` | 팀원/후속 LLM 보고서 도입 시 일간 보고서 + 이상 요약 ≈ 60k tokens/월 | `~$0.015` |
-| Bedrock Claude 3 Haiku (output) | `$0.00125 / 1k tokens` | 팀원/후속 LLM 보고서 도입 시 ≈ 15k tokens/월 | `~$0.019` |
+| Bedrock chatbot fast — Claude Haiku 4.5 input | `$1.00 / 1M tokens` | 600 queries/월 × 1.2k input | `~$0.72` |
+| Bedrock chatbot fast — Claude Haiku 4.5 output | `$5.00 / 1M tokens` | 600 queries/월 × 300 output | `~$0.90` |
+| Bedrock chatbot precise — Claude Sonnet 4.6 input | `$3.00 / 1M tokens` | 120 queries/월 × 1.5k input | `~$0.54` |
+| Bedrock chatbot precise — Claude Sonnet 4.6 output | `$15.00 / 1M tokens` | 120 queries/월 × 400 output | `~$0.72` |
 | DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3s/20s 주기 = ~120k write/월 | `~$0.15` |
 | DynamoDB GRAPH#5M write/read/storage | on-demand/storage | 3공장 기준 5분 bucket ~25,920 write/월 + < 1GB | `~$0.03` |
 | DynamoDB on-demand read | `$0.25 / 1M RCU` | Backend 캐시 hit으로 read 감소 ~50k/월 | `~$0.013` |
@@ -240,7 +244,7 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | Lambda CloudInfraSlowCollector invocations | `$0.20 / 1M` (1M 무료) | active. 5분 주기 = ~8,640/월 | `~$0.00` (무료 티어 내) |
 | CloudWatch GetMetricData API (collector) | `$0.01 / 1k metrics` | active. metric 수 × 51,840 호출/월 | `~$0.10~0.40` |
 | EventBridge Scheduler invocations (collector) | `$1.00 / 1M` (14M 무료) | active. ~51,840/월 | `~$0.00` (무료 티어 내) |
-| **사용량 합계 (factory-a 단독)** | | | **`~$1.90 / month`** |
+| **사용량 합계 (factory-a 단독)** | | | **`~$4.80 / month`** |
 
 > Cloud Infra collector는 active이며 위 합계에는 보수적으로 미포함했다. 사용량 ~$0.3~1.0/월 추가(주로 CloudWatch GetMetricData API). Lambda/Scheduler는 무료 티어 내, 고정 시간 비용 없음.
 
@@ -250,12 +254,12 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 
 | 운영 패턴 | 고정 | 사용량 | 합계 |
 | --- | ---: | ---: | ---: |
-| 상시 가동 (24/7) | ~$123.08/월 | ~$1.90/월 | **`~$124.98 / month`** |
-| 데모 운영 (월 2회 × 8h) | ~$6.55/월 | ~$1.90/월 | **`~$8.45 / month`** |
+| 상시 가동 (24/7) | ~$178.35/월 | ~$4.80/월 | **`~$183.15 / month`** |
+| 데모 운영 (월 2회 × 8h) | ~$7.73/월 | ~$4.80/월 | **`~$12.53 / month`** |
 | destroy 후 (Step 9.5 이전 — Route53 hosted zone + RDS snapshot) | snapshot/storage 기준 + hosted zone $0.50/월 | ~$0.60/월 | Route53 hosted zone은 영구 자원 (Step 7.5 분리). snapshot 크기에 따라 추가 |
 | destroy 후 (Step 9.5 migration 완료 후 — permanent root 잔여) | permanent root 고정 $0.50/월 + ECR ~$0.05/월 | ~$0.05/월 | **~$0.50~0.55/월 (Route53 $0.50 + ECR ~$0.05)**. Cognito/DDB/S3-web/CloudFront/ACM/IAM: ~$0.00. 상세는 아래 표 참조 |
 
-factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write/Bedrock token이 메시지 수에 가장 민감.
+factory-b/c 추가 시 IoT 메시지 수 비례 증가. 사용량 항목 중 S3 PUT/DDB write/Bedrock token이 메시지 수와 챗봇 사용량에 가장 민감.
 
 ### infra/data-dashboard destroy 후 잔여 비용 (Step 9.5 permanent root 분리 완료 후)
 

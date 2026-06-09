@@ -52,6 +52,7 @@
 | 0030 | ECS backend right-sizing(0.5→1 vCPU) + Application Auto Scaling(min 2, ALBRequestCountPerTarget 40 + CPU 50%) | accepted | 2026-06-04 | M6, infra/data-dashboard ECS, 비용 baseline |
 | 0031 | Dashboard RBAC 사용자 관리: Cognito 로그인 + RDS 권한 모델 | accepted | 2026-06-04 | M6, apps/dashboard-backend/web, Cognito, RDS PostgreSQL |
 | 0032 | 아키텍처 Overview 다이어그램 확정: `re4~re7` 통합 → 단일 overview, Phase 1 Step 0~10 반영 | accepted | 2026-06-08 | docs/architecture overview, M4/M6 시각화, ADR 0016~0031 매핑 |
+| 0033 | 챗봇 데이터 QA 아키텍처: Tool-based QA + 제한적 RAG, 결정형 라우팅 우선, Bedrock LLM은 evidence 설명 계층 | accepted | 2026-06-08 | M6, apps/dashboard-backend(/chat)/web, Bedrock, ECS IAM, DDB/S3/RDS, (후속)image 합류 |
 
 ## 파일 형식
 

@@ -10,6 +10,7 @@ import type {
   AdminUser,
   AdminUserPayload,
   CurrentUser,
+  ChatQueryResponse,
 } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -182,4 +183,14 @@ export async function updateAdminUser(userId: string, payload: AdminUserPayload)
 
 export async function deleteAdminUser(userId: string): Promise<{ status: string; id: string }> {
   return apiFetch<{ status: string; id: string }>(`/admin/users/${userId}`, { method: 'DELETE' })
+}
+
+export async function sendChatQuery(question: string, factoryId?: string): Promise<ChatQueryResponse> {
+  return apiFetch<ChatQueryResponse>('/chat/query', {
+    method: 'POST',
+    body: {
+      question,
+      factory_id: factoryId || undefined,
+    },
+  })
 }

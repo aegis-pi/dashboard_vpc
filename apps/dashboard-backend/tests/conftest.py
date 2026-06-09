@@ -58,6 +58,9 @@ os.environ.update(
         "COGNITO_JWKS_TTL_SECONDS": "3600",
         "RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS": "test-user,test-user-sub",
         "AWS_REGION": "ap-south-1",
+        # Bedrock off by default in tests: rule/template path is deterministic and
+        # makes no network call.  Bedrock-path tests flip this per-test + stub the call.
+        "BEDROCK_ENABLED": "false",
     }
 )
 

@@ -4,6 +4,7 @@ import { getCurrentUser } from './auth/auth'
 import { FleetPage } from './pages/FleetPage'
 import { FactoryPage } from './pages/FactoryPage'
 import { ReportsPage } from './pages/ReportsPage'
+import { ChatPage } from './pages/ChatPage'
 import { CloudInfraPage } from './pages/CloudInfraPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { LoginPage } from './pages/LoginPage'
@@ -48,6 +49,7 @@ export function App() {
           <Route path="/factory/:factoryId" element={<RequireAuth><FactoryPage /></RequireAuth>} />
           <Route path="/cloud-infra" element={<RequireAuth><CloudInfraPage /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth><AdminUsersPage /></RequireAuth>} />
+          <Route path="/chat" element={<RequireAuth><ChatPage /></RequireAuth>} />
           <Route path="/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

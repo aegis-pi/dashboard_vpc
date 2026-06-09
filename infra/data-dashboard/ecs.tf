@@ -129,6 +129,8 @@ data "aws_iam_policy_document" "ecs_task_assume" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_role" "ecs_task" {
   name               = "${local.naming_prefix}-IAMRole-ECS-TaskRole"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
@@ -225,6 +227,36 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     ]
   }
 
+  statement {
+    sid    = "BedrockChatbotInvoke"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+    ]
+    resources = concat(
+      [
+        for profile in var.bedrock_inference_profile_resource_patterns :
+        "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${profile}"
+      ],
+      [
+        for model in var.bedrock_foundation_model_resource_patterns :
+        "arn:aws:bedrock:*::foundation-model/${model}"
+      ],
+    )
+  }
+
+  statement {
+    sid    = "BedrockChatbotInferenceProfileRead"
+    effect = "Allow"
+    actions = [
+      "bedrock:GetInferenceProfile",
+    ]
+    resources = [
+      for profile in var.bedrock_inference_profile_resource_patterns :
+      "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${profile}"
+    ]
+  }
+
 }
 
 resource "aws_iam_role_policy" "ecs_task_inline" {
@@ -298,6 +330,16 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "S3_OPERATION_TIMEOUT_SECONDS", value = "12" },
         { name = "S3_MAX_ATTEMPTS", value = "2" },
         { name = "S3_MAX_POOL_CONNECTIONS", value = "10" },
+        { name = "BEDROCK_ENABLED", value = tostring(var.bedrock_enabled) },
+        { name = "BEDROCK_REGION", value = var.aws_region },
+        { name = "BEDROCK_MODEL_FAST", value = var.bedrock_model_fast },
+        { name = "BEDROCK_MODEL_PRECISE", value = var.bedrock_model_precise },
+        { name = "BEDROCK_MAX_TOKENS", value = "512" },
+        { name = "BEDROCK_TEMPERATURE", value = "0.2" },
+        { name = "BEDROCK_CONNECT_TIMEOUT_SECONDS", value = "3" },
+        { name = "BEDROCK_READ_TIMEOUT_SECONDS", value = "20" },
+        { name = "BEDROCK_OPERATION_TIMEOUT_SECONDS", value = "25" },
+        { name = "BEDROCK_MAX_ATTEMPTS", value = "2" },
       ]
 
       # Sensitive values injected from Secrets Manager at container launch.

@@ -96,6 +96,37 @@ export interface CurrentUser {
   allowed_factory_ids: string[] | null
 }
 
+export type ChatIntent = 'current_status' | 'cause_analysis' | 'history_trend' | 'report' | 'unknown'
+export type ChatGenerator = 'bedrock' | 'rule'
+export type ChatModelTier = 'fast' | 'precise' | null
+
+export interface ChatTimeScope {
+  kind: 'now' | 'point' | 'range'
+  window: string
+  target_kst?: string | null
+  start?: string | null
+  end?: string | null
+  assumed?: boolean
+  note?: string
+}
+
+export interface ChatEvidence {
+  confirmed: Record<string, unknown>
+  inferred: string[]
+  missing: string[]
+}
+
+export interface ChatQueryResponse {
+  answer: string
+  intent: ChatIntent
+  factory_id: string | null
+  time_scope: ChatTimeScope
+  evidence: ChatEvidence
+  image_ref: unknown | null
+  generator: ChatGenerator
+  model_tier: ChatModelTier
+}
+
 // ─── Device entry (nested format from infra_state.devices) ──────────
 export interface DeviceEntry {
   available?: boolean | null
