@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutGrid,
   FileText,
+  Images,
   MessageSquare,
   LogOut,
   ChevronLeft,
@@ -50,6 +51,7 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
   const isChat = location.pathname === '/chat'
   const isReports = location.pathname === '/reports'
   const isCloudInfra = location.pathname === '/cloud-infra'
+  const isImageSnapshots = location.pathname === '/image-snapshots'
   const isAdminUsers = location.pathname === '/admin/users'
   const cloudStatus = cloudInfra?.available ? cloudInfra.overall_status : undefined
 
@@ -148,25 +150,36 @@ export function Sidebar({ factories = [], collapsed = false, onNavigate }: Sideb
           <>
             <div className="sidebar-nav-label" style={{ marginTop: 8 }}>System</div>
             {canViewSystem && (
-              <button
-                className={`nav-item ${isCloudInfra ? 'active' : ''}`}
-                onClick={() => go('/cloud-infra')}
-                aria-label="클라우드 인프라"
-                title="클라우드 인프라"
-              >
-                <span className="nav-status-icon">
-                  <Server size={15} />
+              <>
+                <button
+                  className={`nav-item ${isCloudInfra ? 'active' : ''}`}
+                  onClick={() => go('/cloud-infra')}
+                  aria-label="클라우드 인프라"
+                  title="클라우드 인프라"
+                >
+                  <span className="nav-status-icon">
+                    <Server size={15} />
+                    <span
+                      className="nav-status-dot"
+                      style={{ background: cloudInfraDotColor(cloudStatus) }}
+                    />
+                  </span>
+                  <span className="nav-item-label" style={{ flex: 1 }}>클라우드 인프라</span>
                   <span
-                    className="nav-status-dot"
+                    className="nav-item-count nav-expanded-dot"
                     style={{ background: cloudInfraDotColor(cloudStatus) }}
                   />
-                </span>
-                <span className="nav-item-label" style={{ flex: 1 }}>클라우드 인프라</span>
-                <span
-                  className="nav-item-count nav-expanded-dot"
-                  style={{ background: cloudInfraDotColor(cloudStatus) }}
-                />
-              </button>
+                </button>
+                <button
+                  className={`nav-item ${isImageSnapshots ? 'active' : ''}`}
+                  onClick={() => go('/image-snapshots')}
+                  aria-label="이미지 스냅샷"
+                  title="이미지 스냅샷"
+                >
+                  <Images size={15} />
+                  <span className="nav-item-label" style={{ flex: 1 }}>이미지 스냅샷</span>
+                </button>
+              </>
             )}
             {canManageUsers && (
               <button

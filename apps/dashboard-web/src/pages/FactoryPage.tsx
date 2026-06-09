@@ -34,6 +34,7 @@ import {
   type HistoryWindow,
 } from '../hooks/useFactoryHistory'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { aiDetectionLabel } from '../adapters/factory'
 import type { FactoryDetail, NodeStatus, WorkloadStatus, DeviceEntry } from '../api/types'
 
 type TabId = 'overview' | 'history' | 'infrastructure' | 'timeline'
@@ -214,7 +215,8 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
             : (
               <div className="grid row3">
                 {causes.slice(0, 3).map((c, i) => {
-                  const name = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
+                  const rawName = typeof c === 'string' ? c : (c.name ?? c.field ?? '?')
+                  const name = aiDetectionLabel(rawName) ?? rawName
                   const value = typeof c === 'string' ? null : c.value
                   const contribution = typeof c === 'string' ? null : c.contribution
                   return (
@@ -260,9 +262,9 @@ function OverviewTab({ data }: { data: FactoryDetail }) {
               </span>
             </div>
             <div className="grid row3" style={{ gap: 10 }}>
-              <ScoreLine label="fire_score" value={ai.fire} />
-              <ScoreLine label="fall_score" value={ai.fall} />
-              <ScoreLine label="bend_score" value={ai.bend} />
+              <ScoreLine label="화재" value={ai.fire} />
+              <ScoreLine label="넘어짐" value={ai.fall} />
+              <ScoreLine label="굽힘" value={ai.bend} />
             </div>
 
             <div style={{
@@ -525,8 +527,8 @@ function HistoryTab({ factoryId, refreshSignalKey }: { factoryId: string; refres
     ? `최대/평균/최소 · ${bucketMinutes ?? 5}분 집계 · 고정 표시 범위`
     : '온도 · 습도 · 기압'
   const aiMetricLabel = isBucketedWindow
-    ? `fire / fall / bend · 선=${bucketMinutes ?? 5}분 평균, 점=최대 ≥0.8`
-    : 'fire / fall / bend · 0 ~ 1'
+    ? `화재 / 넘어짐 / 굽힘 · 선=${bucketMinutes ?? 5}분 평균, 점=최대 ≥0.8`
+    : '화재 / 넘어짐 / 굽힘 · 0 ~ 1'
 
   return (
     <>

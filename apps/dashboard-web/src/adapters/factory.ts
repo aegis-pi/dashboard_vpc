@@ -1,5 +1,24 @@
 import type { FactorySummary } from '../api/types'
 
+export function aiDetectionLabel(name?: string | null) {
+  const labels: Record<string, string> = {
+    fire: '화재',
+    fire_score: '화재',
+    fire_score_max: '화재',
+    fall: '넘어짐',
+    fall_score: '넘어짐',
+    fall_score_max: '넘어짐',
+    fallen: '넘어짐',
+    fallen_detected: '넘어짐',
+    bend: '굽힘',
+    bend_score: '굽힘',
+    bend_score_max: '굽힘',
+    bending: '굽힘',
+    bending_detected: '굽힘',
+  }
+  return name ? (labels[name] ?? name) : name
+}
+
 export interface FactoryViewModel {
   factory_id: string
   risk_level: string | undefined
@@ -19,8 +38,9 @@ export interface FactoryViewModel {
 export function adaptFactorySummary(f: FactorySummary): FactoryViewModel {
   const rawCauses = f.top_causes ?? f.risk?.top_causes ?? []
   const top_causes = rawCauses.map((c) => {
-    if (typeof c === 'string') return { name: c }
-    return { name: c.name ?? c.field ?? '?', value: c.value, contribution: c.contribution }
+    if (typeof c === 'string') return { name: aiDetectionLabel(c) ?? c }
+    const name = c.name ?? c.field ?? '?'
+    return { name: aiDetectionLabel(name) ?? name, value: c.value, contribution: c.contribution }
   })
   const infra = f.infra_state
   const workloads: unknown[] = infra?.workloads ?? []

@@ -4,6 +4,8 @@ import type {
   FactoryDetail,
   HistoryItem,
   ReportItem,
+  ImageSnapshotResponse,
+  ImageSnapshotRange,
   FactorySummary,
   CloudInfraStatus,
   CloudInfraHistoryItem,
@@ -142,6 +144,26 @@ export async function fetchReport(
   if (res.status === 401) throw new AuthError('인증 만료')
   if (!res.ok) throw new ApiError(`API 오류 ${res.status}`, res.status)
   return res.text()
+}
+
+export async function fetchImageSnapshots(
+  factoryId: string,
+  start: string,
+  end: string,
+  limit = 120,
+): Promise<ImageSnapshotResponse> {
+  const params = new URLSearchParams({
+    factory_id: factoryId,
+    start,
+    end,
+    limit: String(limit),
+  })
+  return apiFetch<ImageSnapshotResponse>(`/image-snapshots?${params.toString()}`)
+}
+
+export async function fetchImageSnapshotRange(factoryId: string): Promise<ImageSnapshotRange> {
+  const params = new URLSearchParams({ factory_id: factoryId })
+  return apiFetch<ImageSnapshotRange>(`/image-snapshots/range?${params.toString()}`)
 }
 
 export async function fetchCloudInfra(): Promise<CloudInfraStatus> {

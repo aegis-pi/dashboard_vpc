@@ -96,7 +96,7 @@ export interface CurrentUser {
   allowed_factory_ids: string[] | null
 }
 
-export type ChatIntent = 'current_status' | 'cause_analysis' | 'history_trend' | 'report' | 'unknown'
+export type ChatIntent = 'current_status' | 'cause_analysis' | 'history_trend' | 'spike_check' | 'report' | 'unknown'
 export type ChatGenerator = 'bedrock' | 'rule'
 export type ChatModelTier = 'fast' | 'precise' | null
 export type ChatModelPreference = 'auto' | 'fast' | 'precise'
@@ -128,6 +128,7 @@ export interface ChatQueryResponse {
   image_ref: unknown | null
   generator: ChatGenerator
   model_tier: ChatModelTier
+  router?: 'llm' | 'rule'  // how intent/time was resolved (ADR 0034)
 }
 
 // ─── Device entry (nested format from infra_state.devices) ──────────
@@ -303,6 +304,32 @@ export interface ReportItem {
   s3_key?: string
   last_modified?: string | null
   size_bytes?: number | null
+}
+
+// ─── Image snapshot types ────────────────────────────────────────────
+export interface ImageSnapshotItem {
+  factory_id: string
+  s3_key: string
+  filename: string
+  url: string
+  last_modified?: string | null
+  size_bytes?: number | null
+  detection_type?: string | null
+}
+
+export interface ImageSnapshotResponse {
+  factory_id: string
+  start: string
+  end: string
+  count: number
+  items: ImageSnapshotItem[]
+}
+
+export interface ImageSnapshotRange {
+  factory_id: string
+  available_start: string | null
+  available_latest_hour: string | null
+  object_count: number
 }
 
 // ─── Cloud infra status ───────────────────────────────────────────────
