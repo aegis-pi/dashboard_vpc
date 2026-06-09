@@ -14,6 +14,7 @@ chatbot from becoming an RBAC bypass.  No ddb call is made for a factory the
 principal cannot access.
 """
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -32,6 +33,7 @@ _CAUSE_NOW_WINDOW = "1h"
 class ChatQueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     factory_id: str | None = Field(default=None, max_length=40)
+    model_tier: Literal["auto", "fast", "precise"] | None = None
 
 
 def _ddb_gateway_timeout() -> HTTPException:
@@ -57,7 +59,11 @@ def _envelope(
     }
 
 
-async def _explain(parsed: chat.ParsedQuery, evidence: chat.Evidence) -> tuple[str, str, str | None]:
+async def _explain(
+    parsed: chat.ParsedQuery,
+    evidence: chat.Evidence,
+    requested_tier: str | None = None,
+) -> tuple[str, str, str | None]:
     """Final 'explain' step: Bedrock when enabled, deterministic rule on fallback.
 
     Returns (answer, generator, model_tier).  The pipeline before this point is
@@ -65,7 +71,11 @@ async def _explain(parsed: chat.ParsedQuery, evidence: chat.Evidence) -> tuple[s
     """
     if not get_settings().bedrock_enabled:
         return chat.render_answer(parsed, evidence), "rule", None
-    tier = bedrock.tier_for_intent(parsed.intent)
+    tier = (
+        requested_tier
+        if requested_tier in (bedrock.TIER_FAST, bedrock.TIER_PRECISE)
+        else bedrock.tier_for_intent(parsed.intent)
+    )
     try:
         answer = await bedrock.generate_answer(parsed, evidence, tier)
         return answer, "bedrock", tier
@@ -136,5 +146,5 @@ async def chat_query(
     except ddb.DynamoDBUnavailableError as exc:
         raise _ddb_gateway_timeout() from exc
 
-    answer, generator, model_tier = await _explain(parsed, evidence)
+    answer, generator, model_tier = await _explain(parsed, evidence, body.model_tier)
     return _envelope(parsed, answer, evidence, generator, model_tier)

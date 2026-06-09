@@ -74,6 +74,21 @@ def test_chat_cause_uses_precise_tier(client, ddb_mock, bedrock_on, monkeypatch)
     assert r.json()["model_tier"] == "precise"
 
 
+def test_chat_model_tier_override(client, ddb_mock, bedrock_on, monkeypatch):
+    async def _fake(parsed, evidence, tier):
+        return f"[LLM:{tier}] 빠른 원인 분석"
+
+    monkeypatch.setattr(bedrock, "generate_answer", _fake)
+    r = client.post(
+        "/chat/query",
+        json={"question": "factory-a 왜 위험해?", "model_tier": "fast"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["model_tier"] == "fast"
+    assert "LLM:fast" in data["answer"]
+
+
 def test_chat_falls_back_to_rule_on_bedrock_error(client, ddb_mock, bedrock_on, monkeypatch):
     async def _boom(parsed, evidence, tier):
         raise bedrock.BedrockUnavailableError("down")
