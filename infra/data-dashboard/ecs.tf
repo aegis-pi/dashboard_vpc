@@ -171,7 +171,7 @@ data "aws_iam_policy_document" "ecs_task_inline" {
   }
 
   statement {
-    sid    = "S3ReadProcessedAndReports"
+    sid    = "S3ReadProcessedReportsAndImageSnapshots"
     effect = "Allow"
     actions = [
       "s3:GetObject",
@@ -179,11 +179,12 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     resources = [
       "arn:aws:s3:::${var.shared_data_bucket_name}/processed/*",
       "arn:aws:s3:::${var.shared_data_bucket_name}/reports/*",
+      "arn:aws:s3:::${var.shared_data_bucket_name}/image_snapshot/*",
     ]
   }
 
   statement {
-    sid    = "S3ListReports"
+    sid    = "S3ListReadablePrefixes"
     effect = "Allow"
     actions = [
       "s3:ListBucket",
@@ -195,7 +196,9 @@ data "aws_iam_policy_document" "ecs_task_inline" {
       test     = "StringLike"
       variable = "s3:prefix"
       values = [
+        "processed/*",
         "reports/daily/*",
+        "image_snapshot/*",
       ]
     }
   }

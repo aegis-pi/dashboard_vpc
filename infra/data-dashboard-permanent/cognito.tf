@@ -58,8 +58,14 @@ resource "aws_cognito_user_pool_client" "this" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
 
-  callback_urls = ["https://${local.dashboard_web_fqdn}/callback"]
-  logout_urls   = ["https://${local.dashboard_web_fqdn}/"]
+  callback_urls = [
+    "https://${local.dashboard_web_fqdn}/callback",
+    "http://localhost:5173/callback", # 로컬 프론트엔드 개발용
+  ]
+  logout_urls = [
+    "https://${local.dashboard_web_fqdn}/",
+    "http://localhost:5173/", # 로컬 프론트엔드 개발용
+  ]
 
   supported_identity_providers = ["COGNITO"]
 
