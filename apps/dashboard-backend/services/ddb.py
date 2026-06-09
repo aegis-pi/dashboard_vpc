@@ -190,13 +190,15 @@ def _list_factories_by_scan_sync(table_name: str, limit: int) -> list[dict]:
     )
 
 
-def _get_graph_5m_sync(table_name: str, factory_id: str, since_sk: str) -> list[dict]:
+def _get_graph_5m_sync(
+    table_name: str, factory_id: str, since_sk: str, until_sk: str | None = None
+) -> list[dict]:
     """Query GRAPH#5M items ascending for a factory (max 288 items for 24h window)."""
     table = _ddb().Table(table_name)
     kwargs: dict = dict(
         KeyConditionExpression=(
             Key("pk").eq(f"FACTORY#{factory_id}")
-            & Key("sk").between(since_sk, f"{GRAPH_5M_PREFIX}~")
+            & Key("sk").between(since_sk, until_sk or f"{GRAPH_5M_PREFIX}~")
         ),
         ScanIndexForward=True,
     )
@@ -211,23 +213,26 @@ def _get_graph_5m_sync(table_name: str, factory_id: str, since_sk: str) -> list[
 
 
 def _get_history_sync(
-    table_name: str, factory_id: str, since_sk: str, max_items: int = 500
+    table_name: str,
+    factory_id: str,
+    since_sk: str,
+    max_items: int = 500,
+    until_sk: str | None = None,
 ) -> list[dict]:
-    """Query HISTORY#STATE items newest-first up to max_items, then re-sort ascending.
+    """Query HISTORY#STATE items up to max_items.
 
-    Paginates with ScanIndexForward=False so the hard cap always returns the
-    most recent data points rather than the oldest ones.  Without this cap,
-    a 24-hour window on a large table (100k+ items) can require 50+ DynamoDB
-    page calls, exceeding the operation timeout and saturating the semaphore.
+    Open-ended history windows use newest-first so the cap returns recent data.
+    Bounded chat windows use ascending order and an upper sk bound, otherwise
+    the newest-first cap can be consumed by samples after the requested end.
     """
     page_size = min(300, max_items)
     table = _ddb().Table(table_name)
     kwargs: dict = dict(
         KeyConditionExpression=(
             Key("pk").eq(f"FACTORY#{factory_id}")
-            & Key("sk").between(since_sk, f"{HISTORY_STATE_PREFIX}~")
+            & Key("sk").between(since_sk, until_sk or f"{HISTORY_STATE_PREFIX}~")
         ),
-        ScanIndexForward=False,
+        ScanIndexForward=bool(until_sk),
         Limit=page_size,
     )
     items: list = []
@@ -238,7 +243,8 @@ def _get_history_sync(
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
-    return [_from_ddb(i) for i in reversed(items[:max_items])]
+    converted = [_from_ddb(i) for i in items[:max_items]]
+    return converted if until_sk else list(reversed(converted))
 
 
 def _get_cloud_infra_history_sync(
@@ -298,6 +304,7 @@ async def get_factory_history(
     window: str = "1h",
     max_items: int = 500,
     since: str | None = None,
+    until: str | None = None,
 ) -> list[dict]:
     """Return history items for chart consumption.
 
@@ -311,16 +318,20 @@ async def get_factory_history(
 
     if _parse_window(window) <= timedelta(hours=1):
         since_sk = f"{HISTORY_STATE_PREFIX}{query_since}"
-        raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items)
+        until_sk = f"{HISTORY_STATE_PREFIX}{until}" if until else None
+        raw = await _run_ddb(_get_history_sync, table_name, factory_id, since_sk, max_items, until_sk)
         extracted = [_extract(i) for i in raw]
-        return _filter_after_since(extracted, since) if since else extracted
+        extracted = _filter_after_since(extracted, since) if since else extracted
+        return _filter_before_until(extracted, until) if until else extracted
 
     since_sk = f"{GRAPH_5M_PREFIX}{query_since}"
-    raw = await _run_ddb(_get_graph_5m_sync, table_name, factory_id, since_sk)
+    until_sk = f"{GRAPH_5M_PREFIX}{until}" if until else None
+    raw = await _run_ddb(_get_graph_5m_sync, table_name, factory_id, since_sk, until_sk)
     extracted = [_extract_graph_5m(i) for i in raw]
     n = _bucket_size_for_window(window)
     result = _reaggregate_extracted(extracted, n) if n > 1 else extracted
-    return _filter_after_since(result, since) if since else result
+    result = _filter_after_since(result, since) if since else result
+    return _filter_before_until(result, until) if until else result
 
 
 async def get_cloud_infra_history(
@@ -593,6 +604,12 @@ def _filter_after_since(items: list[dict], since: str | None) -> list[dict]:
     if not since:
         return items
     return [item for item in items if str(item.get("timestamp") or "") > since]
+
+
+def _filter_before_until(items: list[dict], until: str | None) -> list[dict]:
+    if not until:
+        return items
+    return [item for item in items if str(item.get("timestamp") or "") <= until]
 
 
 def _coalesce_fs(fs: dict, *dot_paths: str):

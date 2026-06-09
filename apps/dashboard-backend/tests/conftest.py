@@ -61,6 +61,9 @@ os.environ.update(
         # Bedrock off by default in tests: rule/template path is deterministic and
         # makes no network call.  Bedrock-path tests flip this per-test + stub the call.
         "BEDROCK_ENABLED": "false",
+        # LLM routing (ADR 0034) off by default: keeps the rule parser deterministic
+        # for existing tests.  Routing tests enable it + stub bedrock.resolve_query.
+        "CHAT_ROUTING_ENABLED": "false",
     }
 )
 

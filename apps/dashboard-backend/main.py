@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
-from routers import admin_users, auth_me, chat, cloud_infra, factories, reports, ws
+from routers import admin_users, auth_me, chat, cloud_infra, factories, image_snapshots, reports, ws
 from services import ddb
 from services.metadata import check_metadata_db, ensure_metadata_schema
 from services.redis_client import get_redis
@@ -31,6 +31,7 @@ app.add_middleware(
 app.include_router(factories.router)
 app.include_router(chat.router)
 app.include_router(cloud_infra.router)
+app.include_router(image_snapshots.router)
 app.include_router(reports.router)
 app.include_router(admin_users.router)
 app.include_router(auth_me.router)

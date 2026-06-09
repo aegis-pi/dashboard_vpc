@@ -64,6 +64,15 @@ class Settings(BaseSettings):
     bedrock_operation_timeout_seconds: float = 25.0
     bedrock_max_attempts: int = 2
 
+    # Chat query routing (ADR 0034): an LLM "resolve" step (Converse tool-use)
+    # extracts intent/factory/time before the deterministic data tools run.
+    # Falls back to the rule parser when disabled, unavailable, or invalid.
+    # Only active when bedrock_enabled is also True (resolve needs Bedrock).
+    chat_routing_enabled: bool = True
+    bedrock_resolve_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    bedrock_resolve_max_tokens: int = 512
+    bedrock_resolve_operation_timeout_seconds: float = 12.0
+
     # Browser clients allowed to call the Dashboard API.
     cors_allow_origins: str = "https://dashboard.aegis-pi.cloud,http://localhost:5173"
 

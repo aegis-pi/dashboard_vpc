@@ -8,6 +8,7 @@ Verifies:
 - Each GRAPH#5M item exposes is_bucket, risk_score_avg, risk_score_min
 """
 import inspect
+import asyncio
 
 
 def test_history_prefix_code_uses_only_history_state():
@@ -53,6 +54,47 @@ def test_history_since_returns_only_newer_items(client, ddb_mock):
     delta = r.json()
     assert len(delta) == 1
     assert delta[0]["timestamp"] == items[1]["timestamp"]
+
+
+def test_history_until_bounds_query_before_newer_cap(ddb_mock):
+    from services import ddb
+
+    factory_id = "factory-z"
+    for second in range(150):
+        ts = f"2026-06-09T08:00:{second % 60:02d}.{second // 60:03d}Z"
+        ddb_mock.put_item(Item={
+            "pk": f"FACTORY#{factory_id}",
+            "sk": f"HISTORY#STATE#{ts}",
+            "factory_id": factory_id,
+            "updated_at": ts,
+            "risk": {"score": 100, "level": "safe"},
+            "factory_state": {},
+            "infra_state": {},
+        })
+    for ts, score in (
+        ("2026-06-09T07:25:17.000Z", 49),
+        ("2026-06-09T07:25:22.000Z", 49),
+    ):
+        ddb_mock.put_item(Item={
+            "pk": f"FACTORY#{factory_id}",
+            "sk": f"HISTORY#STATE#{ts}",
+            "factory_id": factory_id,
+            "updated_at": ts,
+            "risk": {"score": score, "level": "danger"},
+            "factory_state": {},
+            "infra_state": {},
+        })
+
+    items = asyncio.run(ddb.get_factory_history(
+        factory_id,
+        "1h",
+        120,
+        since="2026-06-09T07:25:00.000Z",
+        until="2026-06-09T07:35:00.000Z",
+    ))
+
+    assert [i["risk_score"] for i in items] == [49.0, 49.0]
+    assert all(i["timestamp"].startswith("2026-06-09T07:25") for i in items)
 
 
 def test_history_window_default_limits():

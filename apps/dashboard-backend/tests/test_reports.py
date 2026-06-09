@@ -1,3 +1,10 @@
+import asyncio
+import json
+from datetime import datetime, timezone
+
+import boto3
+from moto import mock_aws
+
 import deps.rbac as rbac_module
 from main import app
 from services import s3
@@ -89,6 +96,56 @@ def test_get_report_uses_partitioned_s3_key(monkeypatch):
             "reports/daily/yyyy=2026/mm=05/dd=27/factory-b/report.md",
         )
     ]
+
+
+def test_list_processed_risk_scores_reads_bounded_s3_details():
+    s3._s3_client.cache_clear()
+    with mock_aws():
+        client = boto3.client("s3", region_name="ap-south-1")
+        client.create_bucket(
+            Bucket="aegis-bucket-data",
+            CreateBucketConfiguration={"LocationConstraint": "ap-south-1"},
+        )
+        client.put_object(
+            Bucket="aegis-bucket-data",
+            Key=(
+                "processed/factory-c/risk_score/yyyy=2026/mm=06/dd=09/hh=04/"
+                "factory-c:factory_state:worker:2026-06-09T04:15:12Z.json"
+            ),
+            Body=json.dumps(
+                {
+                    "risk": {
+                        "score": 0.0,
+                        "level": "danger",
+                        "top_causes": [{"field": "data_freshness", "value": "stale_over_300s"}],
+                    },
+                }
+            ),
+            ContentType="application/json",
+        )
+        client.put_object(
+            Bucket="aegis-bucket-data",
+            Key=(
+                "processed/factory-c/risk_score/yyyy=2026/mm=06/dd=09/hh=04/"
+                "factory-c:factory_state:worker:2026-06-09T04:40:00Z.json"
+            ),
+            Body=json.dumps({"score": 76.1, "top_causes": []}),
+            ContentType="application/json",
+        )
+
+        result = asyncio.run(
+            s3.list_processed_risk_scores(
+                "factory-c",
+                datetime(2026, 6, 9, 4, 10, 0, tzinfo=timezone.utc),
+                datetime(2026, 6, 9, 4, 20, 0, tzinfo=timezone.utc),
+            )
+        )
+
+    assert len(result) == 1
+    assert result[0]["timestamp"] == "2026-06-09T04:15:12Z"
+    assert result[0]["risk_score"] == 0.0
+    assert result[0]["level"] == "danger"
+    assert result[0]["top_causes"] == [{"field": "data_freshness", "value": "stale_over_300s"}]
 
 
 def test_get_report_not_found_returns_404(client, monkeypatch):
