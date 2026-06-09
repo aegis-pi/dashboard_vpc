@@ -1,10 +1,12 @@
 import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from 'react'
-import { Bot, Factory, Send, User, Zap } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Bot, Brain, Factory, Send, User, Zap } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
 import { adaptSidebarFactory } from '../adapters/factory'
 import { sendChatQuery } from '../api/client'
-import type { ChatQueryResponse } from '../api/types'
+import { parseInline, parseMarkdown, type MdBlock } from '../utils/markdown'
+import type { ChatModelPreference, ChatQueryResponse } from '../api/types'
 
 type ChatRole = 'assistant' | 'user'
 
@@ -17,11 +19,22 @@ interface ChatMessage {
   error?: boolean
 }
 
-const SUGGESTIONS = [
-  'factory-a 지금 상태 어때?',
-  'factory-a 왜 위험해?',
-  'factory-a 최근 1시간 추이 알려줘',
+const SUGGESTION_TEMPLATES = [
+  (factoryId: string) => `${factoryId} 지금 상태 어때?`,
+  (factoryId: string) => `${factoryId} 왜 위험해?`,
+  (factoryId: string) => `${factoryId} 최근 1시간 추이 알려줘`,
 ]
+
+const MODEL_OPTIONS: Array<{ value: ChatModelPreference; label: string }> = [
+  { value: 'auto', label: '자동 선택' },
+  { value: 'fast', label: '빠른 답변' },
+  { value: 'precise', label: '정밀 분석' },
+]
+
+const MODEL_TIER_LABEL: Record<Exclude<ChatModelPreference, 'auto'>, string> = {
+  fast: '빠른 답변',
+  precise: '정밀 분석',
+}
 
 function messageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -32,6 +45,51 @@ function formatEvidenceValue(value: unknown): string {
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '-'
   if (typeof value === 'string' || typeof value === 'boolean') return String(value)
   return JSON.stringify(value)
+}
+
+function inlineMd(text: string): ReactNode[] {
+  return parseInline(text).map((span, key) => {
+    if (span.bold) return <strong key={key}>{span.text}</strong>
+    if (span.code) return <code key={key} className="mono">{span.text}</code>
+    return <span key={key}>{span.text}</span>
+  })
+}
+
+function renderMarkdownBlock(block: MdBlock, key: number): ReactNode {
+  if (block.kind === 'h') return <p key={key} className="chat-md-heading">{inlineMd(block.text ?? '')}</p>
+  if (block.kind === 'p') return <p key={key}>{inlineMd(block.text ?? '')}</p>
+  if (block.kind === 'list') {
+    const Tag = block.ordered ? 'ol' : 'ul'
+    return (
+      <Tag key={key}>
+        {block.items?.map((item, index) => <li key={index}>{inlineMd(item)}</li>)}
+      </Tag>
+    )
+  }
+  if (block.kind === 'table') {
+    return (
+      <div key={key} className="chat-md-table-wrap">
+        <table className="chat-md-table">
+          <thead>
+            <tr>{block.head?.map((cell, index) => <th key={index}>{inlineMd(cell)}</th>)}</tr>
+          </thead>
+          <tbody>
+            {block.rows?.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => <td key={cellIndex}>{inlineMd(cell)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  return null
+}
+
+function MarkdownMessage({ text }: { text: string }) {
+  const blocks = parseMarkdown(text)
+  return <div className="chat-md">{blocks.map((block, index) => renderMarkdownBlock(block, index))}</div>
 }
 
 function EvidencePanel({ response }: { response: ChatQueryResponse }) {
@@ -81,14 +139,14 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
           {message.pending ? (
             <span className="chat-typing"><span /> <span /> <span /></span>
           ) : (
-            <p>{message.text}</p>
+            <MarkdownMessage text={message.text} />
           )}
         </div>
         {message.response && (
           <>
             <div className="chat-meta">
-              <span>{message.response.generator === 'bedrock' ? 'Bedrock' : 'Rule fallback'}</span>
-              {message.response.model_tier && <span>{message.response.model_tier}</span>}
+              <span>{message.response.generator === 'bedrock' ? 'AI 답변' : '기본 답변'}</span>
+              {message.response.model_tier && <span>{MODEL_TIER_LABEL[message.response.model_tier]}</span>}
               <span>{message.response.intent}</span>
               {message.response.factory_id && <span>{message.response.factory_id}</span>}
             </div>
@@ -116,6 +174,7 @@ export function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [question, setQuestion] = useState('')
   const [selectedFactory, setSelectedFactory] = useState('')
+  const [modelPreference, setModelPreference] = useState<ChatModelPreference>('auto')
   const [sending, setSending] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -136,6 +195,12 @@ export function ChatPage() {
       .sort((a, b) => a.localeCompare(b))
   ), [factories.data?.factories])
 
+  const suggestionFactoryId = selectedFactory || factoryIds[0] || 'factory-a'
+  const suggestions = useMemo(
+    () => SUGGESTION_TEMPLATES.map((template) => template(suggestionFactoryId)),
+    [suggestionFactoryId],
+  )
+
   const submit = async (override?: string) => {
     const text = (override ?? question).trim()
     if (!text || sending) return
@@ -151,7 +216,7 @@ export function ChatPage() {
     setSending(true)
 
     try {
-      const response = await sendChatQuery(text, selectedFactory)
+      const response = await sendChatQuery(text, selectedFactory, modelPreference)
       setMessages((current) => current.map((message) => (
         message.id === pendingId
           ? { id: pendingId, role: 'assistant', text: response.answer, response }
@@ -206,7 +271,7 @@ export function ChatPage() {
           </div>
 
           <div className="chat-suggestions" aria-label="추천 질문">
-            {SUGGESTIONS.map((item) => (
+            {suggestions.map((item) => (
               <button
                 key={item}
                 type="button"
@@ -230,6 +295,18 @@ export function ChatPage() {
                 <option value="">질문에서 식별</option>
                 {factoryIds.map((factoryId) => (
                   <option key={factoryId} value={factoryId}>{factoryId}</option>
+                ))}
+              </select>
+            </div>
+            <div className="chat-model-select">
+              <Brain size={14} />
+              <select
+                value={modelPreference}
+                onChange={(event) => setModelPreference(event.target.value as ChatModelPreference)}
+                aria-label="응답 모드 선택"
+              >
+                {MODEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </div>

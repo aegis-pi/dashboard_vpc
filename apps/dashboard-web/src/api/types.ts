@@ -99,6 +99,7 @@ export interface CurrentUser {
 export type ChatIntent = 'current_status' | 'cause_analysis' | 'history_trend' | 'report' | 'unknown'
 export type ChatGenerator = 'bedrock' | 'rule'
 export type ChatModelTier = 'fast' | 'precise' | null
+export type ChatModelPreference = 'auto' | 'fast' | 'precise'
 
 export interface ChatTimeScope {
   kind: 'now' | 'point' | 'range'

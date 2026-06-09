@@ -2009,6 +2009,57 @@ input { font-family: inherit; }
   overflow-wrap: anywhere;
 }
 .chat-bubble p { margin: 0; white-space: pre-wrap; }
+.chat-md {
+  display: grid;
+  gap: 8px;
+}
+.chat-md p,
+.chat-md ul,
+.chat-md ol {
+  margin: 0;
+}
+.chat-md ul,
+.chat-md ol {
+  padding-left: 18px;
+}
+.chat-md li {
+  margin: 3px 0;
+}
+.chat-md strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+.chat-md code {
+  padding: 1px 5px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: .92em;
+}
+.chat-md-heading {
+  color: var(--ink);
+  font-weight: 700;
+}
+.chat-md-table-wrap {
+  overflow-x: auto;
+}
+.chat-md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.chat-md-table th,
+.chat-md-table td {
+  border: 1px solid var(--line-2);
+  padding: 5px 7px;
+  text-align: left;
+}
+.chat-md-table th {
+  background: var(--surface-2);
+  color: var(--ink);
+  font-weight: 650;
+}
 .chat-bubble.assistant {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -2116,7 +2167,7 @@ input { font-family: inherit; }
 .chat-composer {
   min-height: 56px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: end;
   gap: 9px;
   padding: 8px;
@@ -2125,7 +2176,8 @@ input { font-family: inherit; }
   background: var(--surface);
   box-shadow: var(--shadow-lift);
 }
-.chat-factory-select {
+.chat-factory-select,
+.chat-model-select {
   height: 40px;
   display: inline-flex;
   align-items: center;
@@ -2136,7 +2188,8 @@ input { font-family: inherit; }
   color: var(--ink-3);
   background: var(--surface-2);
 }
-.chat-factory-select select {
+.chat-factory-select select,
+.chat-model-select select {
   height: 30px;
   max-width: 150px;
   border: 0;
@@ -2144,7 +2197,11 @@ input { font-family: inherit; }
   color: var(--ink-2);
   font-size: 12.5px;
 }
-.chat-factory-select select:focus { outline: 0; }
+.chat-model-select select {
+  max-width: 112px;
+}
+.chat-factory-select select:focus,
+.chat-model-select select:focus { outline: 0; }
 .chat-composer textarea {
   width: 100%;
   min-height: 40px;
@@ -2492,11 +2549,13 @@ textarea:focus-visible,
   .chat-composer {
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .chat-factory-select {
+  .chat-factory-select,
+  .chat-model-select {
     grid-column: 1 / -1;
     width: 100%;
   }
-  .chat-factory-select select {
+  .chat-factory-select select,
+  .chat-model-select select {
     max-width: none;
     flex: 1;
   }

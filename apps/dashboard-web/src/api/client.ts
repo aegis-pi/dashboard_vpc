@@ -10,6 +10,7 @@ import type {
   AdminUser,
   AdminUserPayload,
   CurrentUser,
+  ChatModelPreference,
   ChatQueryResponse,
 } from './types'
 
@@ -185,12 +186,17 @@ export async function deleteAdminUser(userId: string): Promise<{ status: string;
   return apiFetch<{ status: string; id: string }>(`/admin/users/${userId}`, { method: 'DELETE' })
 }
 
-export async function sendChatQuery(question: string, factoryId?: string): Promise<ChatQueryResponse> {
+export async function sendChatQuery(
+  question: string,
+  factoryId?: string,
+  modelTier: ChatModelPreference = 'auto',
+): Promise<ChatQueryResponse> {
   return apiFetch<ChatQueryResponse>('/chat/query', {
     method: 'POST',
     body: {
       question,
       factory_id: factoryId || undefined,
+      model_tier: modelTier === 'auto' ? undefined : modelTier,
     },
   })
 }
