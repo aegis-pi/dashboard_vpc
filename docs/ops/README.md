@@ -29,6 +29,7 @@
 | `20_tailscale_hub_spoke_runbook.md` | Tailscale 기반 Hub-Spoke 연결 실행 절차 |
 | `21_hub_admin_ui_ingress.md` | ArgoCD/Grafana 관리자 HTTPS Ingress 운영 절차 |
 | `22_data_dashboard_vpc_runbook.md` | 1번 Data/Dashboard VPC apply/destroy 및 backend image rollout 절차 |
+| `23_local_frontend_dev.md` | 로컬 프론트/백엔드(localhost:5173/8000) 개발 환경 세팅 런북 |
 
 ## 기준
 

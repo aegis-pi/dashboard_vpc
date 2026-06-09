@@ -53,6 +53,7 @@
 | 0031 | Dashboard RBAC 사용자 관리: Cognito 로그인 + RDS 권한 모델 | accepted | 2026-06-04 | M6, apps/dashboard-backend/web, Cognito, RDS PostgreSQL |
 | 0032 | 아키텍처 Overview 다이어그램 확정: `re4~re7` 통합 → 단일 overview, Phase 1 Step 0~10 반영 | accepted | 2026-06-08 | docs/architecture overview, M4/M6 시각화, ADR 0016~0031 매핑 |
 | 0033 | 챗봇 데이터 QA 아키텍처: Tool-based QA + 제한적 RAG, 결정형 라우팅 우선, Bedrock LLM은 evidence 설명 계층 | accepted | 2026-06-08 | M6, apps/dashboard-backend(/chat)/web, Bedrock, ECS IAM, DDB/S3/RDS, (후속)image 합류 |
+| 0034 | 챗봇 LLM 라우팅: 결정형 파서 앞에 LLM Resolve(Converse tool-use, Haiku) 추가 + 규칙 fallback + spike_check 도구. ADR 0033 후속 옵션 채택 | proposed | 2026-06-09 | M6, apps/dashboard-backend(/chat: chat·bedrock·router·config), Bedrock Converse 1콜, 비용 |
 
 ## 파일 형식
 

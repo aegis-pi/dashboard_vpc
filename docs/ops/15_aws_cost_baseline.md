@@ -4,6 +4,7 @@
 기준일: 2026-06-04
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-06-09 v3.6  ADR 0034 LLM 라우팅 반영. 챗봇 1콜당 앞단 **resolve(Haiku 4.5 Converse tool-use)** 1콜이 추가됨(입력 ~1.2k/출력 ~150 토큰). 월 720회 기준 resolve 비용 `~$1.4/월`(입력 720×1.2k×$1/M ≈ $0.86 + 출력 720×150×$5/M ≈ $0.54) 추가로, 챗봇 사용량 비용은 v3.5 `~$2.88/월` → `~$4.3/월` 수준. 고정 비용 무변경(상시 리소스 없음, IAM 권한도 기존 Bedrock 권한 재사용). `chat_routing_enabled=false`로 끄면 규칙 파서만 사용해 resolve 비용 0.
   - 2026-06-09 v3.5  ADR 0033 Bedrock 챗봇 backend/배포 인프라 구현 반영. ECS task role `bedrock:InvokeModel`과 backend env 추가는 고정 비용 없음. 현 VPC는 private app subnet → NAT Gateway 기본 경로가 있어 Bedrock egress 가능하며, Bedrock interface endpoint는 비용 대비 현 단계 비채택. 사용량 기준에 fast(Haiku 4.5) `$1/M input + $5/M output`, precise(Sonnet 4.6) `$3/M input + $15/M output` 가정과 월 720회 챗봇 예시 비용 `~$2.88/월` 추가. Phase 1 합계는 v3.4 고정비 기준으로 상시 `~$183.15/월`, 데모 운영 `~$12.53/월`로 보정.
   - 2026-06-04 v3.4  ADR 0030 **apply + 롤아웃 완료**. `terraform apply`(autoscaling target/policy 2 + task def revision 31), `update-service --task-definition kjw-aegis-data-backend:31 --force-new-deployment` → `services-stable` STABLE. 검증: 서비스 desired/running 2, rolloutState COMPLETED, task 2개 cpu 1024/memory 2048/HEALTHY, AZ 1a+1c 분산, scalable target min 2/max 2. 고정 비용 ~$178.35/월(상시) · 데모 ~$7.73/월(16h) 적용 시작. 리소스 상태 표 active 갱신.
   - 2026-06-04 v3.3  ADR 0030 ECS backend right-sizing + Application Auto Scaling 반영(Terraform 구현 + plan 검증 완료, apply 대기 / `terraform plan` = 4 add·0 change·1 destroy). ① task 사양 0.5 vCPU/1 GB → **1 vCPU/2 GB**(512/1024 → 1024/2048): `uvicorn --workers 2`가 0.5 코어를 두고 경쟁하던 oversubscription 해소, GIL-bound history 파싱 가속. 메모리는 1 vCPU의 Fargate 최소치(2 GB)일 뿐 사용량은 ~40%. ② 상시 task 1→**min 2 / max 2 핀**(데모 프로파일: 짧은 버스트엔 반응형 scale 무의미 → 2개 warm 고정, churn 차단), target tracking 2 policy(ALBRequestCountPerTarget 40 + CPU 50%)는 작성하되 min==max 동안 inert(프로덕션 전환 시 max 3~4로 활성). apply 후 고정 비용 상시 가동 ~$123.90→**~$178.35/월**(ECS $18.05→$72.08 = 2×$36.04, + alarm 4개 ~$0.40). 데모 운영(16h/월) ~$6.55→~$7.73/월. max 비용 영향 없음(고정 비용=min 2). 근거: 2026-06-04 incident — 단일 0.5 vCPU task 102 req/min에서 CPU 100%/응답 16s/5xx, 메모리 40%. ※ 서비스 `ignore_changes=[task_definition]` 때문에 apply만으로는 새 사양이 롤아웃되지 않음 → apply 후 `aws ecs update-service --task-definition <family>:<new> --force-new-deployment` 필요.
@@ -227,6 +228,8 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | Bedrock chatbot fast — Claude Haiku 4.5 output | `$5.00 / 1M tokens` | 600 queries/월 × 300 output | `~$0.90` |
 | Bedrock chatbot precise — Claude Sonnet 4.6 input | `$3.00 / 1M tokens` | 120 queries/월 × 1.5k input | `~$0.54` |
 | Bedrock chatbot precise — Claude Sonnet 4.6 output | `$15.00 / 1M tokens` | 120 queries/월 × 400 output | `~$0.72` |
+| Bedrock chatbot resolve — Claude Haiku 4.5 input (ADR 0034) | `$1.00 / 1M tokens` | 720 queries/월 × 1.2k input | `~$0.86` |
+| Bedrock chatbot resolve — Claude Haiku 4.5 output (ADR 0034) | `$5.00 / 1M tokens` | 720 queries/월 × 150 output | `~$0.54` |
 | DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3s/20s 주기 = ~120k write/월 | `~$0.15` |
 | DynamoDB GRAPH#5M write/read/storage | on-demand/storage | 3공장 기준 5분 bucket ~25,920 write/월 + < 1GB | `~$0.03` |
 | DynamoDB on-demand read | `$0.25 / 1M RCU` | Backend 캐시 hit으로 read 감소 ~50k/월 | `~$0.013` |
