@@ -1,10 +1,10 @@
 // Minimal Markdown parser (no external deps) shared by the report renderer,
 // the print/PDF HTML exporter, and the .docx exporter. Supports the subset the
-// daily-report pipeline emits: h1-h3, paragraphs, ordered/unordered lists,
-// pipe tables, and inline **bold** / `code`.
+// daily-report pipeline emits: h1-h3, paragraphs, blockquotes, horizontal
+// rules, ordered/unordered lists, pipe tables, and inline **bold** / `code`.
 
 export interface MdBlock {
-  kind: 'h' | 'p' | 'list' | 'table'
+  kind: 'h' | 'p' | 'quote' | 'hr' | 'list' | 'table'
   level?: number
   text?: string
   ordered?: boolean
@@ -23,6 +23,20 @@ function splitRow(line: string): string[] {
   return line.replace(/^\|/, '').replace(/\|$/, '').split('|').map((s) => s.trim())
 }
 
+function isHorizontalRule(line: string): boolean {
+  const trimmed = line.trim()
+  return /^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed)
+}
+
+function isBlockStart(line: string): boolean {
+  return /^(#{1,3})\s+/.test(line) ||
+    line.startsWith('|') ||
+    /^\s*[-*]\s+/.test(line) ||
+    /^\s*\d+\.\s+/.test(line) ||
+    /^\s*>/.test(line) ||
+    isHorizontalRule(line)
+}
+
 export function parseMarkdown(text: string): MdBlock[] {
   const lines = (text ?? '').split('\n')
   const blocks: MdBlock[] = []
@@ -32,6 +46,16 @@ export function parseMarkdown(text: string): MdBlock[] {
     if (!line.trim()) { i++; continue }
     const h = /^(#{1,3})\s+(.*)$/.exec(line)
     if (h) { blocks.push({ kind: 'h', level: h[1]!.length, text: h[2] }); i++; continue }
+    if (isHorizontalRule(line)) { blocks.push({ kind: 'hr' }); i++; continue }
+    if (/^\s*>/.test(line)) {
+      const quote: string[] = []
+      while (i < lines.length && /^\s*>/.test(lines[i]!)) {
+        quote.push(lines[i]!.replace(/^\s*>\s?/, ''))
+        i++
+      }
+      blocks.push({ kind: 'quote', text: quote.join(' ') })
+      continue
+    }
     if (line.startsWith('|') && lines[i + 1]?.match(/^\|\s*[:-]+/)) {
       const head = splitRow(line)
       i += 2
@@ -51,7 +75,7 @@ export function parseMarkdown(text: string): MdBlock[] {
       continue
     }
     const para = [line]; i++
-    while (i < lines.length && lines[i]!.trim() && !/^(#|\||[-*]\s|\d+\.\s)/.test(lines[i]!)) {
+    while (i < lines.length && lines[i]!.trim() && !isBlockStart(lines[i]!)) {
       para.push(lines[i]!); i++
     }
     blocks.push({ kind: 'p', text: para.join(' ') })

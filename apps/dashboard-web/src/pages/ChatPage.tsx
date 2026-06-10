@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Brain, Check, ChevronDown, Database, Factory, FileSearch, Search, Send, ShieldCheck, Sparkles, Zap } from 'lucide-react'
+import { Brain, Check, ChevronDown, Database, ExternalLink, Factory, FileSearch, Image as ImageIcon, Search, Send, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
 import { adaptSidebarFactory, aiDetectionLabel } from '../adapters/factory'
@@ -22,9 +22,10 @@ interface ChatMessage {
 }
 
 const SUGGESTION_TEMPLATES = [
-  (factoryId: string) => `${factoryId} 지금 상태 어때?`,
-  (factoryId: string) => `${factoryId} 왜 위험해?`,
-  (factoryId: string) => `${factoryId} 최근 1시간 추이 알려줘`,
+  (factoryId: string) => `${factoryId} 2026-06-09 오전 9시 35분쯤 화재 위험 점수가 튄 걸 봤는데, 증빙 사진이랑 그때 factory 결과 요약해줘`,
+  (factoryId: string) => `${factoryId} 2026-06-09 보고서에서 주요 이벤트와 확인 필요 항목 요약해줘`,
+  (factoryId: string) => `${factoryId} 2026-06-09 오후 3시 안전 점수 급락 원인 알려줘`,
+  (factoryId: string) => `${factoryId} 2026-06-09 오후 2시~4시 안전 점수와 AI 탐지 추이 비교해줘`,
 ]
 
 const MODEL_OPTIONS: Array<{ value: ChatModelPreference; label: string }> = [
@@ -119,9 +120,20 @@ function inlineMd(text: string): ReactNode[] {
   })
 }
 
-function renderMarkdownBlock(block: MdBlock, key: number): ReactNode {
-  if (block.kind === 'h') return <p key={key} className="chat-md-heading">{inlineMd(block.text ?? '')}</p>
+function renderMarkdownBlock(block: MdBlock, key: number, isLeadHeading = false): ReactNode {
+  if (block.kind === 'h') {
+    const level = Math.min(Math.max(block.level ?? 3, 1), 3)
+    const Tag = `h${level}` as 'h1' | 'h2' | 'h3'
+    const classes = [
+      'chat-md-heading',
+      `chat-md-heading-${level}`,
+      isLeadHeading ? 'chat-md-heading-lead' : '',
+    ].filter(Boolean).join(' ')
+    return <Tag key={key} className={classes}>{inlineMd(block.text ?? '')}</Tag>
+  }
   if (block.kind === 'p') return <p key={key}>{inlineMd(block.text ?? '')}</p>
+  if (block.kind === 'quote') return <blockquote key={key}>{inlineMd(block.text ?? '')}</blockquote>
+  if (block.kind === 'hr') return <hr key={key} />
   if (block.kind === 'list') {
     const Tag = block.ordered ? 'ol' : 'ul'
     return (
@@ -153,21 +165,54 @@ function renderMarkdownBlock(block: MdBlock, key: number): ReactNode {
 
 function MarkdownMessage({ text }: { text: string }) {
   const blocks = parseMarkdown(text)
-  return <div className="chat-md">{blocks.map((block, index) => renderMarkdownBlock(block, index))}</div>
+  const firstHeadingIndex = blocks.findIndex((block) => block.kind === 'h')
+  return (
+    <div className="chat-md">
+      {blocks.map((block, index) => renderMarkdownBlock(block, index, index === firstHeadingIndex))}
+    </div>
+  )
 }
 
 function EvidencePanel({ response }: { response: ChatQueryResponse }) {
   const confirmedRows = buildConfirmedRows(response.evidence.confirmed ?? {})
   const inferred = response.evidence.inferred ?? []
   const missing = response.evidence.missing ?? []
+  const imageRef = response.image_ref
+  const imageItems = imageRef?.items ?? []
 
-  if (!confirmedRows.length && !inferred.length && !missing.length) return null
+  if (!confirmedRows.length && !inferred.length && !missing.length && !imageItems.length) return null
 
   return (
     <div className="chat-evidence">
+      {imageRef && imageItems.length > 0 && (
+        <section className="chat-evidence-section image">
+          <div className="chat-evidence-title">
+            <ImageIcon size={14} />
+            <span>증빙 이미지</span>
+            <em>{imageItems.length}개</em>
+            <strong className="mono">{imageRef.time_range_kst}</strong>
+          </div>
+          <div className="chat-image-grid">
+            {imageItems.map((item) => (
+              <a key={item.s3_key} className="chat-image-card" href={item.url} target="_blank" rel="noreferrer">
+                <img src={item.url} alt={item.filename} loading="lazy" />
+                <span>
+                  <strong>{item.detection_type ?? '미분류'}</strong>
+                  <small>{item.filename}</small>
+                </span>
+                <ExternalLink size={13} />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
       {confirmedRows.length > 0 && (
-        <div>
-          <div className="chat-evidence-title">확인된 값</div>
+        <section className="chat-evidence-section confirmed">
+          <div className="chat-evidence-title">
+            <ShieldCheck size={14} />
+            <span>확인된 값</span>
+            <em>{confirmedRows.length}개</em>
+          </div>
           <div className="chat-evidence-grid">
             {confirmedRows.map((row) => (
               <div key={row.label} className="chat-evidence-item">
@@ -176,19 +221,27 @@ function EvidencePanel({ response }: { response: ChatQueryResponse }) {
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
       {inferred.length > 0 && (
-        <div>
-          <div className="chat-evidence-title">추정</div>
+        <section className="chat-evidence-section inferred">
+          <div className="chat-evidence-title">
+            <Sparkles size={14} />
+            <span>추정</span>
+            <em>{inferred.length}개</em>
+          </div>
           <ul>{inferred.map((item, index) => <li key={index}>{item}</li>)}</ul>
-        </div>
+        </section>
       )}
       {missing.length > 0 && (
-        <div>
-          <div className="chat-evidence-title">데이터 한계</div>
+        <section className="chat-evidence-section missing">
+          <div className="chat-evidence-title">
+            <FileSearch size={14} />
+            <span>데이터 한계</span>
+            <em>{missing.length}개</em>
+          </div>
           <ul>{missing.map((item, index) => <li key={index}>{item}</li>)}</ul>
-        </div>
+        </section>
       )}
     </div>
   )
@@ -338,7 +391,7 @@ export function ChatPage() {
     {
       id: 'welcome',
       role: 'assistant',
-      text: '공장 상태, 위험도 추이, 원인 분석을 물어볼 수 있습니다.',
+      text: '보고서 근거, 특정 시간대 원인 분석, 안전 점수·AI 탐지 스파이크를 물어볼 수 있습니다.',
     },
   ])
 
@@ -476,7 +529,7 @@ export function ChatPage() {
               onKeyDown={onKeyDown}
               rows={1}
               maxLength={500}
-              placeholder="공장 상태나 위험 원인을 물어보세요."
+              placeholder="보고서, 시간대별 급락 원인, AI score 스파이크를 물어보세요."
               aria-label="질문 입력"
             />
             <div className="chat-composer-row">

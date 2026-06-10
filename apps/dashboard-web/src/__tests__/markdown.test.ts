@@ -33,6 +33,23 @@ describe('parseMarkdown', () => {
     ])
   })
 
+  it('parses horizontal rules and blockquotes as blocks', () => {
+    expect(parseMarkdown('before\n\n---\n\n> quoted\n> text\n\nafter')).toEqual([
+      { kind: 'p', text: 'before' },
+      { kind: 'hr' },
+      { kind: 'quote', text: 'quoted text' },
+      { kind: 'p', text: 'after' },
+    ])
+  })
+
+  it('does not fold markdown block starts into paragraphs', () => {
+    expect(parseMarkdown('before\n---\n> quote')).toEqual([
+      { kind: 'p', text: 'before' },
+      { kind: 'hr' },
+      { kind: 'quote', text: 'quote' },
+    ])
+  })
+
   it('handles empty / nullish input', () => {
     expect(parseMarkdown('')).toEqual([])
     expect(parseMarkdown(undefined as unknown as string)).toEqual([])

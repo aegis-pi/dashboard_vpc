@@ -44,6 +44,8 @@ function renderBlock(b: MdBlock, key: number): React.ReactNode {
     )
   }
   if (b.kind === 'p') return <p key={key} style={{ margin: '0 0 10px' }}>{inlineMd(b.text ?? '')}</p>
+  if (b.kind === 'quote') return <blockquote key={key}>{inlineMd(b.text ?? '')}</blockquote>
+  if (b.kind === 'hr') return <hr key={key} />
   if (b.kind === 'list') {
     const Tag = b.ordered ? 'ol' : 'ul'
     return (
@@ -99,6 +101,8 @@ function markdownToHtml(text: string): string {
   return parseMarkdown(text ?? '').map((b) => {
     if (b.kind === 'h') return `<h${b.level}>${inlineMdHtml(b.text ?? '')}</h${b.level}>`
     if (b.kind === 'p') return `<p>${inlineMdHtml(b.text ?? '')}</p>`
+    if (b.kind === 'quote') return `<blockquote>${inlineMdHtml(b.text ?? '')}</blockquote>`
+    if (b.kind === 'hr') return '<hr>'
     if (b.kind === 'list') {
       const Tag = b.ordered ? 'ol' : 'ul'
       return `<${Tag}>${b.items!.map((it) => `<li>${inlineMdHtml(it)}</li>`).join('')}</${Tag}>`
@@ -132,6 +136,9 @@ function openPrintWindow(factoryId: string, date: string, markdown: string) {
     th{background:#F4F5F7;font-weight:600;}
     code{font-family:"SF Mono",Consolas,monospace;background:#F4F5F7;padding:1pt 5pt;
          border-radius:3pt;font-size:0.92em;}
+    blockquote{margin:0 0 10pt;padding:6pt 10pt;border-left:3pt solid #2563EB;
+               background:#DCE7FB;color:#14181F;}
+    hr{border:0;border-top:1.5pt solid #8A93A1;margin:14pt 0;}
     ul,ol{padding-left:20pt;margin:0 0 10pt;} li{margin-bottom:3pt;}
   </style></head><body>
   <div class="meta">Aegis-π Risk Twin · ${factoryId} · ${date} 일간 보고서</div>

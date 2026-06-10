@@ -119,13 +119,21 @@ export interface ChatEvidence {
   missing: string[]
 }
 
+export interface ChatImageRef {
+  kind: 'image_snapshots'
+  factory_id: string
+  time_range_kst: string
+  count: number
+  items: ImageSnapshotItem[]
+}
+
 export interface ChatQueryResponse {
   answer: string
   intent: ChatIntent
   factory_id: string | null
   time_scope: ChatTimeScope
   evidence: ChatEvidence
-  image_ref: unknown | null
+  image_ref: ChatImageRef | null
   generator: ChatGenerator
   model_tier: ChatModelTier
   router?: 'llm' | 'rule'  // how intent/time was resolved (ADR 0034)

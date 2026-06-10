@@ -1,6 +1,7 @@
 // Real .docx exporter for daily reports (Office Open XML, not HTML-disguised
 // .doc). Reuses the shared markdown parser so the downloaded Word file matches
-// what the page renders: headings, paragraphs, lists, tables, bold/code.
+// what the page renders: headings, paragraphs, blockquotes, horizontal rules,
+// lists, tables, bold/code.
 //
 // The `docx` library (~0.5 MB) is loaded lazily via dynamic import so it never
 // enters the initial page bundle — it is only fetched when a user actually
@@ -12,6 +13,8 @@ type Docx = typeof import('docx')
 const CODE_FONT = 'Consolas'
 const CODE_FILL = 'F4F5F7'
 const HEAD_FILL = 'F4F5F7'
+const QUOTE_FILL = 'DCE7FB'
+const QUOTE_BORDER = '2563EB'
 const META_COLOR = '56606E'
 const BORDER_COLOR = 'D9DCE2'
 const ORDERED_REF = 'report-ordered'
@@ -77,6 +80,21 @@ function blockToElements(
   }
   if (b.kind === 'p') {
     return [new d.Paragraph({ spacing: { after: 120 }, children: inlineRuns(d, b.text ?? '') })]
+  }
+  if (b.kind === 'quote') {
+    return [new d.Paragraph({
+      spacing: { after: 120 },
+      shading: { type: d.ShadingType.CLEAR, color: 'auto', fill: QUOTE_FILL },
+      border: { left: { style: d.BorderStyle.SINGLE, size: 16, color: QUOTE_BORDER, space: 8 } },
+      children: inlineRuns(d, b.text ?? ''),
+    })]
+  }
+  if (b.kind === 'hr') {
+    return [new d.Paragraph({
+      spacing: { before: 120, after: 120 },
+      border: { bottom: { style: d.BorderStyle.SINGLE, size: 8, color: '8A93A1', space: 1 } },
+      children: [],
+    })]
   }
   if (b.kind === 'list') {
     const ordered = !!b.ordered
