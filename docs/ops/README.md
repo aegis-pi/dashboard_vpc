@@ -6,7 +6,7 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `00_quick_start.md` | `factory-a` 현재 상태와 빠른 확인 명령 |
+| `00_quick_start.md` | `factory-a`와 Data/Dashboard 현재 상태, 빠른 apply/destroy 진입점 |
 | `01_safe_edge_bootstrap.md` | Safe-Edge 기준선 구축 절차 |
 | `02_self_check.md` | 운영자가 직접 상태를 점검하는 기준 |
 | `03_test_checklist.md` | 장애/데이터/통합 테스트 체크리스트 |
@@ -28,7 +28,7 @@
 | `19_factory_c_windows_virtualbox_k3s.md` | Windows VirtualBox 기반 `factory-c` K3s 구축과 IoT 데이터 송신 검증 |
 | `20_tailscale_hub_spoke_runbook.md` | Tailscale 기반 Hub-Spoke 연결 실행 절차 |
 | `21_hub_admin_ui_ingress.md` | ArgoCD/Grafana 관리자 HTTPS Ingress 운영 절차 |
-| `22_data_dashboard_vpc_runbook.md` | 1번 Data/Dashboard VPC apply/destroy 및 backend image rollout 절차 |
+| `22_data_dashboard_vpc_runbook.md` | 1번 Data/Dashboard VPC apply/destroy, 영구 root, Foundation 경계, backend image rollout 절차 |
 | `23_local_frontend_dev.md` | 로컬 프론트/백엔드(localhost:5173/8000) 개발 환경 세팅 런북 |
 
 ## 기준

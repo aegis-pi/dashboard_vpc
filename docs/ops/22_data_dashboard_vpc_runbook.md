@@ -3,6 +3,7 @@
 상태: source of truth
 기준일: 2026-06-09
 수정 이력:
+  - 2026-06-10 v3.6  운영 빠른 실행 절차 정리. `build-data-dashboard.sh`는 DNS/permanent root preflight 후 재생성 root를 apply하고, `destroy-data-dashboard.sh`는 기본 대화형 확인 후 재생성 root만 destroy하도록 정리. Foundation과 Data/Dashboard root 경계를 명시.
   - 2026-06-09 v3.5  Dashboard backend ECR image를 ECS service에 반영하는 운영 스크립트 `scripts/ops/deploy-dashboard-backend.sh` 추가. GitHub Actions가 push한 `sha-<7char>` 태그를 입력하면 ECR 확인, Terraform task definition 등록, ECS service update, health check, post-apply plan 확인을 수행한다.
   - 2026-06-08 v3.4  Cloud Infra 일간 보고서 접근 제어와 Reports selector 운영 배포 완료. `factory_id=cloud-infra` 보고서는 공장 권한 대신 system-view 권한으로 list/get 접근을 허용. backend image `sha-71bbe1d`, ECS task definition revision 40, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
   - 2026-06-08 v3.3  Dashboard history/report export numeric string 정규화와 Reports Word `.docx` 내보내기 운영 배포 완료. backend image `sha-199cb52`, ECS task definition revision 39, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
@@ -102,6 +103,23 @@ infra/data-dashboard-dns/  # Route53 Hosted Zone 영구 자원
 infra/data-dashboard-permanent/  # Cognito/ECR/DDB report/S3 web/CloudFront 영구 자원
 ```
 
+root 역할:
+
+| root | 역할 | build/destroy 정책 |
+| --- | --- | --- |
+| `infra/data-dashboard/` | VPC, subnet, NAT, ALB, ECS Backend, RDS, Redis, Lambda, runtime secret, API DNS record | 데모/운영 재생성 대상. `build-data-dashboard.sh`와 `destroy-data-dashboard.sh`가 직접 적용 |
+| `infra/data-dashboard-dns/` | Route53 hosted zone | 영구 유지. NS 위임 안정화를 위해 destroy 대상 아님 |
+| `infra/data-dashboard-permanent/` | Cognito, ECR `aegis/dashboard-backend`, S3 web bucket, CloudFront, report table, GitHub OIDC roles | 영구 유지. 웹/인증/이미지 저장소 재설정 비용을 줄이기 위해 destroy 대상 아님 |
+
+Foundation 의미:
+
+```text
+infra/foundation/ = 워크스트림 A가 관리하는 공용 AWS 기반 자원 묶음
+예: aegis-bucket-data, 기존 IoT raw S3 적재 Rule, AMP/ECR/OIDC 등
+```
+
+Data/Dashboard는 Foundation 자원을 참조하거나 prefix/table을 소비하지만, Foundation Terraform root를 수정하거나 destroy하지 않는다.
+
 손대지 않는 영역:
 
 ```text
@@ -113,12 +131,14 @@ scripts/destroy/destroy-hub.sh
 scripts/destroy/destroy-all.sh
 ```
 
-## 현재 Active 기준 (2026-05-27 destroy 후)
+## 현재 Active 기준 (2026-06-10)
 
-사용자 요청으로 세션 종료 전 `infra/data-dashboard/` 일시 root를 destroy 했다.
-이후 운영 Dashboard UI가 실제 DDB flat/nested 데이터 shape를 모두 처리하도록 수정되었고, Aegis-frontend 기준 UI 포팅과 `top_causes` field/name 양식 보정이 진행됐다.
-추가로 frontend refresh/subsampling 개선이 반영되어 WS 메시지 기반 refresh는 3초 throttle을 적용하고, 인증 실패 close code 4001은 재시도 없이 offline 처리한다. TopBar refresh interval과 Fleet/Factory auto polling도 반영됐다. Fleet은 선택 간격으로 목록과 최근 변화를 갱신하고, Factory는 WS 우선 + 미연결 시 polling 구조를 사용한다.
-Backend는 CORS 운영 origin을 명시하도록 수정되어 `https://dashboard.aegis-pi.cloud` preflight와 인증 API 호출을 허용한다.
+- Dashboard Web: `https://dashboard.aegis-pi.cloud`
+- Dashboard API: `https://api.aegis-pi.cloud`
+- Backend: ECS Fargate desired/running 2 기준으로 운영
+- 인증/권한: Cognito + RDS RBAC (`app_user`, `factory`, `user_factory_access`, `audit_log`)
+- 운영 기능: Fleet/Factory, Cloud Infra, Reports S3 조회, 이미지 스냅샷, AI 채팅 데이터 QA
+- 후속: 인증 사용자로 실제 Bedrock tool-use 질의 및 `/image-snapshots` 실데이터 수기 확인, LLM 보고서 생성기
 
 ## Dashboard RBAC 사용자 관리
 
@@ -711,6 +731,8 @@ aws s3 sync apps/dashboard-web/dist/ s3://kjw-aegis-data-web/ \
 
 ## Apply
 
+Apply는 `infra/data-dashboard/` 재생성 root만 실제로 올린다. 실행 전 `infra/data-dashboard-dns/`와 `infra/data-dashboard-permanent/`는 `terraform init/fmt/validate`로 preflight만 수행한다.
+
 기본 도메인 `aegis-pi.cloud`:
 
 ```bash
@@ -732,15 +754,25 @@ scripts/build/build-data-dashboard.sh --domain aegis-pi.cloud --otp <MFA_OTP>
 스크립트 수행 내용:
 
 ```text
-terraform init
-terraform fmt -check
-terraform validate
-terraform plan -var dashboard_domain_name=... -out=tfplan
-terraform apply tfplan
-tfplan 삭제
+1. AWS MFA 세션 확인 또는 OTP 기반 세션 준비
+2. 삭제 예약 중인 Data/Dashboard runtime secret 즉시 삭제로 이름 충돌 방지
+3. infra/data-dashboard-dns terraform init / fmt -check / validate
+4. infra/data-dashboard-permanent terraform init / fmt -check / validate
+5. infra/data-dashboard terraform init / fmt -check / validate
+6. infra/data-dashboard terraform plan -var dashboard_domain_name=... -out=tfplan
+7. infra/data-dashboard terraform apply tfplan
+8. tfplan 삭제
 ```
 
 삭제 예약 중인 기존 Data/Dashboard secret이 있으면 apply 전에 강제 삭제해 이름 충돌을 막는다.
+
+Apply 후 최소 확인:
+
+```bash
+curl -fsS https://api.aegis-pi.cloud/healthz
+curl -fsS https://api.aegis-pi.cloud/readyz
+curl -fsSI https://dashboard.aegis-pi.cloud/ | head
+```
 
 ## Destroy
 
@@ -754,18 +786,37 @@ MFA 세션 토큰이 없으면 OTP를 전달한다.
 scripts/destroy/destroy-data-dashboard.sh --domain aegis-pi.cloud --otp <MFA_OTP>
 ```
 
+자동화 환경에서 대화형 확인을 생략해야 할 때만 `--yes`를 붙인다.
+
+```bash
+scripts/destroy/destroy-data-dashboard.sh --domain aegis-pi.cloud --yes
+```
+
 스크립트 수행 내용:
 
 ```text
-terraform init
-terraform validate
-terraform plan -destroy -var dashboard_domain_name=... -out=tfplan.destroy
-terraform apply tfplan.destroy
-tfplan.destroy 삭제
+1. AWS MFA 세션 확인 또는 OTP 기반 세션 준비
+2. `--yes`가 없으면 `destroy-data-dashboard` 문구 입력 확인
+3. infra/data-dashboard terraform init
+4. infra/data-dashboard terraform validate
+5. infra/data-dashboard terraform plan -destroy -var dashboard_domain_name=... -out=tfplan.destroy
+6. infra/data-dashboard terraform apply tfplan.destroy
+7. tfplan.destroy 삭제
 ```
 
 RDS는 final snapshot을 생성한다. snapshot 이름은 Terraform `random_id`를 포함해 매 apply/destroy 사이클마다 충돌하지 않는다.
 Lambda VPC ENI가 `available` 상태로 남아 보안 그룹/서브넷 삭제가 지연될 수 있다. AWS가 자동 정리하지 않으면 해당 destroy 대상 VPC ENI만 확인 후 정리한다.
+
+Destroy 후 정상 기준:
+
+```text
+infra/data-dashboard state count = 0
+infra/data-dashboard-dns state count = 1
+infra/data-dashboard-permanent state count = 25
+dashboard.aegis-pi.cloud = HTTP 200 가능
+api.aegis-pi.cloud = DNS 미해결 또는 API 미응답 가능 (ALB/API 삭제 후 정상)
+RDS final snapshot = available
+```
 
 ## 수동 확인
 

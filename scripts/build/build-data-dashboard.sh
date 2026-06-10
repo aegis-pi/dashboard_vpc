@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TF_ROOT="${REPO_ROOT}/infra/data-dashboard"
+TF_DNS_ROOT="${REPO_ROOT}/infra/data-dashboard-dns"
+TF_PERMANENT_ROOT="${REPO_ROOT}/infra/data-dashboard-permanent"
 DOMAIN="${DASHBOARD_DOMAIN_NAME:-aegis-pi.cloud}"
 OTP=""
 PLAN_FILE="tfplan"
@@ -13,6 +15,7 @@ usage() {
 Usage: scripts/build/build-data-dashboard.sh [--domain DOMAIN] [--otp OTP]
 
 Builds the Workstream B Data/Dashboard Terraform root only.
+It preflights the DNS/permanent roots, then applies the recreatable root.
 
 Options:
   --domain DOMAIN  Dashboard base domain. Default: aegis-pi.cloud
@@ -55,6 +58,14 @@ source "${REPO_ROOT}/scripts/lib/aws-mfa.sh"
 
 aegis_ensure_aws_mfa "${OTP}"
 
+terraform_preflight() {
+  local root="$1"
+
+  terraform -chdir="${root}" init
+  terraform -chdir="${root}" fmt -check
+  terraform -chdir="${root}" validate
+}
+
 cleanup_pending_secret() {
   local name="$1"
   local deleted_date
@@ -89,9 +100,9 @@ cleanup_pending_secret() {
 cleanup_pending_secret "kjw-aegis-data-rds-master"
 cleanup_pending_secret "kjw-aegis-data-redis-auth"
 
-terraform -chdir="${TF_ROOT}" init
-terraform -chdir="${TF_ROOT}" fmt -check
-terraform -chdir="${TF_ROOT}" validate
+terraform_preflight "${TF_DNS_ROOT}"
+terraform_preflight "${TF_PERMANENT_ROOT}"
+terraform_preflight "${TF_ROOT}"
 terraform -chdir="${TF_ROOT}" plan \
   -var="dashboard_domain_name=${DOMAIN}" \
   -out="${PLAN_FILE}"

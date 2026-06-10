@@ -1,7 +1,9 @@
 # Aegis-Pi Docs
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-10
+수정 이력:
+  - 2026-06-10  Data/Dashboard 빠른 build/destroy 진입점과 Foundation/root 경계 최신화.
 
 ## 목적
 
@@ -14,7 +16,7 @@
 - 2026-04-30 기준 AI snapshot은 node-local hostPath를 사용하며, AI 추론 결과는 InfluxDB PVC를 통해 Longhorn에 저장한다.
 - 2026-04-30 기준 LAN 제거 및 `k3s-agent` 중지 failover/failback 재검증을 완료했다.
 - 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI가 활성 상태다.
-- **1번 Data/Dashboard VPC(워크스트림 B)는 Phase 1 Step 0~9.5 구현 완료 후 운영 배포 단계다(Step 10 운영 자동화/데모 진행 중).** Step 9.5 permanent split 이후 `infra/data-dashboard` 일시 root를 build/destroy 사이클로 운영하며, 영구 자원(CloudFront/Cognito/S3 web/ECR/도메인)은 `infra/data-dashboard-permanent`/`infra/data-dashboard-dns`에 상시 유지된다. 운영 backend image `sha-e96bf81`(ECS revision 37), https://dashboard.aegis-pi.cloud / https://api.aegis-pi.cloud 활성. destroy 사이클 시 Terraform backend S3 bucket·RDS final snapshot·permanent/dns 자원만 잔존. 코드는 UI 마무리 보정만 남기고 구현 완료.
+- **1번 Data/Dashboard VPC(워크스트림 B)는 Phase 1 Step 10 운영 정리 단계다.** `infra/data-dashboard` 재생성 root를 build/destroy 사이클로 운영하며, 영구 자원(CloudFront/Cognito/S3 web/ECR/도메인)은 `infra/data-dashboard-permanent`/`infra/data-dashboard-dns`에 상시 유지된다. https://dashboard.aegis-pi.cloud / https://api.aegis-pi.cloud 활성 기준이다.
 - `build-hub`는 AWS Hub EKS/VPC/NAT/EIP, ArgoCD, Prometheus Agent, Grafana, AWS Load Balancer Controller, Admin UI, Hub Tailscale Operator/egress/UI/cluster Secret 복구를 자동화한다.
 - M1 Issue 5에서 IoT Rule -> S3 raw 적재와 M1 검증용 `risk/risk-normalizer` IRSA S3 권한 검증을 완료했다. 최신 데이터 처리 방향은 Lambda data processor와 DynamoDB/S3 processed다.
 - M1 Issue 6에서 AMP Workspace와 `observability/prometheus-agent` IRSA remote_write 권한 검증을 완료했다.
@@ -30,7 +32,7 @@
 - M2 Issue 6에서 `factory-a-podinfo-smoke` Application을 `factory-a`에 Sync해 `Synced` + `Healthy`, Pod 2개 `Running`을 확인했고, Tailscale egress Service 삭제 시 sync failure 및 재생성 후 복구를 검증했다.
 - M3 Issue 1에서 `aegis-pi-gitops` GitOps 저장소 구조, `aegis-spoke` Helm chart, 공장별 values, ApplicationSet skeleton, manifest validation workflow를 완료했다.
 - 워크스트림 A는 M3 Issue 2 ECR push/pull 검증을 진행 중이며, 본 환경에서는 수정/실행하지 않는다.
-- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~9.5를 구현 완료하고 Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회를 운영 배포했다. 현재는 Step 10 운영 자동화/데모와 UI 마무리 보정 단계다.
+- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~10 대부분을 구현 완료하고 Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회/이미지 스냅샷/AI 채팅 데이터 QA를 운영 배포했다. 현재는 운영 문서/데모 정리와 수기 검증 후속 단계다.
 - `factory-b`, `factory-c`, GitHub Actions build/deploy CI는 워크스트림 A/후속 단계다.
 - 현재 운영 source of truth는 `docs/ops/` 문서다.
 - 마일스톤 추적은 `docs/issues/` 문서를 따른다.
@@ -141,7 +143,7 @@ Windows operator PC Tailscale IPv4: 100.67.181.8
 ## 현재 Hub 기준
 
 ```text
-AWS actual state: Hub/Foundation/IoT/Admin UI active after 2026-05-15 rebuild; 1번 Data/Dashboard VPC destroyed on 2026-05-22
+AWS actual state: Hub/Foundation/IoT/Admin UI active after 2026-05-15 rebuild; Data/Dashboard active via recreatable/permanent split roots
 Hub bootstrap roots:
 - infra/hub: VPC/EKS/node group, Route53/ACM, IRSA
 - scripts/ansible: namespace/LimitRange/ArgoCD/Prometheus Agent/Grafana/AWS Load Balancer Controller/Admin UI Ingress bootstrap
