@@ -1,7 +1,10 @@
 """Runtime configuration contract between local defaults and ECS overrides."""
 import ast
 import re
+from datetime import datetime, timezone
 from pathlib import Path
+
+from services import s3
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -66,3 +69,29 @@ def test_literal_ecs_env_overrides_match_local_settings_defaults():
             mismatches[name] = {"config.py": defaults[name], "ecs.tf": raw_value}
 
     assert mismatches == {}
+
+
+def test_dashboard_task_role_can_read_chat_s3_evidence_prefixes():
+    ecs_tf = ECS_TF_PATH.read_text()
+    state_snapshot_prefix = s3._hour_prefixes(
+        "factory-a",
+        "state_snapshot",
+        datetime(2026, 6, 9, 5, 0, tzinfo=timezone.utc),
+        datetime(2026, 6, 9, 5, 0, tzinfo=timezone.utc),
+    )[0]
+
+    assert state_snapshot_prefix.startswith("processed/factory-a/state_snapshot/")
+
+    required_fragments = [
+        "/processed/*",
+        "/processed_agg/*",
+        "/reports/*",
+        "/image_snapshot/*",
+        '"processed/*"',
+        '"processed_agg/*"',
+        '"reports/daily/*"',
+        '"image_snapshot/*"',
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in ecs_tf

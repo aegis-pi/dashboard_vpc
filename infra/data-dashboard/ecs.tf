@@ -178,6 +178,7 @@ data "aws_iam_policy_document" "ecs_task_inline" {
     ]
     resources = [
       "arn:aws:s3:::${var.shared_data_bucket_name}/processed/*",
+      "arn:aws:s3:::${var.shared_data_bucket_name}/processed_agg/*",
       "arn:aws:s3:::${var.shared_data_bucket_name}/reports/*",
       "arn:aws:s3:::${var.shared_data_bucket_name}/image_snapshot/*",
     ]
@@ -197,6 +198,7 @@ data "aws_iam_policy_document" "ecs_task_inline" {
       variable = "s3:prefix"
       values = [
         "processed/*",
+        "processed_agg/*",
         "reports/daily/*",
         "image_snapshot/*",
       ]
