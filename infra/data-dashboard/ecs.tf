@@ -337,7 +337,7 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "BEDROCK_REGION", value = var.aws_region },
         { name = "BEDROCK_MODEL_FAST", value = var.bedrock_model_fast },
         { name = "BEDROCK_MODEL_PRECISE", value = var.bedrock_model_precise },
-        { name = "BEDROCK_MAX_TOKENS", value = "512" },
+        { name = "BEDROCK_MAX_TOKENS", value = "1024" },
         { name = "BEDROCK_TEMPERATURE", value = "0.2" },
         { name = "BEDROCK_CONNECT_TIMEOUT_SECONDS", value = "3" },
         { name = "BEDROCK_READ_TIMEOUT_SECONDS", value = "20" },
