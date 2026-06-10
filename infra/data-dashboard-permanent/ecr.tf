@@ -78,9 +78,9 @@ data "aws_iam_policy_document" "github_oidc_ecr_push_assume" {
     }
 
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo_for_oidc}:*"]
+      values   = ["repo:${var.github_repo_for_oidc}:ref:refs/heads/main"]
     }
   }
 }
