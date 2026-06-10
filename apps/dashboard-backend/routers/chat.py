@@ -34,6 +34,8 @@ _S3_AGG_MAX_OBJECTS = 288
 _S3_POINT_DETAIL_MAX_OBJECTS = 500
 _S3_DETAIL_MAX_OBJECTS = 1200
 _S3_DETAIL_MAX_WINDOW = timedelta(minutes=15)
+_S3_ANOMALY_DETAIL_HALF_WINDOW = timedelta(minutes=2)
+_S3_ANOMALY_DETAIL_MAX_OBJECTS = 80
 _IMAGE_REF_MAX_OBJECTS = 6
 _IMAGE_REF_HALF_WINDOW = timedelta(minutes=10)
 _IMAGE_KEYWORDS = ("사진", "이미지", "스냅샷", "snapshot", "image", "증빙")
@@ -251,6 +253,53 @@ async def _get_s3_bounded_history(
     return items, confirmed, missing
 
 
+def _risk_floor_value(item: dict) -> float | None:
+    value = item.get("risk_score_min") if item.get("risk_score_min") is not None else item.get("risk_score")
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _risk_min_instant_utc(items: list[dict]) -> datetime | None:
+    min_item = min(
+        (item for item in items if _risk_floor_value(item) is not None),
+        key=lambda item: _risk_floor_value(item),
+        default=None,
+    )
+    if not min_item:
+        return None
+    for candidate in (min_item.get("risk_score_min_at"), min_item.get("timestamp"), min_item.get("bucket_start")):
+        parsed = chat._parse_iso(candidate) if isinstance(candidate, str) else None
+        if parsed is not None:
+            return parsed.astimezone(timezone.utc)
+    return None
+
+
+async def _maybe_enrich_trend_with_state_snapshot(
+    parsed: chat.ParsedQuery,
+    evidence: chat.Evidence,
+    items: list[dict],
+) -> None:
+    if parsed.intent != chat.Intent.HISTORY_TREND:
+        return
+    if evidence.confirmed.get("top_causes"):
+        return
+    if not any("top_causes" in m for m in evidence.missing):
+        return
+    center = _risk_min_instant_utc(items)
+    if center is None:
+        return
+    try:
+        details = await s3.list_processed_state_snapshots(
+            parsed.factory_id,
+            center - _S3_ANOMALY_DETAIL_HALF_WINDOW,
+            center + _S3_ANOMALY_DETAIL_HALF_WINDOW,
+            max_objects=_S3_ANOMALY_DETAIL_MAX_OBJECTS,
+        )
+    except s3.S3UnavailableError:
+        evidence.missing.append("S3 processed state_snapshot 최저점 상세 조회 실패")
+        return
+    chat.enrich_history_with_state_snapshots(evidence, details)
+
+
 async def _resolve_parsed(body: "ChatQueryRequest", now_utc: datetime) -> tuple[chat.ParsedQuery, str]:
     """Understand the query: LLM resolve (ADR 0034) with rule-parser fallback.
 
@@ -376,6 +425,7 @@ async def _fetch_evidence(parsed: chat.ParsedQuery, now_utc: datetime) -> chat.E
         evidence = chat.summarize_history(items, scope)
         evidence.confirmed.update(confirmed)
         evidence.missing.extend(missing)
+        await _maybe_enrich_trend_with_state_snapshot(parsed, evidence, items)
         if parsed.intent == chat.Intent.CAUSE_ANALYSIS and scope.start_utc and scope.end_utc:
             try:
                 details = await s3.list_processed_risk_scores(

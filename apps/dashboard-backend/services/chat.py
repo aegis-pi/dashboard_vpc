@@ -182,6 +182,15 @@ def _format_item_time_kst(item: dict) -> str | None:
     return dt.astimezone(KST).strftime("%Y-%m-%d %H:%M:%S KST")
 
 
+def _format_risk_min_time_kst(item: dict) -> str | None:
+    """Return the exact risk min timestamp when aggregate metadata carries it."""
+    ts = item.get("risk_score_min_at")
+    dt = _parse_iso(ts) if isinstance(ts, str) else None
+    if dt is not None:
+        return dt.astimezone(KST).strftime("%Y-%m-%d %H:%M:%S KST")
+    return _format_item_time_kst(item)
+
+
 def _round(value, digits: int = 1):
     return round(value, digits) if isinstance(value, (int, float)) else value
 
@@ -844,7 +853,7 @@ def summarize_history(items: list[dict], scope: TimeScope) -> Evidence:
     ev.confirmed["risk_score_avg_level"] = risk_level_from_score(sum(risks) / len(risks))
     ev.confirmed["risk_score_policy"] = RISK_SCORE_POLICY
     if risk_min_item:
-        ev.confirmed["risk_score_min_time_kst"] = _format_item_time_kst(risk_min_item)
+        ev.confirmed["risk_score_min_time_kst"] = _format_risk_min_time_kst(risk_min_item)
     if risk_max_item:
         ev.confirmed["risk_score_max_time_kst"] = _format_item_time_kst(risk_max_item)
     if temps:
@@ -956,6 +965,50 @@ def enrich_history_with_processed_risk_scores(ev: Evidence, details: list[dict])
         ev.missing = [m for m in ev.missing if "top_causes" not in m]
     else:
         ev.missing.append("S3 processed risk_score 상세에도 top_causes 원인 필드가 없음")
+    return ev
+
+
+def enrich_history_with_state_snapshots(ev: Evidence, details: list[dict]) -> Evidence:
+    """Add S3 processed/state_snapshot details around an aggregate anomaly."""
+    usable = [d for d in details if d.get("risk_score") is not None]
+    if not usable:
+        ev.missing.append("S3 processed state_snapshot 상세 데이터 없음")
+        return ev
+
+    min_detail = min(usable, key=lambda d: d["risk_score"])
+    raw_causes = [c for c in (min_detail.get("top_causes") or []) if isinstance(c, dict)]
+    cause_details = [
+        {
+            "name": display_cause_name(str(c.get("name") or c.get("field"))),
+            "field": c.get("field") or c.get("name"),
+            "reason": c.get("reason"),
+            "value": c.get("value"),
+            "contribution": _round(c.get("contribution")),
+            "severity": c.get("severity"),
+            "source": c.get("source"),
+        }
+        for c in raw_causes
+        if c.get("name") or c.get("field")
+    ]
+    causes = list(dict.fromkeys(c["name"] for c in cause_details if c.get("name")))
+    ev.confirmed["state_snapshot_source"] = "S3 processed/state_snapshot"
+    ev.confirmed["state_snapshot_sample_count"] = len(usable)
+    ev.confirmed["state_snapshot_min"] = _round(min_detail.get("risk_score"))
+    ts = _parse_iso(min_detail.get("timestamp"))
+    if ts:
+        ev.confirmed["state_snapshot_min_time_kst"] = ts.astimezone(KST).strftime("%Y-%m-%d %H:%M:%S KST")
+    if causes:
+        ev.confirmed["top_causes"] = causes
+        ev.confirmed["state_snapshot_top_causes"] = causes
+        ev.confirmed["state_snapshot_top_cause_details"] = cause_details
+        ev.inferred.append(
+            "S3 processed state_snapshot 상세에서 최저점 주요 원인은 "
+            + ", ".join(causes)
+            + "로 확인됩니다."
+        )
+        ev.missing = [m for m in ev.missing if "top_causes" not in m]
+    else:
+        ev.missing.append("S3 processed state_snapshot 상세에도 top_causes 원인 필드가 없음")
     return ev
 
 

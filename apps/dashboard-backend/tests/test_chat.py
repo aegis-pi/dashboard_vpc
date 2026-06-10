@@ -314,6 +314,32 @@ def test_processed_risk_drilldown_uses_korean_cause_labels():
     assert not any("top_causes" in m for m in ev.missing)
 
 
+def test_state_snapshot_drilldown_uses_korean_cause_labels():
+    ev = chat.Evidence(missing=["5분 집계 데이터에는 top_causes 원인 필드가 없음"])
+    chat.enrich_history_with_state_snapshots(
+        ev,
+        [
+            {
+                "timestamp": "2026-06-09T05:54:45.202Z",
+                "risk_score": 49.0,
+                "top_causes": [
+                    {
+                        "field": "data_freshness",
+                        "reason": "pipeline_status_critical",
+                        "value": "critical",
+                        "contribution": 41.0,
+                        "severity": "danger",
+                    }
+                ],
+            }
+        ],
+    )
+    assert ev.confirmed["top_causes"] == ["데이터 신선도"]
+    assert ev.confirmed["state_snapshot_source"] == "S3 processed/state_snapshot"
+    assert ev.confirmed["state_snapshot_top_cause_details"][0]["reason"] == "pipeline_status_critical"
+    assert not any("top_causes" in m for m in ev.missing)
+
+
 def test_summarize_history_describes_dip_and_recovery_when_delta_is_flat():
     ev = chat.summarize_history(
         [
@@ -877,6 +903,83 @@ def test_chat_suggested_absolute_interval_trend_prompt(client, monkeypatch):
     assert data["evidence"]["confirmed"]["primary_detail_source"] == "S3 processed_agg/metrics_5m"
     assert data["evidence"]["confirmed"]["ai_detection_max_score"] == 0.88
     assert "AI 탐지 최대 점수" in data["answer"]
+
+
+def test_chat_interval_trend_drills_down_state_snapshot_cause(client, monkeypatch):
+    async def _metrics_5m(fid, start_utc, end_utc, max_objects=288):
+        assert fid == "factory-a"
+        return [
+            {
+                "timestamp": "2026-06-09T05:00:00.000Z",
+                "bucket_start": "2026-06-09T05:00:00Z",
+                "bucket_end": "2026-06-09T05:04:59.999Z",
+                "is_bucket": True,
+                "risk_score": 99.7,
+                "risk_score_min": 99.0,
+                "risk_score_max": 100.0,
+                "ai_max_score": 0.0,
+            },
+            {
+                "timestamp": "2026-06-09T05:50:00.000Z",
+                "bucket_start": "2026-06-09T05:50:00Z",
+                "bucket_end": "2026-06-09T05:54:59.999Z",
+                "is_bucket": True,
+                "risk_score": 99.0,
+                "risk_score_min": 49.0,
+                "risk_score_min_at": "2026-06-09T05:54:45.202Z",
+                "risk_score_max": 100.0,
+                "ai_max_score": 0.0,
+            },
+            {
+                "timestamp": "2026-06-09T07:00:00.000Z",
+                "bucket_start": "2026-06-09T07:00:00Z",
+                "bucket_end": "2026-06-09T07:04:59.999Z",
+                "is_bucket": True,
+                "risk_score": 100.0,
+                "risk_score_min": 100.0,
+                "risk_score_max": 100.0,
+                "ai_max_score": 0.0,
+            },
+        ]
+
+    async def _state_snapshots(fid, start_utc, end_utc, max_objects=80):
+        assert fid == "factory-a"
+        assert start_utc == datetime(2026, 6, 9, 5, 52, 45, 202000, tzinfo=timezone.utc)
+        assert end_utc == datetime(2026, 6, 9, 5, 56, 45, 202000, tzinfo=timezone.utc)
+        assert max_objects == 80
+        return [
+            {
+                "timestamp": "2026-06-09T05:54:45.202Z",
+                "risk_score": 49.0,
+                "top_causes": [
+                    {
+                        "field": "data_freshness",
+                        "reason": "pipeline_status_critical",
+                        "value": "critical",
+                        "contribution": 41.0,
+                        "severity": "danger",
+                    }
+                ],
+            }
+        ]
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _metrics_5m)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _state_snapshots)
+
+    r = client.post(
+        "/chat/query",
+        json={"question": "factory-a 2026-06-09 오후 2시~4시 안전 점수와 AI 탐지 추이 비교해줘"},
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intent"] == chat.Intent.HISTORY_TREND
+    conf = data["evidence"]["confirmed"]
+    assert conf["risk_score_min_time_kst"] == "2026-06-09 14:54:45 KST"
+    assert conf["top_causes"] == ["데이터 신선도"]
+    assert conf["state_snapshot_source"] == "S3 processed/state_snapshot"
+    assert any("state_snapshot 상세" in item for item in data["evidence"]["inferred"])
+    assert not any("top_causes" in item for item in data["evidence"]["missing"])
 
 
 def test_chat_cloud_infra_report_requires_system_access(client, monkeypatch):
