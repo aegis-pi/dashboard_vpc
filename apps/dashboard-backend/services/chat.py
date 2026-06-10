@@ -240,17 +240,18 @@ _INTERVAL_RE = re.compile(
 )
 _RECENT_RE = re.compile(r"(?:최근|지난|직전)\s*(\d+)\s*(시간|분|일)")
 _NOW_KEYWORDS = ("지금", "현재", "실시간", "now")
+_DATE_RE = re.compile(r"(20\d{2})[-./년]\s*(\d{1,2})[-./월]\s*(\d{1,2})")
 
 
 def parse_intent(text: str) -> str:
     t = text.lower()
+    if any(k in t for k in _REPORT_KEYWORDS):
+        return Intent.REPORT
     if any(k in text for k in _CAUSE_KEYWORDS):
         return Intent.CAUSE_ANALYSIS
     # spike before trend/status: "튄 값 있어?" must not collapse to current_status.
     if any(k in t for k in _SPIKE_KEYWORDS):
         return Intent.SPIKE_CHECK
-    if any(k in t for k in _REPORT_KEYWORDS):
-        return Intent.REPORT
     if any(k in text for k in _TREND_KEYWORDS) or _RECENT_RE.search(text):
         return Intent.HISTORY_TREND
     if any(k in text for k in _STATUS_KEYWORDS):
@@ -328,6 +329,13 @@ def _resolve_unmarked_past_time(now_kst: datetime, hour: int, minute: int) -> da
 
 def _base_day(text: str, now_kst: datetime):
     """Resolve the base calendar day from day words. Returns (date, explicit_day)."""
+    m = _DATE_RE.search(text)
+    if m:
+        yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            return datetime(yyyy, mm, dd, tzinfo=KST).date(), True
+        except ValueError:
+            pass
     if "그저께" in text or "엊그제" in text:
         return (now_kst - timedelta(days=2)).date(), True
     if "어제" in text:
@@ -454,9 +462,6 @@ def parse_time(text: str, now_utc: datetime) -> TimeScope:
         assumed=True,
         note="시점이 명시되지 않아 현재 기준으로 답합니다.",
     )
-
-
-_DATE_RE = re.compile(r"(20\d{2})[-./년]\s*(\d{1,2})[-./월]\s*(\d{1,2})")
 
 
 def parse_report_date(text: str, now_utc: datetime) -> str | None:
@@ -1023,6 +1028,74 @@ def summarize_spikes(
     ev.confirmed["value_mean"] = _round(mean, digits)
     ev.confirmed["value_std"] = _round(std, max(2, digits))
 
+    risks = [v for v in (_metric_value(i, METRIC_RISK_SCORE) for i in items) if v is not None]
+    temps = [v for v in (_metric_value(i, METRIC_TEMPERATURE) for i in items) if v is not None]
+    ai_values = [v for v in (_metric_value(i, METRIC_AI_DETECTION) for i in items) if v is not None]
+    if risks:
+        risk_items = [
+            (i, _metric_value(i, METRIC_RISK_SCORE))
+            for i in items
+            if _metric_value(i, METRIC_RISK_SCORE) is not None
+        ]
+        risk_min_items = [
+            (i, _first_number(i, "risk_score_min", "risk_score"))
+            for i in items
+            if _first_number(i, "risk_score_min", "risk_score") is not None
+        ]
+        risk_min_idx, (risk_min_item, risk_min) = min(
+            enumerate(risk_min_items),
+            key=lambda x: x[1][1],
+        )
+        first_risk = risk_items[0][1]
+        last_risk = risk_items[-1][1]
+        risk_avg = sum(risks) / len(risks)
+        ev.confirmed["risk_score_start"] = _round(first_risk)
+        ev.confirmed["risk_score_end"] = _round(last_risk)
+        ev.confirmed["risk_score_delta"] = _round(last_risk - first_risk)
+        ev.confirmed["risk_score_min"] = _round(risk_min)
+        ev.confirmed["risk_score_max"] = _round(max(risks))
+        ev.confirmed["risk_score_avg"] = _round(risk_avg)
+        ev.confirmed["risk_score_min_time_kst"] = _format_item_time_kst(risk_min_item)
+        ev.confirmed["risk_score_start_level"] = risk_level_from_score(first_risk)
+        ev.confirmed["risk_score_end_level"] = risk_level_from_score(last_risk)
+        ev.confirmed["risk_score_min_level"] = risk_level_from_score(risk_min)
+        ev.confirmed["risk_score_max_level"] = risk_level_from_score(max(risks))
+        ev.confirmed["risk_score_avg_level"] = risk_level_from_score(risk_avg)
+        ev.confirmed["risk_score_policy"] = RISK_SCORE_POLICY
+        recovery = next(
+            ((item, value) for item, value in risk_min_items[risk_min_idx + 1:] if value >= 85),
+            None,
+        )
+        if recovery is not None:
+            recovery_item, recovery_score = recovery
+            ev.confirmed["risk_score_recovered_at_kst"] = _format_item_time_kst(recovery_item)
+            ev.confirmed["risk_score_recovered_score"] = _round(recovery_score)
+            ev.confirmed["risk_score_recovered_level"] = risk_level_from_score(recovery_score)
+        if risk_min < first_risk and last_risk >= 85:
+            recovered_at = ev.confirmed.get("risk_score_recovered_at_kst")
+            recovered_phrase = (
+                f"{recovered_at}에 {_round(ev.confirmed.get('risk_score_recovered_score'))}점"
+                if recovered_at
+                else f"조회 구간 종료 시 {_round(last_risk)}점"
+            )
+            ev.inferred.append(
+                f"{ev.confirmed.get('risk_score_min_time_kst') or '구간 중간'}에 안전 점수가 "
+                f"{_round(risk_min)}점까지 내려갔지만, {recovered_phrase}"
+                f"({risk_level_kr(ev.confirmed.get('risk_score_recovered_level') or risk_level_from_score(last_risk))})으로 회복되어 "
+                "관제 지표상 단기 이상 신호가 해소된 흐름입니다."
+            )
+    if temps:
+        ev.confirmed["temperature_avg"] = _round(sum(temps) / len(temps))
+    if ai_values:
+        ai_items = [
+            (i, _metric_value(i, METRIC_AI_DETECTION))
+            for i in items
+            if _metric_value(i, METRIC_AI_DETECTION) is not None
+        ]
+        ai_item, ai_value = max(ai_items, key=lambda x: x[1])
+        ev.confirmed["ai_detection_max_score"] = _round(ai_value, 3)
+        ev.confirmed["ai_detection_max_time_kst"] = _format_item_time_kst(ai_item)
+
     spikes: list[tuple[str, float]] = []
     if threshold is not None:
         cmp = comparison if comparison in ("above", "below") else "above"
@@ -1043,7 +1116,7 @@ def summarize_spikes(
         ev.confirmed["spikes"] = [
             {
                 "time_kst": (
-                    _parse_iso(ts).astimezone(KST).strftime("%Y-%m-%d %H:%M")
+                    _parse_iso(ts).astimezone(KST).strftime("%Y-%m-%d %H:%M:%S")
                     if _parse_iso(ts) else ts
                 ),
                 "value": _round(v, digits),
@@ -1207,14 +1280,18 @@ def render_answer(parsed: ParsedQuery, ev: Evidence) -> str:
             return f"[{fid}] 요청한 일일 보고서를 찾지 못했습니다.\n" + _fmt_evidence_block(ev)
         title = c.get("report_title") or f"{fid} 일일 보고서"
         date = c.get("report_date")
-        head = f"[{fid}] {date} 보고서 기준입니다. {title}"
+        head = f"# {fid} {date} 일일 리포트 요약"
         summary = c.get("summary")
         sections = c.get("report_sections") or {}
-        lines = [head]
+        lines = [head, f"{title} 기준입니다."]
         if summary:
+            lines.append("## 요약")
             lines.append(summary)
         for name, payload in list(sections.items())[:3]:
+            if name == "요약" and summary:
+                continue
             rows = payload.get("table_rows") or []
+            lines.append(f"## {name}")
             if rows:
                 rendered = []
                 for row in rows[:5]:
@@ -1222,9 +1299,9 @@ def render_answer(parsed: ParsedQuery, ev: Evidence) -> str:
                     value = row.get("값") or row.get("유형") or row.get("항목") or row.get("이유")
                     decision = row.get("판단") or row.get("지속") or row.get("근거") or row.get("구간")
                     rendered.append(" / ".join(str(x) for x in (label, value, decision) if x))
-                lines.append(f"{name}: " + "; ".join(rendered))
+                lines.append("; ".join(rendered))
             elif payload.get("text") and name != "요약":
-                lines.append(f"{name}: {payload['text']}")
+                lines.append(str(payload["text"]))
         tail = _fmt_evidence_block(ev)
         if tail:
             lines.append(tail)
@@ -1264,7 +1341,36 @@ def render_answer(parsed: ParsedQuery, ev: Evidence) -> str:
         detail = ", ".join(f"{p['time_kst']}({p['value']})" for p in pts[:3])
         head = f"[{fid}] {metric} 기준 크게 벗어난 지점 {count}개가 감지되었습니다."
         body = f"주요 지점: {detail}." if detail else ""
-        return "\n".join(filter(None, [head, body])) + tail
+        context = ""
+        if c.get("risk_score_avg") is not None:
+            context = (
+                f"같은 조회 구간의 안전 점수는 평균 {c.get('risk_score_avg')}점"
+                f"({risk_level_kr(c.get('risk_score_avg_level'))}), "
+                f"최저 {c.get('risk_score_min')}점 ~ 최고 {c.get('risk_score_max')}점입니다."
+            )
+            if c.get("risk_score_min_time_kst"):
+                context += f" 최저점은 {c.get('risk_score_min_time_kst')}에 발생했습니다."
+            if c.get("risk_score_end") is not None:
+                if c.get("risk_score_recovered_at_kst"):
+                    context += (
+                        f" {c.get('risk_score_recovered_at_kst')}에 "
+                        f"{c.get('risk_score_recovered_score')}점"
+                        f"({risk_level_kr(c.get('risk_score_recovered_level'))})으로 회복했고,"
+                        f" 조회 구간 종료 시점에는 {c.get('risk_score_end')}점이었습니다."
+                    )
+                else:
+                    context += (
+                        f" 조회 구간 종료 시점에는 {c.get('risk_score_end')}점"
+                        f"({risk_level_kr(c.get('risk_score_end_level'))})까지 회복됐습니다."
+                    )
+            if c.get("ai_detection_max_score") is not None:
+                context += f" AI 탐지 최대 점수는 {c.get('ai_detection_max_score')}"
+                if c.get("ai_detection_max_time_kst"):
+                    context += f"({c.get('ai_detection_max_time_kst')})"
+                context += "입니다."
+            if c.get("temperature_avg") is not None:
+                context += f" 평균 온도는 {c.get('temperature_avg')}도입니다."
+        return "\n".join(filter(None, [head, body, context])) + tail
 
     # CAUSE_ANALYSIS / HISTORY_TREND share the history evidence shape.
     when = ""

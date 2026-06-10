@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from config import get_settings
-from services import bedrock, chat
+from services import bedrock, chat, s3
 
 NOW = datetime(2026, 6, 9, 5, 0, 0, tzinfo=timezone.utc)  # 14:00 KST
 RANGE_SCOPE = chat.TimeScope(kind="range", window="6h")
@@ -94,6 +94,27 @@ def test_rule_parse_query_interval_spike():
     assert parsed.time.window == "6h"  # 5h old → GRAPH#5M, where AI *_max fields live
 
 
+def test_rule_parse_query_interval_spike_absolute_date():
+    parsed = chat.parse_query("factory-a 2026-06-09 오전 9시~10시 AI score 튄 값 있어?", None, NOW)
+    assert parsed.intent == chat.Intent.SPIKE_CHECK
+    assert parsed.metric == "ai_detection"
+    assert parsed.time.kind == "interval"
+    assert parsed.time.start_utc == datetime(2026, 6, 9, 0, 0, 0, tzinfo=timezone.utc)
+    assert parsed.time.end_utc == datetime(2026, 6, 9, 1, 0, 0, tzinfo=timezone.utc)
+    assert parsed.time.assumed is False
+
+
+def test_rule_parse_query_point_cause_absolute_date():
+    now_next_day = datetime(2026, 6, 10, 5, 0, 0, tzinfo=timezone.utc)  # 14:00 KST
+    parsed = chat.parse_query("factory-a 2026-06-09 오후 3시 안전 점수 급락 원인 알려줘", None, now_next_day)
+    assert parsed.intent == chat.Intent.CAUSE_ANALYSIS
+    assert parsed.time.kind == "point"
+    assert parsed.time.target_kst == datetime(2026, 6, 9, 15, 0, 0, tzinfo=chat.KST)
+    assert parsed.time.start_utc == datetime(2026, 6, 9, 5, 55, 0, tzinfo=timezone.utc)
+    assert parsed.time.end_utc == datetime(2026, 6, 9, 6, 5, 0, tzinfo=timezone.utc)
+    assert parsed.time.assumed is False
+
+
 def test_rule_parse_query_interval_yesterday_pm_trend():
     parsed = chat.parse_query("factory-b 어제 오후 2시부터 4시까지 추이", None, NOW)
     assert parsed.intent == chat.Intent.HISTORY_TREND
@@ -155,8 +176,15 @@ def test_spike_endpoint_wiring(client, ddb_mock, routing_on, monkeypatch):
     async def _fake_answer(parsed, evidence, tier):
         return "스파이크 검사 보고입니다."
 
+    async def _fake_metrics(factory_id, start_utc, end_utc, max_objects=288):
+        return [
+            {"timestamp": "2026-06-08T00:50:00.000Z", "risk_score": 10.0},
+            {"timestamp": "2026-06-08T00:55:00.000Z", "risk_score": 20.0},
+        ]
+
     monkeypatch.setattr(bedrock, "resolve_query", _fake_resolve)
     monkeypatch.setattr(bedrock, "generate_answer", _fake_answer)
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _fake_metrics)
 
     r = client.post("/chat/query", json={"question": "factory-a 최근 1시간 ai score 튄 값 있어?"})
     assert r.status_code == 200
@@ -180,8 +208,12 @@ def test_spike_interval_endpoint_routes_to_anchored_window(client, ddb_mock, rou
     async def _fake_answer(parsed, evidence, tier):
         return "스파이크 검사 보고입니다."
 
+    async def _fake_metrics(factory_id, start_utc, end_utc, max_objects=288):
+        return []
+
     monkeypatch.setattr(bedrock, "resolve_query", _fake_resolve)
     monkeypatch.setattr(bedrock, "generate_answer", _fake_answer)
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _fake_metrics)
 
     r = client.post("/chat/query", json={"question": "factory-a 3시간 전부터 2시간 전까지 ai score 튄 값"})
     assert r.status_code == 200

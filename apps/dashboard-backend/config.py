@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     bedrock_region: str = "ap-south-1"
     bedrock_model_fast: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_model_precise: str = "global.anthropic.claude-sonnet-4-6"
-    bedrock_max_tokens: int = 512
+    bedrock_max_tokens: int = 1024
     bedrock_temperature: float = 0.2
     bedrock_connect_timeout_seconds: float = 3.0
     bedrock_read_timeout_seconds: float = 20.0

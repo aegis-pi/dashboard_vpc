@@ -4,7 +4,7 @@ Two layers:
   - Pure parsing/evidence logic in services.chat (deterministic, fixed `now`).
   - /chat/query endpoint against the moto ddb_mock + RBAC enforcement.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import deps.rbac as rbac_module
 from main import app
@@ -23,6 +23,10 @@ def test_intent_cause():
 
 def test_intent_report():
     assert chat.parse_intent("factory-a 일간 보고서 보여줘") == chat.Intent.REPORT
+
+
+def test_intent_report_beats_cause_keywords():
+    assert chat.parse_intent("factory-a 2026-06-09 보고서에서 주요 이벤트와 확인 필요 항목 요약해줘") == chat.Intent.REPORT
 
 
 def test_intent_trend():
@@ -353,7 +357,15 @@ def test_chat_cause_analysis_uses_history(client, ddb_mock):
     assert data["evidence"]["confirmed"]["risk_score_delta"] == 10.0
 
 
-def test_chat_trend_recent_hour(client, ddb_mock):
+def test_chat_trend_recent_hour(client, monkeypatch):
+    async def _metrics_5m(factory_id, start_utc, end_utc, max_objects=288):
+        assert factory_id == "factory-a"
+        return [
+            {"timestamp": "2026-06-08T00:30:00.000Z", "risk_score": 10.0, "risk_score_min": 10.0, "risk_score_max": 10.0},
+            {"timestamp": "2026-06-08T00:45:00.000Z", "risk_score": 20.0, "risk_score_min": 20.0, "risk_score_max": 20.0},
+        ]
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _metrics_5m)
     r = client.post("/chat/query", json={"question": "factory-a 최근 1시간 추이"})
     assert r.status_code == 200
     data = r.json()
@@ -365,21 +377,26 @@ def test_chat_trend_recent_hour(client, ddb_mock):
 
 
 def test_chat_range_fetches_low_risk_and_high_ai_scores(client, monkeypatch):
-    called = {"history": False}
+    called = {"s3_detail": False}
 
-    async def _fake_history(factory_id, window, max_items, since=None, until=None):
-        called["history"] = True
+    async def _fake_metrics(factory_id, start_utc, end_utc, max_objects=288):
+        assert factory_id == "factory-a"
+        return []
+
+    async def _fake_snapshots(factory_id, start_utc, end_utc, max_objects=1200):
+        called["s3_detail"] = True
         assert factory_id == "factory-a"
         return [
             {"timestamp": "2026-06-08T00:50:00.000Z", "risk_score": 91.0, "ai_max_score": 0.2},
             {"timestamp": "2026-06-08T00:55:00.000Z", "risk_score": 37.0, "fire_score_max": 0.96},
         ]
 
-    monkeypatch.setattr(ddb, "get_factory_history", _fake_history)
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _fake_metrics)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _fake_snapshots)
     r = client.post("/chat/query", json={"question": "factory-a 최근 10분 왜 위험해?"})
     assert r.status_code == 200
     data = r.json()
-    assert called["history"] is True
+    assert called["s3_detail"] is True
     conf = data["evidence"]["confirmed"]
     assert conf["risk_score_min"] == 37.0
     assert conf["risk_score_min_level"] == "danger"
@@ -392,7 +409,6 @@ def test_chat_range_fetches_low_risk_and_high_ai_scores(client, monkeypatch):
 
 
 def test_chat_short_point_falls_back_to_graph_when_raw_history_empty(client, monkeypatch):
-    calls = []
     s3_calls = []
 
     class FixedDatetime(datetime):
@@ -401,10 +417,7 @@ def test_chat_short_point_falls_back_to_graph_when_raw_history_empty(client, mon
             value = datetime(2026, 6, 9, 7, 40, 0, tzinfo=timezone.utc)
             return value if tz is None else value.astimezone(tz)
 
-    async def _fake_history(factory_id, window, max_items, since=None, until=None):
-        calls.append((factory_id, window, since, until))
-        if window == "1h":
-            return []
+    async def _fake_metrics(factory_id, start_utc, end_utc, max_objects=288):
         return [
             {
                 "timestamp": "2026-06-09T07:25:00.000Z",
@@ -414,6 +427,16 @@ def test_chat_short_point_falls_back_to_graph_when_raw_history_empty(client, mon
                 "risk_score_min": 43.0,
                 "risk_score_max": 90.0,
                 "ai_max_score": 0.76,
+            }
+        ]
+
+    async def _fake_snapshots(factory_id, start_utc, end_utc, max_objects=500):
+        return [
+            {
+                "timestamp": "2026-06-09T07:25:00.000Z",
+                "risk_score": 43.0,
+                "ai_max_score": 0.76,
+                "top_cause_names": ["ai_event_rate"],
             }
         ]
 
@@ -429,7 +452,8 @@ def test_chat_short_point_falls_back_to_graph_when_raw_history_empty(client, mon
         ]
 
     monkeypatch.setattr(chat_router, "datetime", FixedDatetime)
-    monkeypatch.setattr(ddb, "get_factory_history", _fake_history)
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _fake_metrics)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _fake_snapshots)
     monkeypatch.setattr(s3, "list_processed_risk_scores", _fake_risk_details)
     r = client.post(
         "/chat/query",
@@ -438,20 +462,19 @@ def test_chat_short_point_falls_back_to_graph_when_raw_history_empty(client, mon
     assert r.status_code == 200
     data = r.json()
     assert data["intent"] == chat.Intent.CAUSE_ANALYSIS
-    assert [c[1] for c in calls] == ["1h", "6h"]
-    assert calls[0][3] is not None
     conf = data["evidence"]["confirmed"]
     assert conf["risk_score_min"] == 43.0
     assert conf["risk_score_min_level"] == "danger"
-    assert conf["risk_score_min_time_kst"] == "2026-06-09 16:25~16:30 KST"
+    assert conf["risk_score_min_time_kst"] == "2026-06-09 16:25:00 KST"
     assert conf["ai_detection_max_score"] == 0.76
-    assert conf["ai_detection_max_time_kst"] == "2026-06-09 16:25~16:30 KST"
+    assert conf["ai_detection_max_time_kst"] == "2026-06-09 16:25:00 KST"
     assert conf["processed_risk_score_source"] == "S3 processed/risk_score"
     assert conf["processed_risk_score_min_time_kst"] == "2026-06-09 16:27:12 KST"
     assert conf["top_causes"] == ["AI 이벤트"]
     assert s3_calls and s3_calls[0][0] == "factory-a"
     assert any("S3 processed" in s for s in data["evidence"]["inferred"])
-    assert "2026-06-09 16:25~16:30 KST" in data["answer"]
+    assert conf["primary_detail_source"] == "S3 processed/state_snapshot"
+    assert "2026-06-09 16:25:00 KST" in data["answer"]
 
 
 def test_chat_graph_cause_degrades_when_s3_drilldown_unavailable(client, monkeypatch):
@@ -461,14 +484,13 @@ def test_chat_graph_cause_degrades_when_s3_drilldown_unavailable(client, monkeyp
             value = datetime(2026, 6, 9, 7, 40, 0, tzinfo=timezone.utc)
             return value if tz is None else value.astimezone(tz)
 
-    async def _fake_history(factory_id, window, max_items, since=None, until=None):
-        if window == "1h":
-            return []
+    async def _fake_metrics(factory_id, start_utc, end_utc, max_objects=288):
+        return []
+
+    async def _fake_snapshots(factory_id, start_utc, end_utc, max_objects=500):
         return [
             {
                 "timestamp": "2026-06-09T07:25:00.000Z",
-                "bucket_end": "2026-06-09T07:30:00.000Z",
-                "is_bucket": True,
                 "risk_score": 72.0,
                 "risk_score_min": 43.0,
                 "risk_score_max": 90.0,
@@ -479,7 +501,8 @@ def test_chat_graph_cause_degrades_when_s3_drilldown_unavailable(client, monkeyp
         raise s3.S3UnavailableError("timeout")
 
     monkeypatch.setattr(chat_router, "datetime", FixedDatetime)
-    monkeypatch.setattr(ddb, "get_factory_history", _fake_history)
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _fake_metrics)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _fake_snapshots)
     monkeypatch.setattr(s3, "list_processed_risk_scores", _raise_s3)
 
     r = client.post(
@@ -560,6 +583,8 @@ def test_chat_report_intent_reads_latest_s3_markdown(client, monkeypatch):
     assert data["evidence"]["confirmed"]["report_date"] == "2026-06-08"
     assert data["evidence"]["confirmed"]["report_target"] == "factory-a"
     assert "날짜가 명시되지 않아" in data["evidence"]["inferred"][0]
+    assert data["answer"].startswith("# factory-a 2026-06-08 일일 리포트 요약")
+    assert "## 요약" in data["answer"]
     assert "98.74" in data["answer"]
 
 
@@ -573,6 +598,231 @@ def test_chat_report_intent_uses_requested_date(client, monkeypatch):
     r = client.post("/chat/query", json={"question": "factory-b 2026-06-07 보고서 요약"})
     assert r.status_code == 200
     assert r.json()["evidence"]["confirmed"]["report_date"] == "2026-06-07"
+
+
+def test_chat_suggested_absolute_report_prompt(client, monkeypatch):
+    async def _get_report(report_date, factory_id):
+        assert report_date == "2026-06-09"
+        assert factory_id == "factory-a"
+        return """# factory-a 일일 운영 리포트 - 2026-06-09
+
+## 요약
+15:00 전후 안전 점수 급락과 AI 화재 탐지 상승이 함께 관측되었습니다.
+
+## 주요 이벤트
+
+| 시간 | 유형 | 심각도 | 지속 | 근거 |
+| --- | --- | ---: | ---: | --- |
+| 09:35~09:36 | Risk 저하 | 77.5 | 2분 | msg-09 |
+| 09:36~09:36 | ai_score_spike | 61 | 1분 | msg-fire |
+
+## 확인 필요 항목
+
+| 우선순위 | 항목 | 이유 | 근거 |
+| --- | --- | --- | --- |
+| 높음 | AI 화재 탐지 확인 | fire_score가 threshold를 넘었습니다. | msg-15 |
+"""
+
+    monkeypatch.setattr(s3, "get_report_markdown", _get_report)
+    r = client.post(
+        "/chat/query",
+        json={"question": "factory-a 2026-06-09 보고서에서 주요 이벤트와 확인 필요 항목 요약해줘"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intent"] == chat.Intent.REPORT
+    assert data["evidence"]["confirmed"]["report_date"] == "2026-06-09"
+    assert data["answer"].startswith("# factory-a 2026-06-09 일일 리포트 요약")
+    assert "## 주요 이벤트" in data["answer"]
+    assert "2026-06-09" in data["answer"]
+    assert "주요 이벤트" in data["answer"]
+    assert "AI 화재 탐지" in data["answer"]
+
+
+def test_chat_suggested_absolute_point_cause_prompt(client, monkeypatch):
+    async def _metrics_5m(fid, start_utc, end_utc, max_objects=288):
+        assert fid == "factory-a"
+        assert start_utc == datetime(2026, 6, 9, 5, 55, 0, tzinfo=timezone.utc)
+        assert end_utc == datetime(2026, 6, 9, 6, 5, 0, tzinfo=timezone.utc)
+        return []
+
+    async def _state_snapshots(fid, start_utc, end_utc, max_objects=500):
+        assert fid == "factory-a"
+        assert start_utc == datetime(2026, 6, 9, 5, 55, 0, tzinfo=timezone.utc)
+        assert end_utc == datetime(2026, 6, 9, 6, 5, 0, tzinfo=timezone.utc)
+        return [
+            {
+                "timestamp": "2026-06-09T05:56:00.000Z",
+                "risk_score": 82.0,
+                "temperature_celsius_avg": 29.0,
+                "ai_max_score": 0.31,
+            },
+            {
+                "timestamp": "2026-06-09T06:00:00.000Z",
+                "risk_score": 38.0,
+                "temperature_celsius_avg": 36.2,
+                "ai_max_score": 0.92,
+                "top_cause_names": ["fire_score", "temperature"],
+                "top_causes": [{"field": "fire_score", "value": 0.92}],
+            },
+            {
+                "timestamp": "2026-06-09T06:04:00.000Z",
+                "risk_score": 54.0,
+                "temperature_celsius_avg": 34.0,
+                "ai_max_score": 0.74,
+            },
+        ]
+
+    async def _risk_details(fid, start_utc, end_utc, max_objects):
+        assert fid == "factory-a"
+        return [{"timestamp": "2026-06-09T06:00:00.000Z", "risk_score": 38.0, "top_causes": [{"field": "fire_score", "value": 0.92}]}]
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _metrics_5m)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _state_snapshots)
+    monkeypatch.setattr(s3, "list_processed_risk_scores", _risk_details)
+    r = client.post(
+        "/chat/query",
+        json={"question": "factory-a 2026-06-09 오후 3시 안전 점수 급락 원인 알려줘"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intent"] == chat.Intent.CAUSE_ANALYSIS
+    assert data["time_scope"]["target_kst"].startswith("2026-06-09T15:00:00")
+    assert "2026-06-09 15:00 KST 무렵" in data["answer"]
+    assert "최저 38.0점" in data["answer"]
+    assert data["evidence"]["confirmed"]["primary_detail_source"] == "S3 processed/state_snapshot"
+    assert data["evidence"]["confirmed"]["ai_detection_max_score"] == 0.92
+
+
+def test_chat_suggested_absolute_spike_prompt(client, monkeypatch):
+    async def _metrics_5m(fid, start_utc, end_utc, max_objects=12):
+        assert fid == "factory-a"
+        assert start_utc == datetime(2026, 6, 9, 0, 30, 0, tzinfo=timezone.utc)
+        assert end_utc == datetime(2026, 6, 9, 0, 40, 0, tzinfo=timezone.utc)
+        return [
+            {
+                "timestamp": "2026-06-09T00:35:00.000Z",
+                "bucket_start": "2026-06-09T00:35:00Z",
+                "bucket_end": "2026-06-09T00:39:59.999Z",
+                "is_bucket": True,
+                "risk_score": 95.4,
+                "risk_score_min": 49.0,
+                "risk_score_max": 100.0,
+                "temperature_celsius_avg": 28.3,
+                "ai_max_score": 1.0,
+                "fire_score_max": 1.0,
+            }
+        ]
+
+    async def _state_snapshots(fid, start_utc, end_utc, max_objects=500):
+        assert fid == "factory-a"
+        assert start_utc == datetime(2026, 6, 9, 0, 30, 0, tzinfo=timezone.utc)
+        assert end_utc == datetime(2026, 6, 9, 0, 40, 0, tzinfo=timezone.utc)
+        base = datetime(2026, 6, 9, 0, 30, 0, tzinfo=timezone.utc)
+        values = [0.1, 0.09, 0.11, 0.1, 0.12, 0.95, 0.11, 0.1, 0.09, 0.1, 0.11]
+        return [
+            {
+                "timestamp": (base + timedelta(minutes=index)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                "risk_score": 49.0 if index == 6 else (95.0 if index == 0 else 100.0),
+                "temperature_celsius_avg": 36.5 if index == 5 else 28.0,
+                "ai_max_score": value,
+            }
+            for index, value in enumerate(values)
+        ]
+
+    async def _images(factory_id, start_time, end_time, max_objects=120):
+        assert factory_id == "factory-a"
+        assert start_time == datetime(2026, 6, 9, 9, 25, 0, tzinfo=chat.KST)
+        assert end_time == datetime(2026, 6, 9, 9, 45, 0, tzinfo=chat.KST)
+        assert max_objects == 6
+        filenames = [
+            "260609093551_event_FIRE.jpg",
+            "260609093609_event_FIRE.jpg",
+            "260609093615_event_FIRE.jpg",
+            "260609093621_event_FIRE.jpg",
+            "260609093627_event_FIRE.jpg",
+        ]
+        return [
+            {
+                "factory_id": "factory-a",
+                "s3_key": (
+                    "image_snapshot/factory_id=factory-a/yyyy=2026/mm=06/dd=09/hh=09/"
+                    f"{filename}"
+                ),
+                "filename": filename,
+                "url": f"https://example.com/{filename}",
+                "last_modified": "2026-06-09T00:36:31+00:00",
+                "size_bytes": 12345,
+                "detection_type": "화재",
+            }
+            for filename in filenames
+        ]
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _metrics_5m)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _state_snapshots)
+    monkeypatch.setattr(s3, "list_image_snapshots", _images)
+    r = client.post(
+        "/chat/query",
+        json={
+            "question": (
+                "factory-a 2026-06-09 오전 9시 35분쯤 화재 위험 점수가 튄 걸 봤는데, "
+                "증빙 사진이랑 그때 factory 결과 요약해줘"
+            )
+        },
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intent"] == chat.Intent.SPIKE_CHECK
+    assert data["time_scope"]["target_kst"].startswith("2026-06-09T09:35:00")
+    assert data["evidence"]["confirmed"]["query_time_window_kst"] == "2026-06-09 09:30~09:40 KST"
+    assert data["evidence"]["confirmed"]["spike_count"] == 1
+    assert "크게 벗어난 지점 1개" in data["answer"]
+    assert "2026-06-09 09:35" in data["answer"]
+    assert "08:55" not in data["answer"]
+    assert "같은 조회 구간의 안전 점수" in data["answer"]
+    assert "최저점" in data["answer"]
+    assert "회복" in data["answer"]
+    assert "2026-06-09 09:37:00 KST에 100.0점" in data["answer"]
+    assert "증빙 이미지 5개" in data["answer"]
+    assert data["image_ref"]["kind"] == "image_snapshots"
+    assert data["image_ref"]["count"] == 5
+    assert data["image_ref"]["items"][0]["detection_type"] == "화재"
+    assert data["evidence"]["confirmed"]["image_snapshot_count"] == 5
+    assert data["evidence"]["confirmed"]["image_snapshot_status"] == "available"
+    assert "AI 탐지 상승과 이미지 스냅샷" in data["evidence"]["inferred"][-1]
+    assert len(data["image_ref"]["items"]) == 5
+    assert data["evidence"]["confirmed"]["processed_agg_metrics_5m_count"] == 1
+    assert data["evidence"]["confirmed"]["processed_state_snapshot_count"] == 11
+    assert data["evidence"]["confirmed"]["primary_detail_source"] == "S3 processed/state_snapshot"
+    assert data["evidence"]["confirmed"]["risk_score_min"] == 49.0
+    assert data["evidence"]["confirmed"]["risk_score_end"] == 100.0
+    assert data["evidence"]["confirmed"]["risk_score_recovered_at_kst"] == "2026-06-09 09:37:00 KST"
+    assert data["evidence"]["confirmed"]["risk_score_recovered_score"] == 100.0
+
+
+def test_chat_suggested_absolute_interval_trend_prompt(client, monkeypatch):
+    async def _metrics_5m(fid, start_utc, end_utc, max_objects=288):
+        assert fid == "factory-a"
+        assert start_utc == datetime(2026, 6, 9, 5, 0, 0, tzinfo=timezone.utc)
+        assert end_utc == datetime(2026, 6, 9, 7, 0, 0, tzinfo=timezone.utc)
+        return [
+            {"timestamp": "2026-06-09T05:00:00.000Z", "risk_score": 91.0, "ai_max_score": 0.12},
+            {"timestamp": "2026-06-09T06:00:00.000Z", "risk_score": 42.0, "ai_max_score": 0.88},
+            {"timestamp": "2026-06-09T07:00:00.000Z", "risk_score": 63.0, "ai_max_score": 0.51},
+        ]
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _metrics_5m)
+    r = client.post(
+        "/chat/query",
+        json={"question": "factory-a 2026-06-09 오후 2시~4시 안전 점수와 AI 탐지 추이 비교해줘"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intent"] == chat.Intent.HISTORY_TREND
+    assert data["evidence"]["confirmed"]["time_range_kst"] == "2026-06-09 14:00~16:00 KST"
+    assert data["evidence"]["confirmed"]["primary_detail_source"] == "S3 processed_agg/metrics_5m"
+    assert data["evidence"]["confirmed"]["ai_detection_max_score"] == 0.88
+    assert "AI 탐지 최대 점수" in data["answer"]
 
 
 def test_chat_cloud_infra_report_requires_system_access(client, monkeypatch):

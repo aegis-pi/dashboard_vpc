@@ -49,7 +49,8 @@ _SYSTEM_PROMPT = (
     "spikes의 time_kst·value만 사실로 보고한다. spike_count가 0이면 '튄 지점 없음'으로 답하고 "
     "지점을 지어내지 않는다.\n"
     "10) 구간 평균이 시작/종료보다 낮거나 최저점이 있으면 risk_score_min_time_kst를 사용해 "
-    "'언제 점수가 하락했고, 종료 시점에 몇 점까지 복구됐다'는 흐름을 말한다. "
+    "'언제 점수가 하락했는지'를 말한다. risk_score_recovered_at_kst가 있으면 "
+    "'언제 몇 점으로 회복했는지'를 함께 말하고, 없을 때만 종료 시점 점수로 복구 흐름을 말한다. "
     "원인 필드가 없으면 원인을 단정하지 말고 AI 탐지/센서 값과 같은 확인된 동시 신호만 언급한다.\n"
     "11) AI 탐지 원천 라벨은 fire/fire_score=화재, fall/fallen/fall_score=넘어짐, "
     "bend/bending/bend_score=굽힘으로만 표현한다. 영문 원천 필드명을 답변에 그대로 쓰지 않는다.\n"
@@ -58,7 +59,16 @@ _SYSTEM_PROMPT = (
     "data_limits만 근거로 답한다. 보고서 본문에 없는 조치·원인을 새로 만들지 않는다.\n"
     "14) report_sections가 있으면 질문과 가장 관련 있는 섹션을 우선 답하고, 날짜가 최신으로 추정된 경우 "
     "inferred의 날짜 가정을 함께 말한다.\n"
-    "15) 3~5문장 이내로, 관제 담당자에게 보고하듯 답한다."
+    "15) 이미지 증빙을 말할 때 '별도 시스템'이라고 쓰지 말고, 반드시 '이미지 스냅샷 시스템'이라고 표현한다.\n"
+    "16) image_snapshot_count가 0이고 AI 탐지가 상승했다면 사진 촬영 센서 또는 이미지 스냅샷 저장 파이프라인 "
+    "확인이 필요하다고 말한다. 이미지가 있으나 AI 탐지/온도 상승이 함께 확인되지 않으면 "
+    "사진 촬영 오탐 또는 miss 가능성을 추정으로만 말한다.\n"
+    "17) 답변 첫 줄은 반드시 '# {공장/대상} {날짜 또는 시점} 요약' 형식의 Markdown 제목으로 쓴다. "
+    "예: '# factory-a 2026-06-09 일일 리포트 요약'. 내부 소제목이 필요하면 '## 핵심 내용'처럼 "
+    "한 단계 낮은 제목을 사용하고, 최상단 제목에 '###'를 쓰지 않는다.\n"
+    "18) 줄바꿈은 Markdown 구조에만 사용한다. 제목 다음에는 바로 한 문단을 두고, 문장 중간에서 "
+    "강제 줄바꿈하지 않는다. 서로 다른 생각은 빈 줄로 문단을 나누고, 나열은 '- ' bullet만 사용한다.\n"
+    "19) 3~5문장 이내로, 관제 담당자에게 보고하듯 답한다."
 )
 
 
@@ -220,6 +230,8 @@ def _converse_sync(
     text = "".join(p.get("text", "") for p in parts).strip()
     if not text:
         raise BedrockUnavailableError("Bedrock returned an empty response")
+    if resp.get("stopReason") == "max_tokens":
+        raise BedrockUnavailableError("Bedrock answer hit max_tokens")
     return text
 
 

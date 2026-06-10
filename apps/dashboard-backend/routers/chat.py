@@ -30,6 +30,13 @@ _POINT_MAX_ITEMS = 500
 _CAUSE_NOW_WINDOW = "1h"
 _GRAPH_FALLBACK_WINDOW = "6h"
 _S3_DRILLDOWN_MAX_OBJECTS = 300
+_S3_AGG_MAX_OBJECTS = 288
+_S3_POINT_DETAIL_MAX_OBJECTS = 500
+_S3_DETAIL_MAX_OBJECTS = 1200
+_S3_DETAIL_MAX_WINDOW = timedelta(minutes=15)
+_IMAGE_REF_MAX_OBJECTS = 6
+_IMAGE_REF_HALF_WINDOW = timedelta(minutes=10)
+_IMAGE_KEYWORDS = ("사진", "이미지", "스냅샷", "snapshot", "image", "증빙")
 
 
 class ChatQueryRequest(BaseModel):
@@ -50,6 +57,7 @@ def _envelope(
     parsed: chat.ParsedQuery,
     answer: str,
     evidence: chat.Evidence,
+    image_ref: dict | None = None,
     generator: str = "rule",
     model_tier: str | None = None,
     router: str = "rule",
@@ -60,7 +68,7 @@ def _envelope(
         "factory_id": parsed.factory_id,
         "time_scope": parsed.time.to_dict(),
         "evidence": evidence.to_dict(),
-        "image_ref": None,  # reserved (ADR 0033 §6); populated in a later step
+        "image_ref": image_ref,
         "generator": generator,   # "bedrock" | "rule"
         "model_tier": model_tier,  # "fast" | "precise" | None (raw model id is admin-only)
         "router": router,          # "llm" | "rule" (how intent/time was resolved; ADR 0034)
@@ -80,6 +88,80 @@ def _bound_items(items: list[dict], end_utc: datetime | None) -> list[dict]:
 
 def _uses_graph_buckets(items: list[dict]) -> bool:
     return any(bool(i.get("is_bucket")) for i in items)
+
+
+def _wants_image_ref(parsed: chat.ParsedQuery) -> bool:
+    return any(keyword in parsed.raw.lower() for keyword in _IMAGE_KEYWORDS)
+
+
+def _image_scope_from_evidence(parsed: chat.ParsedQuery, evidence: chat.Evidence) -> tuple[datetime, datetime] | None:
+    if parsed.time.target_kst:
+        return parsed.time.target_kst - _IMAGE_REF_HALF_WINDOW, parsed.time.target_kst + _IMAGE_REF_HALF_WINDOW
+    spikes = evidence.confirmed.get("spikes") or []
+    if spikes and isinstance(spikes, list):
+        first = spikes[0] if isinstance(spikes[0], dict) else {}
+        time_kst = first.get("time_kst")
+        if isinstance(time_kst, str):
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                try:
+                    center = datetime.strptime(time_kst, fmt).replace(tzinfo=chat.KST)
+                    return center - _IMAGE_REF_HALF_WINDOW, center + _IMAGE_REF_HALF_WINDOW
+                except ValueError:
+                    pass
+    if parsed.time.start_utc and parsed.time.end_utc:
+        return parsed.time.start_utc.astimezone(chat.KST), parsed.time.end_utc.astimezone(chat.KST)
+    return None
+
+
+async def _maybe_fetch_image_ref(
+    parsed: chat.ParsedQuery,
+    evidence: chat.Evidence,
+    principal: Principal,
+) -> dict | None:
+    if not _wants_image_ref(parsed) or not parsed.factory_id or parsed.factory_id == chat.REPORT_TARGET_CLOUD_INFRA:
+        return None
+    require_system_access(principal)
+    scope = _image_scope_from_evidence(parsed, evidence)
+    if scope is None:
+        evidence.missing.append("이미지 조회에 사용할 시각 범위를 특정하지 못함")
+        return None
+    start_kst, end_kst = scope
+    items = await s3.list_image_snapshots(
+        parsed.factory_id,
+        start_kst,
+        end_kst,
+        max_objects=_IMAGE_REF_MAX_OBJECTS,
+    )
+    evidence.confirmed["image_snapshot_count"] = len(items)
+    evidence.confirmed["image_snapshot_time_range_kst"] = (
+        f"{start_kst.strftime('%Y-%m-%d %H:%M')}~{end_kst.strftime('%H:%M')} KST"
+    )
+    ai_max = evidence.confirmed.get("ai_detection_max_score")
+    temp_avg = evidence.confirmed.get("temperature_avg")
+    if not items:
+        if isinstance(ai_max, (int, float)) and ai_max >= 0.7:
+            evidence.missing.append(
+                "AI 탐지는 상승했지만 요청 시각 범위의 S3 image_snapshot 객체가 없어 "
+                "사진 촬영 센서 또는 이미지 스냅샷 저장 파이프라인 확인 필요"
+            )
+        else:
+            evidence.missing.append("요청 시각 범위에서 S3 image_snapshot 객체를 찾지 못함")
+        return None
+    evidence.confirmed["image_snapshot_status"] = "available"
+    if isinstance(ai_max, (int, float)) and ai_max >= 0.7:
+        evidence.inferred.append("AI 탐지 상승과 이미지 스냅샷이 같은 시간대에 확인되었습니다.")
+    elif isinstance(temp_avg, (int, float)) and temp_avg < 30:
+        evidence.inferred.append(
+            "이미지 스냅샷은 있으나 AI 탐지와 온도 상승이 함께 확인되지 않아 "
+            "사진 촬영 오탐 또는 miss 가능성을 우선 확인해야 합니다."
+        )
+    return {
+        "kind": "image_snapshots",
+        "factory_id": parsed.factory_id,
+        "time_range_kst": evidence.confirmed["image_snapshot_time_range_kst"],
+        "count": len(items),
+        "items": items,
+    }
 
 
 async def _get_bounded_history(
@@ -107,6 +189,54 @@ async def _get_bounded_history(
         if _has_risk_data(graph_items):
             return graph_items
     return items
+
+
+async def _get_s3_bounded_history(
+    factory_id: str,
+    scope: chat.TimeScope,
+    *,
+    prefer_detail: bool = False,
+) -> tuple[list[dict], dict, list[str]]:
+    """Read bounded historical chat data from S3, not DDB TTL-backed stores."""
+    if scope.start_utc is None or scope.end_utc is None:
+        return [], {}, ["S3 조회에 필요한 시작/종료 시각 없음"]
+
+    duration = scope.end_utc - scope.start_utc
+    agg_items = await s3.list_processed_agg_metrics_5m(
+        factory_id,
+        scope.start_utc,
+        scope.end_utc,
+        max_objects=_S3_AGG_MAX_OBJECTS,
+    )
+
+    should_read_detail = prefer_detail or duration <= _S3_DETAIL_MAX_WINDOW
+    detail_items: list[dict] = []
+    if should_read_detail:
+        detail_items = await s3.list_processed_state_snapshots(
+            factory_id,
+            scope.start_utc,
+            scope.end_utc,
+            max_objects=_S3_POINT_DETAIL_MAX_OBJECTS if prefer_detail else _S3_DETAIL_MAX_OBJECTS,
+        )
+
+    items = detail_items or agg_items
+    confirmed = {
+        "query_time_window_kst": (
+            f"{scope.start_utc.astimezone(chat.KST).strftime('%Y-%m-%d %H:%M')}"
+            f"~{scope.end_utc.astimezone(chat.KST).strftime('%H:%M')} KST"
+        ),
+        "processed_agg_metrics_5m_count": len(agg_items),
+        "processed_state_snapshot_count": len(detail_items),
+        "primary_detail_source": (
+            "S3 processed/state_snapshot" if detail_items else "S3 processed_agg/metrics_5m"
+        ),
+    }
+    missing = []
+    if not agg_items:
+        missing.append("S3 processed_agg metrics_5m 데이터 없음")
+    if should_read_detail and not detail_items:
+        missing.append("S3 processed state_snapshot 상세 데이터 없음")
+    return items, confirmed, missing
 
 
 async def _resolve_parsed(body: "ChatQueryRequest", now_utc: datetime) -> tuple[chat.ParsedQuery, str]:
@@ -197,18 +327,22 @@ async def _fetch_evidence(parsed: chat.ParsedQuery, now_utc: datetime) -> chat.E
             center = scope.target_kst.astimezone(timezone.utc)
             spike_scope = chat.TimeScope(
                 kind="range",
-                window=_GRAPH_FALLBACK_WINDOW,
-                start_utc=center - timedelta(hours=1),
-                end_utc=center + timedelta(hours=1),
+                window="10m",
+                start_utc=center - timedelta(minutes=5),
+                end_utc=center + timedelta(minutes=5),
             )
-            items = await _get_bounded_history(
-                fid,
-                spike_scope,
-                _HISTORY_MAX_ITEMS,
-                fallback_to_graph=False,
-            )
+            items, confirmed, missing = await _get_s3_bounded_history(fid, spike_scope, prefer_detail=True)
+            evidence = chat.summarize_spikes(items, spike_scope, parsed.threshold, parsed.metric, parsed.comparison)
+            evidence.confirmed.update(confirmed)
+            evidence.missing.extend(missing)
+            return evidence
         else:
-            # interval / trailing range — bound the fetch by [start, end].
+            if scope.start_utc and scope.end_utc:
+                items, confirmed, missing = await _get_s3_bounded_history(fid, scope)
+                evidence = chat.summarize_spikes(items, scope, parsed.threshold, parsed.metric, parsed.comparison)
+                evidence.confirmed.update(confirmed)
+                evidence.missing.extend(missing)
+                return evidence
             items = await _get_bounded_history(fid, scope, _HISTORY_MAX_ITEMS)
         return chat.summarize_spikes(items, scope, parsed.threshold, parsed.metric, parsed.comparison)
 
@@ -216,16 +350,21 @@ async def _fetch_evidence(parsed: chat.ParsedQuery, now_utc: datetime) -> chat.E
     if scope.kind in ("point", "interval") or (
         scope.kind == "range" and parsed.intent != chat.Intent.CURRENT_STATUS
     ):
-        max_items = _POINT_MAX_ITEMS if scope.kind == "point" else _HISTORY_MAX_ITEMS
-        items = await _get_bounded_history(fid, scope, max_items)
+        if scope.start_utc and scope.end_utc:
+            items, confirmed, missing = await _get_s3_bounded_history(
+                fid,
+                scope,
+                prefer_detail=scope.kind == "point" or parsed.intent == chat.Intent.CAUSE_ANALYSIS,
+            )
+        else:
+            max_items = _POINT_MAX_ITEMS if scope.kind == "point" else _HISTORY_MAX_ITEMS
+            items = await _get_bounded_history(fid, scope, max_items)
+            confirmed = {}
+            missing = []
         evidence = chat.summarize_history(items, scope)
-        if (
-            parsed.intent == chat.Intent.CAUSE_ANALYSIS
-            and scope.start_utc
-            and scope.end_utc
-            and _uses_graph_buckets(items)
-            and not evidence.confirmed.get("top_causes")
-        ):
+        evidence.confirmed.update(confirmed)
+        evidence.missing.extend(missing)
+        if parsed.intent == chat.Intent.CAUSE_ANALYSIS and scope.start_utc and scope.end_utc:
             try:
                 details = await s3.list_processed_risk_scores(
                     fid,
@@ -288,5 +427,12 @@ async def chat_query(
     except s3.S3UnavailableError as exc:
         raise _s3_gateway_timeout() from exc
 
+    try:
+        image_ref = await _maybe_fetch_image_ref(parsed, evidence, principal)
+    except s3.S3UnavailableError as exc:
+        raise _s3_gateway_timeout() from exc
+
     answer, generator, model_tier = await _explain(parsed, evidence, body.model_tier)
-    return _envelope(parsed, answer, evidence, generator, model_tier, router=router_source)
+    if image_ref:
+        answer = f"{answer}\n\n요청한 시각 범위의 증빙 이미지 {image_ref['count']}개를 함께 표시합니다."
+    return _envelope(parsed, answer, evidence, image_ref, generator, model_tier, router=router_source)

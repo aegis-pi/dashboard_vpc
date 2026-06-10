@@ -60,6 +60,20 @@ def test_build_user_message_includes_kst_time_fields():
     assert payload["time_scope"]["end_kst"].startswith("2026-06-08T11:10:00")
 
 
+def test_converse_sync_rejects_max_token_truncation(monkeypatch):
+    class FakeClient:
+        def converse(self, **kwargs):
+            return {
+                "stopReason": "max_tokens",
+                "output": {"message": {"content": [{"text": "데이터 한계: 결측 영향 확인 필요합니"}]}},
+            }
+
+    monkeypatch.setattr(bedrock, "_client", lambda *args: FakeClient())
+
+    with pytest.raises(bedrock.BedrockUnavailableError):
+        bedrock._converse_sync("ap-south-1", 1, 1, 1, "model", "{}", 16, 0.0)
+
+
 # ─── Endpoint: Bedrock path ───────────────────────────────────────────────────
 
 def test_chat_uses_bedrock_when_enabled(client, ddb_mock, bedrock_on, monkeypatch):

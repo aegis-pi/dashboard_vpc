@@ -36,6 +36,11 @@ _IMAGE_SNAPSHOT_KEY_RE = re.compile(
     r"^image_snapshot/factory_id=(?P<factory_id>[^/]+)/"
     r"yyyy=(?P<yyyy>\d{4})/mm=(?P<mm>\d{2})/dd=(?P<dd>\d{2})/hh=(?P<hh>\d{2})/"
 )
+_METRICS_5M_KEY_RE = re.compile(
+    r"^processed_agg/(?P<factory_id>[^/]+)/metrics_5m/"
+    r"yyyy=(?P<yyyy>\d{4})/mm=(?P<mm>\d{2})/dd=(?P<dd>\d{2})/"
+    r"hh=(?P<hh>\d{2})/mm=(?P<minute>\d{2})\.json$"
+)
 _ISO_IN_KEY_RE = re.compile(r"(20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
 _IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 _DETECTION_LABELS = {
@@ -108,6 +113,20 @@ def _hour_prefixes(factory_id: str, dataset: str, start_utc: datetime, end_utc: 
     return prefixes
 
 
+def _metrics_5m_hour_prefixes(factory_id: str, start_utc: datetime, end_utc: datetime) -> list[str]:
+    current = start_utc.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    end = end_utc.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    prefixes = []
+    while current <= end:
+        prefixes.append(
+            f"processed_agg/{factory_id}/metrics_5m/"
+            f"yyyy={current.year:04d}/mm={current.month:02d}/dd={current.day:02d}/"
+            f"hh={current.hour:02d}/"
+        )
+        current += timedelta(hours=1)
+    return prefixes
+
+
 def _parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -120,6 +139,23 @@ def _parse_iso(value: str | None) -> datetime | None:
 def _timestamp_from_processed_key(key: str) -> datetime | None:
     match = _ISO_IN_KEY_RE.search(key)
     return _parse_iso(match.group(1)) if match else None
+
+
+def _timestamp_from_metrics_5m_key(key: str) -> datetime | None:
+    match = _METRICS_5M_KEY_RE.match(key)
+    if not match:
+        return None
+    try:
+        return datetime(
+            int(match["yyyy"]),
+            int(match["mm"]),
+            int(match["dd"]),
+            int(match["hh"]),
+            int(match["minute"]),
+            tzinfo=timezone.utc,
+        )
+    except ValueError:
+        return None
 
 
 def _image_snapshot_prefix(factory_id: str, snapshot_date: str, hour: int) -> str:
@@ -205,6 +241,19 @@ def _risk_level_from_body(body: dict) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _number_or_none(value) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _top_causes_from_body(body: dict) -> list:
     risk = body.get("risk") if isinstance(body.get("risk"), dict) else {}
     value = body.get("top_causes", risk.get("top_causes"))
@@ -272,6 +321,57 @@ def _list_processed_json_sync(
                 if timestamp is None or timestamp < start_utc or timestamp > end_utc:
                     continue
                 found.append(result)
+    except ClientError as exc:
+        raise S3UnavailableError("S3 request failed") from exc
+    except BotoCoreError as exc:
+        raise S3UnavailableError("S3 request failed") from exc
+    return sorted(found, key=lambda item: item["timestamp"])
+
+
+def _list_metrics_5m_json_sync(
+    bucket: str,
+    factory_id: str,
+    start_utc: datetime,
+    end_utc: datetime,
+    max_objects: int,
+) -> list[dict[str, Any]]:
+    client = _client()
+    candidates: list[tuple[str, datetime]] = []
+    try:
+        paginator = client.get_paginator("list_objects_v2")
+        for prefix in _metrics_5m_hour_prefixes(factory_id, start_utc, end_utc):
+            for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+                for obj in page.get("Contents", []):
+                    key = obj.get("Key")
+                    if not key or not key.endswith(".json"):
+                        continue
+                    key_timestamp = _timestamp_from_metrics_5m_key(key)
+                    if key_timestamp is None:
+                        continue
+                    if key_timestamp < start_utc or key_timestamp >= end_utc:
+                        continue
+                    candidates.append((key, key_timestamp))
+    except ClientError as exc:
+        raise S3UnavailableError("S3 request failed") from exc
+    except BotoCoreError as exc:
+        raise S3UnavailableError("S3 request failed") from exc
+
+    candidates = sorted(candidates, key=lambda item: item[1])[:max_objects]
+    if not candidates:
+        return []
+
+    workers = min(10, len(candidates))
+    found: list[dict[str, Any]] = []
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(_read_processed_json_candidate, bucket, key, timestamp)
+                for key, timestamp in candidates
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    found.append(result)
     except ClientError as exc:
         raise S3UnavailableError("S3 request failed") from exc
     except BotoCoreError as exc:
@@ -510,3 +610,115 @@ async def list_processed_risk_scores(
             }
         )
     return normalized
+
+
+def _normalize_metrics_5m_object(obj: dict[str, Any]) -> dict[str, Any]:
+    body = obj.get("body") or {}
+    risk_score = ((body.get("risk") or {}).get("score") or {})
+    sensor = body.get("sensor") or {}
+    temp = sensor.get("temperature_celsius") or {}
+    ai = body.get("ai_detection") or {}
+    by_type = ai.get("by_type") or {}
+    fire = by_type.get("fire_score") or {}
+    fall = by_type.get("fall_score") or {}
+    bend = by_type.get("bend_score") or {}
+    return {
+        "timestamp": body.get("bucket_start") or obj.get("timestamp"),
+        "bucket_start": body.get("bucket_start") or obj.get("timestamp"),
+        "bucket_end": body.get("bucket_end"),
+        "is_bucket": True,
+        "source": "S3 processed_agg/metrics_5m",
+        "s3_key": obj.get("s3_key"),
+        "risk_score": _number_or_none(risk_score.get("mean")),
+        "risk_score_min": _number_or_none(risk_score.get("min")),
+        "risk_score_max": _number_or_none(risk_score.get("max")),
+        "temperature_celsius_avg": _number_or_none(temp.get("mean")),
+        "temperature_celsius_max": _number_or_none(temp.get("max")),
+        "ai_max_score": _number_or_none(ai.get("max_score")),
+        "fire_score": _number_or_none(fire.get("mean")),
+        "fall_score": _number_or_none(fall.get("mean")),
+        "bend_score": _number_or_none(bend.get("mean")),
+        "fire_score_max": _number_or_none(fire.get("max")),
+        "fall_score_max": _number_or_none(fall.get("max")),
+        "bend_score_max": _number_or_none(bend.get("max")),
+    }
+
+
+def _normalize_state_snapshot_object(obj: dict[str, Any]) -> dict[str, Any]:
+    body = obj.get("body") or {}
+    factory_state = body.get("factory_state") or {}
+    risk = body.get("risk") or {}
+    return {
+        "timestamp": body.get("updated_at") or obj.get("timestamp"),
+        "source": "S3 processed/state_snapshot",
+        "s3_key": obj.get("s3_key"),
+        "risk_score": _number_or_none(risk.get("score")),
+        "risk_score_min": _number_or_none(risk.get("score")),
+        "risk_score_max": _number_or_none(risk.get("score")),
+        "level": risk.get("level") if isinstance(risk.get("level"), str) else None,
+        "top_cause_names": [
+            c.get("field") or c.get("name")
+            for c in risk.get("top_causes", [])
+            if isinstance(c, dict) and (c.get("field") or c.get("name"))
+        ],
+        "top_causes": risk.get("top_causes") if isinstance(risk.get("top_causes"), list) else [],
+        "temperature_celsius_avg": _number_or_none(factory_state.get("temperature_celsius")),
+        "temperature_celsius": _number_or_none(factory_state.get("temperature_celsius")),
+        "fire_score": _number_or_none(factory_state.get("fire_score")),
+        "fire_score_max": _number_or_none(factory_state.get("fire_score")),
+        "fall_score": _number_or_none(factory_state.get("fall_score")),
+        "fall_score_max": _number_or_none(factory_state.get("fall_score")),
+        "bend_score": _number_or_none(factory_state.get("bend_score")),
+        "bend_score_max": _number_or_none(factory_state.get("bend_score")),
+    }
+
+
+async def list_processed_agg_metrics_5m(
+    factory_id: str,
+    start_utc: datetime,
+    end_utc: datetime,
+    max_objects: int = 12,
+) -> list[dict[str, Any]]:
+    """Read S3 processed_agg metrics_5m buckets for a bounded window."""
+    s = get_settings()
+    try:
+        objects = await asyncio.wait_for(
+            asyncio.to_thread(
+                _list_metrics_5m_json_sync,
+                s.s3_bucket_data,
+                factory_id,
+                start_utc.astimezone(timezone.utc),
+                end_utc.astimezone(timezone.utc),
+                max_objects,
+            ),
+            timeout=s.s3_operation_timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise S3UnavailableError("S3 operation timed out") from exc
+    return [_normalize_metrics_5m_object(obj) for obj in objects]
+
+
+async def list_processed_state_snapshots(
+    factory_id: str,
+    start_utc: datetime,
+    end_utc: datetime,
+    max_objects: int = 500,
+) -> list[dict[str, Any]]:
+    """Read S3 processed state_snapshot objects for a bounded drill-down window."""
+    s = get_settings()
+    try:
+        objects = await asyncio.wait_for(
+            asyncio.to_thread(
+                _list_processed_json_sync,
+                s.s3_bucket_data,
+                factory_id,
+                "state_snapshot",
+                start_utc.astimezone(timezone.utc),
+                end_utc.astimezone(timezone.utc),
+                max_objects,
+            ),
+            timeout=s.s3_operation_timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise S3UnavailableError("S3 operation timed out") from exc
+    return [_normalize_state_snapshot_object(obj) for obj in objects]
