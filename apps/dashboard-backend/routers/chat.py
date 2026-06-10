@@ -126,12 +126,16 @@ async def _maybe_fetch_image_ref(
         evidence.missing.append("이미지 조회에 사용할 시각 범위를 특정하지 못함")
         return None
     start_kst, end_kst = scope
-    items = await s3.list_image_snapshots(
-        parsed.factory_id,
-        start_kst,
-        end_kst,
-        max_objects=_IMAGE_REF_MAX_OBJECTS,
-    )
+    try:
+        items = await s3.list_image_snapshots(
+            parsed.factory_id,
+            start_kst,
+            end_kst,
+            max_objects=_IMAGE_REF_MAX_OBJECTS,
+        )
+    except s3.S3UnavailableError:
+        evidence.missing.append("이미지 스냅샷 S3 조회 실패")
+        return None
     evidence.confirmed["image_snapshot_count"] = len(items)
     evidence.confirmed["image_snapshot_time_range_kst"] = (
         f"{start_kst.strftime('%Y-%m-%d %H:%M')}~{end_kst.strftime('%H:%M')} KST"
@@ -202,36 +206,44 @@ async def _get_s3_bounded_history(
         return [], {}, ["S3 조회에 필요한 시작/종료 시각 없음"]
 
     duration = scope.end_utc - scope.start_utc
-    agg_items = await s3.list_processed_agg_metrics_5m(
-        factory_id,
-        scope.start_utc,
-        scope.end_utc,
-        max_objects=_S3_AGG_MAX_OBJECTS,
-    )
-
-    should_read_detail = prefer_detail or duration <= _S3_DETAIL_MAX_WINDOW
-    detail_items: list[dict] = []
-    if should_read_detail:
-        detail_items = await s3.list_processed_state_snapshots(
-            factory_id,
-            scope.start_utc,
-            scope.end_utc,
-            max_objects=_S3_POINT_DETAIL_MAX_OBJECTS if prefer_detail else _S3_DETAIL_MAX_OBJECTS,
-        )
-
-    items = detail_items or agg_items
     confirmed = {
         "query_time_window_kst": (
             f"{scope.start_utc.astimezone(chat.KST).strftime('%Y-%m-%d %H:%M')}"
             f"~{scope.end_utc.astimezone(chat.KST).strftime('%H:%M')} KST"
         ),
-        "processed_agg_metrics_5m_count": len(agg_items),
-        "processed_state_snapshot_count": len(detail_items),
-        "primary_detail_source": (
-            "S3 processed/state_snapshot" if detail_items else "S3 processed_agg/metrics_5m"
-        ),
     }
     missing = []
+
+    try:
+        agg_items = await s3.list_processed_agg_metrics_5m(
+            factory_id,
+            scope.start_utc,
+            scope.end_utc,
+            max_objects=_S3_AGG_MAX_OBJECTS,
+        )
+    except s3.S3UnavailableError:
+        agg_items = []
+        missing.append("S3 processed_agg metrics_5m 조회 실패")
+
+    should_read_detail = prefer_detail or duration <= _S3_DETAIL_MAX_WINDOW
+    detail_items: list[dict] = []
+    if should_read_detail:
+        try:
+            detail_items = await s3.list_processed_state_snapshots(
+                factory_id,
+                scope.start_utc,
+                scope.end_utc,
+                max_objects=_S3_POINT_DETAIL_MAX_OBJECTS if prefer_detail else _S3_DETAIL_MAX_OBJECTS,
+            )
+        except s3.S3UnavailableError:
+            missing.append("S3 processed state_snapshot 상세 조회 실패")
+
+    items = detail_items or agg_items
+    confirmed["processed_agg_metrics_5m_count"] = len(agg_items)
+    confirmed["processed_state_snapshot_count"] = len(detail_items)
+    confirmed["primary_detail_source"] = (
+        "S3 processed/state_snapshot" if detail_items else "S3 processed_agg/metrics_5m"
+    )
     if not agg_items:
         missing.append("S3 processed_agg metrics_5m 데이터 없음")
     if should_read_detail and not detail_items:

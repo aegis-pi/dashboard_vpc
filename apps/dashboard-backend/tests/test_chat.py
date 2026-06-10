@@ -408,6 +408,22 @@ def test_chat_range_fetches_low_risk_and_high_ai_scores(client, monkeypatch):
     assert "2026-06-08 09:55:00 KST" in data["answer"]
 
 
+def test_chat_s3_history_timeout_degrades_without_504(client, monkeypatch):
+    async def _raise_s3(*args, **kwargs):
+        raise s3.S3UnavailableError("timeout")
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _raise_s3)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _raise_s3)
+
+    r = client.post("/chat/query", json={"question": "factory-a 최근 10분 왜 위험해?"})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intent"] == chat.Intent.CAUSE_ANALYSIS
+    assert any("S3 processed_agg metrics_5m 조회 실패" in m for m in data["evidence"]["missing"])
+    assert any("S3 processed state_snapshot 상세 조회 실패" in m for m in data["evidence"]["missing"])
+
+
 def test_chat_short_point_falls_back_to_graph_when_raw_history_empty(client, monkeypatch):
     s3_calls = []
 
@@ -798,6 +814,44 @@ def test_chat_suggested_absolute_spike_prompt(client, monkeypatch):
     assert data["evidence"]["confirmed"]["risk_score_end"] == 100.0
     assert data["evidence"]["confirmed"]["risk_score_recovered_at_kst"] == "2026-06-09 09:37:00 KST"
     assert data["evidence"]["confirmed"]["risk_score_recovered_score"] == 100.0
+
+
+def test_chat_image_ref_timeout_degrades_without_504(client, monkeypatch):
+    async def _metrics_5m(fid, start_utc, end_utc, max_objects=12):
+        return [
+            {
+                "timestamp": "2026-06-09T00:35:00.000Z",
+                "risk_score": 49.0,
+                "risk_score_min": 49.0,
+                "risk_score_max": 100.0,
+                "ai_max_score": 1.0,
+            }
+        ]
+
+    async def _state_snapshots(fid, start_utc, end_utc, max_objects=500):
+        return []
+
+    async def _raise_images(*args, **kwargs):
+        raise s3.S3UnavailableError("timeout")
+
+    monkeypatch.setattr(s3, "list_processed_agg_metrics_5m", _metrics_5m)
+    monkeypatch.setattr(s3, "list_processed_state_snapshots", _state_snapshots)
+    monkeypatch.setattr(s3, "list_image_snapshots", _raise_images)
+
+    r = client.post(
+        "/chat/query",
+        json={
+            "question": (
+                "factory-a 2026-06-09 오전 9시 35분쯤 화재 위험 점수가 튄 걸 봤는데, "
+                "증빙 사진이랑 그때 factory 결과 요약해줘"
+            )
+        },
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["image_ref"] is None
+    assert any("이미지 스냅샷 S3 조회 실패" in m for m in data["evidence"]["missing"])
 
 
 def test_chat_suggested_absolute_interval_trend_prompt(client, monkeypatch):
