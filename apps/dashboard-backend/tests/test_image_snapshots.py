@@ -55,7 +55,7 @@ def test_list_image_snapshots_reads_partition_and_presigns_urls():
         result = s3._list_image_snapshot_objects_sync(
             "aegis-bucket-data",
             "factory-a",
-            datetime(2026, 6, 9, 14, 30),
+            datetime(2026, 6, 9, 14, 0),
             datetime(2026, 6, 9, 15, 30),
             120,
             900,
@@ -67,6 +67,46 @@ def test_list_image_snapshots_reads_partition_and_presigns_urls():
     assert all(item["factory_id"] == "factory-a" for item in result)
     assert all(item["s3_key"].startswith("image_snapshot/factory_id=factory-a/") for item in result)
     assert all("X-Amz-Signature" in item["url"] for item in result)
+    assert {item["captured_at"] for item in result} == {
+        "2026-06-09T14:05:01",
+        "2026-06-09T15:05:01",
+    }
+
+
+def test_list_image_snapshots_filters_within_hour_by_filename_timestamp():
+    s3._s3_client.cache_clear()
+    with mock_aws():
+        client = boto3.client("s3", region_name="ap-south-1")
+        client.create_bucket(
+            Bucket="aegis-bucket-data",
+            CreateBucketConfiguration={"LocationConstraint": "ap-south-1"},
+        )
+        for filename in (
+            "260612141200_event_FIRE.jpg",
+            "260612141501_event_FIRE.jpg",
+            "260612141959_event_FIRE.jpg",
+            "260612142100_event_FIRE.jpg",
+        ):
+            client.put_object(
+                Bucket="aegis-bucket-data",
+                Key=f"image_snapshot/factory_id=factory-a/yyyy=2026/mm=06/dd=12/hh=14/{filename}",
+                Body=b"jpeg",
+                ContentType="image/jpeg",
+            )
+
+        result = s3._list_image_snapshot_objects_sync(
+            "aegis-bucket-data",
+            "factory-a",
+            datetime(2026, 6, 12, 14, 15),
+            datetime(2026, 6, 12, 14, 20),
+            120,
+            900,
+        )
+
+    assert [item["filename"] for item in result] == [
+        "260612141959_event_FIRE.jpg",
+        "260612141501_event_FIRE.jpg",
+    ]
 
 
 def test_get_image_snapshot_range_uses_existing_s3_partitions():

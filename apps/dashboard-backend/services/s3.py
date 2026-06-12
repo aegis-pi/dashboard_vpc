@@ -42,6 +42,14 @@ _METRICS_5M_KEY_RE = re.compile(
     r"hh=(?P<hh>\d{2})/mm=(?P<minute>\d{2})\.json$"
 )
 _ISO_IN_KEY_RE = re.compile(r"(20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
+_IMAGE_YYYY_COMPACT_TS_RE = re.compile(
+    r"(?<!\d)(?P<yyyy>20\d{2})(?P<mm>\d{2})(?P<dd>\d{2})T"
+    r"(?P<hh>\d{2})(?P<minute>\d{2})(?P<second>\d{2})(?!\d)"
+)
+_IMAGE_YY_COMPACT_TS_RE = re.compile(
+    r"(?<!\d)(?P<yy>\d{2})(?P<mm>\d{2})(?P<dd>\d{2})"
+    r"(?P<hh>\d{2})(?P<minute>\d{2})(?P<second>\d{2})(?!\d)"
+)
 _IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 _DETECTION_LABELS = {
     "fire": "화재",
@@ -197,6 +205,50 @@ def _image_partition_time_from_key(key: str) -> datetime | None:
         )
     except ValueError:
         return None
+
+
+def _image_timestamp_from_key(key: str) -> datetime | None:
+    filename = key.rsplit("/", 1)[-1]
+    match = _IMAGE_YYYY_COMPACT_TS_RE.search(filename)
+    if match:
+        try:
+            return datetime(
+                int(match["yyyy"]),
+                int(match["mm"]),
+                int(match["dd"]),
+                int(match["hh"]),
+                int(match["minute"]),
+                int(match["second"]),
+            )
+        except ValueError:
+            return None
+
+    match = _IMAGE_YY_COMPACT_TS_RE.search(filename)
+    if match:
+        try:
+            return datetime(
+                2000 + int(match["yy"]),
+                int(match["mm"]),
+                int(match["dd"]),
+                int(match["hh"]),
+                int(match["minute"]),
+                int(match["second"]),
+            )
+        except ValueError:
+            return None
+    return None
+
+
+def _image_object_in_range(key: str, start_time: datetime, end_time: datetime) -> bool:
+    captured_at = _image_timestamp_from_key(key)
+    if captured_at is not None:
+        return start_time <= captured_at <= end_time
+
+    partition_time = _image_partition_time_from_key(key)
+    if partition_time is None:
+        return False
+    partition_end = partition_time + timedelta(hours=1)
+    return start_time <= partition_time and partition_end <= end_time
 
 
 def _detection_type_from_key(key: str) -> str | None:
@@ -441,7 +493,10 @@ def _list_image_snapshot_objects_sync(
                     key = obj.get("Key", "")
                     if not key.lower().endswith(_IMAGE_EXTENSIONS):
                         continue
+                    if not _image_object_in_range(key, start_time, end_time):
+                        continue
                     filename = key.rsplit("/", 1)[-1]
+                    captured_at = _image_timestamp_from_key(key)
                     url = client.generate_presigned_url(
                         "get_object",
                         Params={"Bucket": bucket, "Key": key},
@@ -454,6 +509,7 @@ def _list_image_snapshot_objects_sync(
                             "s3_key": key,
                             "filename": filename,
                             "url": url,
+                            "captured_at": captured_at.isoformat(timespec="seconds") if captured_at else None,
                             "last_modified": last_modified.isoformat() if last_modified else None,
                             "size_bytes": obj.get("Size"),
                             "detection_type": _detection_type_from_key(filename),
@@ -462,7 +518,10 @@ def _list_image_snapshot_objects_sync(
                     if len(items) >= max_objects:
                         return sorted(
                             items,
-                            key=lambda item: (item.get("last_modified") or "", item.get("filename") or ""),
+                            key=lambda item: (
+                                item.get("captured_at") or item.get("last_modified") or "",
+                                item.get("filename") or "",
+                            ),
                             reverse=True,
                         )
     except ClientError as exc:
@@ -472,7 +531,10 @@ def _list_image_snapshot_objects_sync(
 
     return sorted(
         items,
-        key=lambda item: (item.get("last_modified") or "", item.get("filename") or ""),
+        key=lambda item: (
+            item.get("captured_at") or item.get("last_modified") or "",
+            item.get("filename") or "",
+        ),
         reverse=True,
     )
 
