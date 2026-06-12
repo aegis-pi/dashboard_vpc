@@ -114,6 +114,7 @@ function SnapshotCard({ item }: { item: ImageSnapshotItem }) {
         </div>
         <div className="snapshot-meta-grid">
           <span>탐지</span><strong>{item.detection_type ?? '미분류'}</strong>
+          <span>촬영</span><strong>{formatDateTime(item.captured_at)}</strong>
           <span>수정</span><strong>{formatDateTime(item.last_modified)}</strong>
           <span>크기</span><strong>{formatBytes(item.size_bytes)}</strong>
         </div>

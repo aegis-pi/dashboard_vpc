@@ -320,6 +320,7 @@ export interface ImageSnapshotItem {
   s3_key: string
   filename: string
   url: string
+  captured_at?: string | null
   last_modified?: string | null
   size_bytes?: number | null
   detection_type?: string | null
