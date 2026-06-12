@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import boto3
 from moto import mock_aws
@@ -107,6 +108,39 @@ def test_list_image_snapshots_filters_within_hour_by_filename_timestamp():
         "260612141959_event_FIRE.jpg",
         "260612141501_event_FIRE.jpg",
     ]
+
+
+def test_list_image_snapshots_accepts_kst_aware_chat_range():
+    kst = ZoneInfo("Asia/Seoul")
+    s3._s3_client.cache_clear()
+    with mock_aws():
+        client = boto3.client("s3", region_name="ap-south-1")
+        client.create_bucket(
+            Bucket="aegis-bucket-data",
+            CreateBucketConfiguration={"LocationConstraint": "ap-south-1"},
+        )
+        for filename in (
+            "260609092400_event_FIRE.jpg",
+            "260609093551_event_FIRE.jpg",
+            "260609094600_event_FIRE.jpg",
+        ):
+            client.put_object(
+                Bucket="aegis-bucket-data",
+                Key=f"image_snapshot/factory_id=factory-a/yyyy=2026/mm=06/dd=09/hh=09/{filename}",
+                Body=b"jpeg",
+                ContentType="image/jpeg",
+            )
+
+        result = s3._list_image_snapshot_objects_sync(
+            "aegis-bucket-data",
+            "factory-a",
+            datetime(2026, 6, 9, 9, 25, tzinfo=kst),
+            datetime(2026, 6, 9, 9, 45, tzinfo=kst),
+            120,
+            900,
+        )
+
+    assert [item["filename"] for item in result] == ["260609093551_event_FIRE.jpg"]
 
 
 def test_get_image_snapshot_range_uses_existing_s3_partitions():

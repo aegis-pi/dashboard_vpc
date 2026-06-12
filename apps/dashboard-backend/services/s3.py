@@ -239,14 +239,28 @@ def _image_timestamp_from_key(key: str) -> datetime | None:
     return None
 
 
+def _has_timezone(value: datetime) -> bool:
+    return value.tzinfo is not None and value.utcoffset() is not None
+
+
+def _align_image_time_to_range(value: datetime, start_time: datetime) -> datetime:
+    if _has_timezone(start_time) and not _has_timezone(value):
+        return value.replace(tzinfo=start_time.tzinfo)
+    if not _has_timezone(start_time) and _has_timezone(value):
+        return value.replace(tzinfo=None)
+    return value
+
+
 def _image_object_in_range(key: str, start_time: datetime, end_time: datetime) -> bool:
     captured_at = _image_timestamp_from_key(key)
     if captured_at is not None:
+        captured_at = _align_image_time_to_range(captured_at, start_time)
         return start_time <= captured_at <= end_time
 
     partition_time = _image_partition_time_from_key(key)
     if partition_time is None:
         return False
+    partition_time = _align_image_time_to_range(partition_time, start_time)
     partition_end = partition_time + timedelta(hours=1)
     return start_time <= partition_time and partition_end <= end_time
 
