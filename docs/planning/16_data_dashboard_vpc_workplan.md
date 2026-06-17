@@ -263,15 +263,15 @@ Step 1 진행 시:
 - ECR aegis/dashboard-backend repo 신설 — Step 7 완료
 - ECS Fargate Task Definition / Service 배포 — Step 7 완료
 - ALB listener rule 연결 (api.<도메인>) — Step 7 완료
-- Backend 활성화 완료: image `sha-9d2c200`, ECS desired/running 1, `/healthz` 200
+- Backend 활성화 완료: 이후 ADR 0030 기준 ECS desired/running 2, task 1 vCPU / 2 GB, `/healthz` 200
 ```
 
 ### Step 7 — ECS Service / ALB 배포 (`infra/data-dashboard/`) ✅ 완료 (2026-05-26)
 
 ```text
 - ECS Cluster (Fargate, capacity provider: FARGATE)
-- Task Definition (0.5 vCPU / 1 GB, awsvpc, FARGATE_LATEST)
-- ECS Service (desired_count=1, deployment circuit breaker)
+- Task Definition (ADR 0030 이후 1 vCPU / 2 GB, awsvpc, FARGATE_LATEST)
+- ECS Service (ADR 0030 이후 desired/min/max 2, deployment circuit breaker)
 - Task Execution Role: ECR pull, CloudWatch Logs
 - Task Role: DDB Get/Query/PutItem, S3 Get, RDS PostgreSQL 접속 정보 조회(Secrets), Redis (Secrets), Secrets Manager Get
 - ALB (HTTPS 443, ACM):
@@ -280,7 +280,7 @@ Step 1 진행 시:
     Health check: GET /healthz
 - Route53 A-record (alias) api.<도메인> → ALB
 - ECR image tag `sha-9d2c200` push 완료
-- ECS service desired_count=1 / running_count=1 / rollout completed
+- ECS service desired_count=2 / running_count=2 / rollout completed (ADR 0030 이후 기준)
 - `curl -i https://api.aegis-pi.cloud/healthz` → HTTP 200
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 은 `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
 ```

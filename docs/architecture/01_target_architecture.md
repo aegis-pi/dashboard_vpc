@@ -1,8 +1,9 @@
 # 목표 확장 아키텍처
 
 상태: draft
-기준일: 2026-06-02
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17 v1.0  ADR 0030 이후 Dashboard Backend ECS task sizing을 1 vCPU / 2 GB, desired/min 2 기준으로 정정.
   - 2026-06-02 v0.9  LLM 보고서 섹션 현행화. Dashboard 보고서 조회 경로(`/reports`, S3 `reports/daily/`)는 구현 완료(ADR 0029), 생성기는 팀원/후속으로 구분.
   - 2026-05-26 v0.8  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 목표로 분리.
   - 2026-05-26 v0.7  Step 6 완료 반영. Dashboard Backend 구현 완료/미배포 상태 명시. frontend/ prototype/reference와 apps/dashboard-web/ 운영 SPA 경로 구분 추가.
@@ -273,7 +274,7 @@ Terraform locals 권장:
     - NAT Gateway × 1 (단일 AZ, ADR 0012)
     - ALB (HTTPS, ACM)
   Private App Subnet (ap-south-1a, 1c)
-    - ECS Fargate Dashboard Backend (FastAPI, 0.5 vCPU / 1 GB)
+    - ECS Fargate Dashboard Backend (FastAPI, 1 vCPU / 2 GB, desired/min 2; ADR 0030)
     - ElastiCache Redis (cache.t4g.micro, 단일 노드)
     - Lambda notifier (DDB Streams trigger, VPC-attach)
   Private Data Subnet (ap-south-1a, 1c)

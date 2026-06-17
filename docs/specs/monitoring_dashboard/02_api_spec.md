@@ -1,8 +1,9 @@
 # Monitoring Dashboard API Spec
 
 상태: source of truth
-기준일: 2026-06-08
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17  실제 backend 라우터와 맞춰 `/chat/query`, `/image-snapshots`, `/image-snapshots/range` 계약을 추가하고, 현재 판단 문구를 운영 source-of-truth 기준으로 정정.
   - 2026-06-08  history endpoint delta refresh 계약(`since`)과 window별 기본 limit 현행화: 10m=250, 1h=2000, 그 외 기본 500.
   - 2026-06-04  Auth/RBAC Endpoint 섹션 추가(`/auth/me`, `/admin/users` CRUD, ADR 0031 구현·배포 완료). 공장별 인가 note 반영. Cloud Infra collector(write)도 본 환경 구현·배포 완료로 정정(`apps/cloud-infra-collector/`).
   - 2026-06-02  `/reports` · `/reports/{date}/{factory_id}` endpoint를 skeleton/DDB 기준에서 S3 `reports/daily/` 기반 구현 완료로 현행화. 응답 필드/IAM/경로 note 추가(ADR 0029). `/cloud-infra` · `/cloud-infra/history` Backend/Frontend read 화면 구현·배포 완료 상태로 현행화.
@@ -208,6 +209,29 @@ Cognito 로그인 사용자의 권한은 RDS PostgreSQL 메타데이터(`factory
 - metadata 테이블은 backend 기동 시 auto-create되며 `/readyz`가 `rds_metadata` 준비 상태를 점검한다.
 - 같은 email의 disabled 잔여 row가 있으면 생성 시 best-effort 정리 후 신규 생성한다(stale 재생성 409 보정).
 
+### Chat / Data QA Endpoint (ADR 0033/0035 구현·배포 완료)
+
+Backend가 Cognito/RDS RBAC를 먼저 검증한 뒤 DDB/S3/RDS에서 evidence를 조회한다. Bedrock은 데이터를
+찾지 않고, Backend가 만든 evidence를 설명하는 계층으로만 사용한다. Bedrock 장애 또는 비활성화 시
+rule/template fallback 응답을 반환한다.
+
+| Method | Path | 인증 | 동작 | 백엔드 경로 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/chat/query` | Cognito JWT | 자연어 관제 질의 응답. `question`, optional `factory_id`, optional `model_tier(auto\|fast\|precise)` | RBAC → DDB/S3/RDS evidence → Bedrock Nova 또는 rule fallback | 구현 완료 |
+
+응답은 `answer`, `intent`, `factory_id`, `time_scope`, `evidence`, `image_ref`, `generator`, `model_tier`,
+`router`를 포함한다. raw Bedrock model id는 API 응답에 노출하지 않고 `model_tier`만 노출한다.
+
+### Image Snapshot Endpoint (구현·배포 완료)
+
+이미지 생산 경로는 워크스트림 A 합류 지점이지만, Dashboard Backend는 S3 `image_snapshot/` prefix의
+객체를 read하고 Cognito/RDS 권한 확인 후 presigned URL을 발급한다.
+
+| Method | Path | 인증 | 동작 | 백엔드 경로 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/image-snapshots/range?factory_id={factory_id}` | Cognito JWT + system-view | 해당 공장의 이미지 스냅샷 보유 시간 범위 조회 | S3 ListObjectsV2 (`image_snapshot/`) | 구현 완료 |
+| GET | `/image-snapshots?factory_id={factory_id}&start=<iso>&end=<iso>[&limit=N]` | Cognito JWT + system-view | 시간 범위 내 이미지 스냅샷 목록 + presigned URL | S3 ListObjectsV2 + presigned GetObject | 구현 완료 |
+
 ### ALB / Backend 정책
 
 - ALB listener는 HTTPS만 허용하고 HTTP는 redirect
@@ -234,6 +258,6 @@ DDB Streams -> WebSocket push: 1~2초
 
 ## 현재 판단
 
-- `factory-a` 운영 dashboard는 Grafana datasource query로 충분하다.
-- API spec은 M6 Risk Twin / Data / Dashboard VPC 구현 시 source of truth로 승격한다.
-- 현재는 후속 설계 초안으로만 유지한다.
+- 본 문서는 M6 Risk Twin / Data / Dashboard VPC 운영 API의 source of truth다.
+- `factory-a` 로컬 운영 관제는 Grafana를 유지하지만, 본사 관제 Dashboard는 위 FastAPI Backend 계약을 따른다.
+- 쓰기 API, Replay/Near-miss, Timestream/Kinesis/OpenSearch 조회는 후속 범위다.

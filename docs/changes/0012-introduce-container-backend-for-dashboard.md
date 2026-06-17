@@ -83,8 +83,8 @@ Dashboard API를 **ECS Fargate 기반 컨테이너 서비스**로 운영한다. 
   - ECR Repository: `aegis/dashboard-backend`
   - 보안그룹: ALB ↔ Fargate, Fargate ↔ RDS PostgreSQL, Fargate ↔ Redis
   - IAM: Task Execution Role(ECR pull, Logs), Task Role(DDB/S3/Bedrock/Secrets read)
-  - CloudWatch Log Group + Container Insights
-  - X-Ray daemon 또는 sidecar
+  - CloudWatch Log Group
+  - Container Insights / X-Ray는 비용과 구현 범위상 기본 OFF. 필요 시 후속 hardening으로 별도 ADR에서 활성화
 
 ### CI/CD
 
@@ -102,7 +102,7 @@ Dashboard API를 **ECS Fargate 기반 컨테이너 서비스**로 운영한다. 
 
 - ADR 0007 "Dashboard API Lambda" 부분: supersede
 - ADR 0007 "Lambda data processor" 부분: 그대로 유지
-- ADR 0007 "Lambda Powertools / 단위 테스트 / X-Ray" 같은 깊이 보강 항목 중 일부(X-Ray 분산 추적, JSON Schema 검증, 단위 테스트)는 컨테이너 Backend에서도 동일하게 적용
+- ADR 0007 "Lambda Powertools / 단위 테스트 / X-Ray" 같은 깊이 보강 항목 중 단위 테스트와 계약 검증은 컨테이너 Backend에 적용한다. X-Ray 분산 추적은 현 운영 기본값이 아니며 후속 hardening 항목으로 둔다.
 
 ### ADR 0011과의 관계
 
@@ -140,6 +140,6 @@ Dashboard API를 **ECS Fargate 기반 컨테이너 서비스**로 운영한다. 
 - `curl https://api.<도메인>/healthz` → 200 OK
 - `curl https://api.<도메인>/api/factories` → JWT 미인증 시 401, 인증 시 200
 - WebSocket 연결 테스트: `wscat -c wss://api.<도메인>/ws/factories/factory-a` → factory-a 상태 push 수신
-- CloudWatch Container Insights에 ECS Task 메트릭 수집
-- X-Ray service map: ALB → ECS → DDB/RDS PostgreSQL/Redis 표시
+- CloudWatch Logs에 backend request/error 로그 수집
+- Container Insights / X-Ray는 기본 OFF 상태를 확인하고, 활성화가 필요하면 비용 baseline과 함께 후속 ADR로 결정
 - destroy 후 `aws ecs list-clusters`에 잔존 자원 없음 + NAT GW 비용 0 회복
