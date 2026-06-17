@@ -143,7 +143,7 @@ factory-b / factory-c
                             v
                     Data / Dashboard VPC
         +------------------------------------------------+
-        | Route53 | ALB | WAF/Auth | Dashboard Web/API    |
+        | Route53 | CloudFront/ALB | Auth | Dashboard Web/API |
         +------------------------------------------------+
              ^              ^              ^
              |              |              |
@@ -695,7 +695,7 @@ full status: 30초
 
 ### Dashboard Access
 
-- [ ] Route53 -> ALB -> WAF/Auth -> Dashboard Web/API 접근 경로가 보인다.
+- [ ] Route53 -> CloudFront/ALB -> Auth -> Dashboard Web/API 접근 경로가 보인다. WAF/Shield는 후속 보안 강화 후보로 분리한다.
 - [ ] Dashboard VPC와 Control VPC 사이에 VPC Peering/TGW가 없다.
 - [ ] Dashboard API가 DynamoDB LATEST/HISTORY와 S3 processed만 read-only로 조회한다.
 - [ ] Tailscale은 Dashboard 접근망이 아니라 Control Plane 접근망으로 구분된다.

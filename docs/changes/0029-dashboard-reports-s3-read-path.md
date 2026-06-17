@@ -16,7 +16,7 @@ ID:        0029
   - `GET /reports` → `ListObjectsV2(Prefix="reports/daily/")`로 객체를 나열하고 `report_date`/`factory_id`/`s3_key`/`last_modified`/`size_bytes`를 `report_date` 내림차순으로 반환.
   - `GET /reports/{report_date}/{factory_id}` → `GetObject`로 `reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md`를 읽어 `text/markdown` 본문 반환. 없으면 HTTP 404.
 - ECS task role IAM은 `reports/daily/*` 한정 `s3:ListBucket`과 `reports/*` `s3:GetObject`를 허용한다(`infra/data-dashboard/ecs.tf`).
-- Dashboard Web의 ReportsPage는 공장·날짜 직접 선택 기반으로 S3 Markdown을 받아 자체 Markdown 파서로 렌더링하고, PDF(브라우저 인쇄)/Word(.doc) 내보내기를 제공한다. 저장된 보고서 목록 카드는 페이지 단순화 과정에서 제거됐다.
+- Dashboard Web의 ReportsPage는 공장·날짜 직접 선택 기반으로 S3 Markdown을 받아 자체 Markdown 파서로 렌더링하고, PDF(브라우저 인쇄)/Word(`.docx`) 내보내기를 제공한다. 저장된 보고서 목록 카드는 페이지 단순화 과정에서 제거됐다.
 - 보고서 **본문 생성기**(lambda-report-generator, ADR 0016 Bedrock)는 여전히 팀원/후속 작업이다. 현재 S3에 객체가 없을 수 있으며, 그 경우 `/reports`는 빈 배열, 본문 조회는 404다.
 
 ## 변경 이유

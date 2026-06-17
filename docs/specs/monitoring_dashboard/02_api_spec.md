@@ -111,7 +111,7 @@ Authorization: Bearer <Cognito Access Token>
   | `last_modified` | object LastModified (ISO-8601) |
   | `size_bytes` | object size |
 
-- `GET /reports/{report_date}/{factory_id}` 응답: `text/markdown` 본문(plain text). Frontend ReportsPage가 자체 Markdown 파서로 렌더링하고 PDF(인쇄)/Word(.doc) 내보내기를 제공한다.
+- `GET /reports/{report_date}/{factory_id}` 응답: `text/markdown` 본문(plain text). Frontend ReportsPage가 자체 Markdown 파서로 렌더링하고 PDF(인쇄)/Word(`.docx`) 내보내기를 제공한다.
 - ADR 0029 참조. 근거 요구사항: FR-DASH-06, FR-DATA-07/08.
 
 ### Cloud Infra Status API (계획 — BE/FE 계약은 `06_cloud_infra_view.md`)

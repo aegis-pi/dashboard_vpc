@@ -1,7 +1,10 @@
 # Change Records
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-17
+
+수정 이력:
+- 2026-06-17  실제 `docs/changes/00*.md` 목록과 0034/0035 코드 반영 상태 기준으로 인덱스 정합성 갱신.
 
 ## 목적
 
@@ -27,7 +30,7 @@
 | 0005 | Workstream split: team -> 2번 Control/Management VPC, this env -> 1번 Data/Dashboard VPC | accepted | 2026-05-15 | M3~M6, 작업 환경 분리 |
 | 0006 | Dashboard frontend: Vite + React 정적 SPA + S3/CloudFront | accepted | 2026-05-15 | M6, frontend, 1번 VPC |
 | 0007 | Dashboard API runtime: Lambda + API Gateway, Lambda는 VPC 밖 | Dashboard API 부분 superseded by 0012 / Lambda data processor 부분 accepted | 2026-05-15 | M6, Lambda, 1번 VPC |
-| 0008 | Dashboard 인증: Cognito User Pool (관리자 전용) + API Gateway Authorizer | accepted | 2026-05-15 | M6, 인증/인가 |
+| 0008 | Dashboard 인증: Cognito User Pool (관리자 전용). API 검증은 0012/0031 이후 ALB+ECS 앱 레벨 JWT/RDS RBAC로 정정 | accepted, amended by 0012/0031 | 2026-05-15 | M6, 인증/인가 |
 | 0009 | S3 저장소: `aegis-bucket-data` 단일 bucket + prefix 분리 | accepted | 2026-05-15 | M4, S3, 워크스트림 합류 |
 | 0010 | Dashboard 도메인: Gabia 신규 + Route53 위임 + Admin UI 도메인과 분리 | accepted | 2026-05-15 | M6, 도메인/DNS |
 | 0011 | 1번 Data/Dashboard VPC NAT Gateway 제거 | superseded by 0012 | 2026-05-15 | M4/M6, 1번 VPC 비용/네트워크 |
@@ -35,7 +38,7 @@
 | 0013 | 메타데이터 저장소: Aurora Serverless v2 PostgreSQL | superseded by 0017 | 2026-05-18 | M6, 1번 VPC, 관계형 DB |
 | 0014 | 실시간 캐시 + Pub/Sub: ElastiCache Redis | accepted | 2026-05-18 | M6, 1번 VPC, 실시간 |
 | 0015 | Dashboard 실시간 푸시: WebSocket + DynamoDB Streams | accepted | 2026-05-18 | M6, 실시간 통신, DDB table 기준은 0022 |
-| 0016 | LLM 일간 보고서: Amazon Bedrock + EventBridge schedule | accepted | 2026-05-18 | M6, AI/LLM, 보고 자동화 |
+| 0016 | LLM 일간 보고서: Amazon Bedrock + EventBridge schedule | accepted, generator deferred; S3 조회는 0029 구현 | 2026-05-18 | M6, AI/LLM, 보고 자동화 |
 | 0017 | 메타데이터 저장소: RDS PostgreSQL | accepted | 2026-05-19 | M6, 1번 VPC, 관계형 DB, 비용 |
 | 0018 | IoT Topic Rule 확장: factory-a 단일 구독 → factory-c 추가 구독 | accepted | 2026-05-19 | M4 데이터 평면, M5 factory-c, 워크스트림 A↔B 합류 |
 | 0019 | factory-c 토폴로지: single-node → master + worker (2-VM K3s cluster) | accepted | 2026-05-19 | M5 VM Spoke 확장, factory-c testbed, 시연 표현 |
@@ -52,8 +55,8 @@
 | 0030 | ECS backend right-sizing(0.5→1 vCPU) + Application Auto Scaling(min 2, ALBRequestCountPerTarget 40 + CPU 50%) | accepted | 2026-06-04 | M6, infra/data-dashboard ECS, 비용 baseline |
 | 0031 | Dashboard RBAC 사용자 관리: Cognito 로그인 + RDS 권한 모델 | accepted | 2026-06-04 | M6, apps/dashboard-backend/web, Cognito, RDS PostgreSQL |
 | 0032 | 아키텍처 Overview 다이어그램 확정: `re4~re7` 통합 → 단일 overview, Phase 1 Step 0~10 반영 | accepted | 2026-06-08 | docs/architecture overview, M4/M6 시각화, ADR 0016~0031 매핑 |
-| 0033 | 챗봇 데이터 QA 아키텍처: Tool-based QA + 제한적 RAG, 결정형 라우팅 우선, Bedrock LLM은 evidence 설명 계층 | accepted | 2026-06-08 | M6, apps/dashboard-backend(/chat)/web, Bedrock, ECS IAM, DDB/S3/RDS, (후속)image 합류 |
-| 0034 | 챗봇 LLM 라우팅: 결정형 파서 앞에 LLM Resolve(Converse tool-use, Haiku) 추가 + 규칙 fallback + spike_check 도구. ADR 0033 후속 옵션 채택 | proposed | 2026-06-09 | M6, apps/dashboard-backend(/chat: chat·bedrock·router·config), Bedrock Converse 1콜, 비용 |
+| 0033 | 챗봇 데이터 QA 아키텍처: Tool-based QA + 제한적 RAG, 결정형 라우팅 우선, Bedrock LLM은 evidence 설명 계층 | accepted | 2026-06-08 | M6, apps/dashboard-backend(/chat)/web, Bedrock, ECS IAM, DDB/S3/RDS/image_snapshot. 이미지 생산은 워크스트림 A 합류 |
+| 0034 | 챗봇 LLM 라우팅: 결정형 파서 앞에 LLM Resolve(Converse tool-use) 추가 + 규칙 fallback + spike_check 도구. 모델 기본값은 ADR 0035가 Nova로 후속 보정 | accepted | 2026-06-09 | M6, apps/dashboard-backend(/chat: chat·bedrock·router·config), apps/dashboard-web(/chat), Bedrock Converse 1콜, 비용 |
 | 0035 | AI 채팅 Bedrock 모델 평가: Claude 2-tier에서 Amazon Nova profile로 전환 | accepted | 2026-06-11 | M6, apps/dashboard-backend(/chat), infra/data-dashboard ECS env/IAM, Bedrock 비용 |
 
 ## 파일 형식

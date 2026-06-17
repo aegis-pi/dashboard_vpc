@@ -5,6 +5,7 @@
 관련 범위: M6 Dashboard, AI/LLM, 보고 자동화
 
 > 2026-05-18 갱신: 초안에서는 Phase 1.5(포트폴리오 확장 단계)로 표기했으나, Phase 1 통합 결정에 따라 Phase 1 배포 목표의 일부다.
+> 2026-06-17 구현 메모: Lambda report-generator/EventBridge 생성기는 아직 팀원/후속 작업이다. 현재 구현 완료 범위는 ADR 0029의 S3 `reports/daily/yyyy=.../mm=.../dd=.../{factory_id}/report.md` read-only 조회와 Dashboard Reports 화면이다. 대화형 AI Chat은 ADR 0033~0035에서 별도 구현됐다.
 
 ## 기존 계획
 
@@ -24,7 +25,7 @@
     → Lambda report-generator
         → 지난 24h DDB HISTORY + S3 processed 집계
         → Bedrock (Claude 3 Haiku) API 호출 (한국어 요약)
-        → 결과를 S3 `reports/<YYYY-MM-DD>.md` 저장
+        → 결과를 S3 `reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md` 저장
         → DynamoDB `aegis-daily-report`에 메타 저장
     → 사용자: Dashboard에서 "일간 보고서" 탭으로 열람
 
@@ -119,13 +120,13 @@
   - PK: `report_date` (YYYY-MM-DD)
   - SK: `factory_id`
   - Attribute: `s3_key`, `summary`, `generated_at`, `model_id`, `tokens_in`, `tokens_out`
-- S3 prefix 추가: `aegis-bucket-data/reports/YYYY-MM-DD/<factory_id>.md`
+- S3 prefix 추가: `aegis-bucket-data/reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md`
 - (선택) `aws_lambda_function` (`incident-summarizer`) for 이상 상황 즉시 요약
 
 ### Backend / Frontend
 
-- Backend: `GET /api/reports?date=YYYY-MM-DD&factory_id=...` → S3 markdown 반환
-- Frontend: 보고서 탭, Markdown 렌더링 (`react-markdown`)
+- Backend: `GET /reports`, `GET /reports/{report_date}/{factory_id}` → S3 markdown list/get
+- Frontend: 보고서 탭, Markdown 렌더링 + PDF/Word(`.docx`) 내보내기
 
 ### 비용
 
@@ -139,7 +140,7 @@
 
 ### 명시적 비채택
 
-- 실시간 LLM 챗봇 → Phase 1 범위 외, RAG·context 관리 복잡도 ↑
+- 실시간 LLM 챗봇 → 당시에는 Phase 1 범위 외로 두었으나, 이후 ADR 0033~0035에서 `/chat/query` 데이터 QA로 별도 구현
 - Sonnet/Opus 등 상위 모델 → 보고서 품질 충분 시 비용 우위, 필요 시 ADR로 모델 교체
 - AWS Comprehend (감성 분석) → 자연어 요약 목적과 부적합
 - Step Functions으로 다단계 LLM 파이프라인 → Phase 1 범위에서 과잉, 단일 Lambda로 충분
@@ -157,7 +158,7 @@
 - `docs/architecture/drawio/03_re6_workstream_b_enhanced.drawio` (Bedrock 박스 + EventBridge)
 - `docs/planning/16_data_dashboard_vpc_workplan.md` (Phase 1 구현 순서에 report-generator)
 - `docs/planning/17_expansion_roadmap.md` (Phase 1 트리거 표)
-- `docs/specs/monitoring_dashboard/02_api_spec.md` (`/api/reports` endpoint)
+- `docs/specs/monitoring_dashboard/02_api_spec.md` (`/reports`, `/reports/{report_date}/{factory_id}` endpoint)
 - `docs/ops/15_aws_cost_baseline.md` (Bedrock 호출 비용)
 
 ## 검증
@@ -165,7 +166,7 @@
 - `terraform plan`에 Lambda report-generator + EventBridge Scheduler + DDB 테이블 포함
 - 수동 invoke: `aws lambda invoke --function-name aegis-report-generator out.json` → S3에 보고서 파일 생성
 - 스케줄 실행: 다음 09:00 KST에 자동 생성 (CloudWatch Logs로 확인)
-- Backend `GET /api/reports?date=YYYY-MM-DD` → 200 + Markdown 반환
+- Backend `GET /reports/{report_date}/{factory_id}` → 200 + Markdown 반환
 - Frontend 보고서 탭에 Markdown 정상 렌더링
 - IAM 검증: report-generator Role이 Bedrock InvokeModel 외 권한 없음
 - 비용 모니터링: 첫 7일 운영 후 실제 Bedrock 호출 비용이 예상치 ($1/월) 안에 있는지 Cost Explorer로 확인

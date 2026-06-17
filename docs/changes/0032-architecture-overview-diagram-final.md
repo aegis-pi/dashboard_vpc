@@ -31,10 +31,10 @@
 
 | 영역 | 구성 | 근거 |
 | --- | --- | --- |
-| Dashboard Access | Browser → Cognito(Hosted UI + Admin API) → CloudFront+WAF → S3 SPA(dashboard-web) | 0006, 0008, 0031 |
+| Dashboard Access | Browser → Cognito(Hosted UI + Admin API) → CloudFront/S3 SPA + ALB/API Backend | 0006, 0008, 0012, 0031 |
 | CI/CD | GitHub Actions → ECR(image) / → S3 SPA `OIDC: S3 배포 + CF invalidation` | 0023 |
 | Data Plane | IoT Core(MQTT/Rules) → Lambda data processor → DynamoDB(`LATEST`/`HISTORY 48h`/`GRAPH#5M`/`CLOUD#infra`/Streams) + S3 raw/processed/reports | 0020, 0021, 0025, 0026 |
-| Report Generator | Lambda report generator(factory + cloud-infra 일간) → Bedrock Claude 3 Haiku | 0016 |
+| Report Generator | Lambda report generator(factory + cloud-infra 일간) → Bedrock. 현재 생성기는 후속/미구현, Dashboard S3 reports 조회는 0029 구현 | 0016, 0029 |
 | CloudInfra Collectors | EventBridge(schedule) → Fast(1m: ECS·ALB·Lambda·DDB·Redis·RDS·SQS·CloudFront) / Slow(5m: EKS·NodeGroup·ASG·K8s(node/pod)·ArgoCD·S3) → DDB `CLOUD#infra` | 0027 |
 | 1번 VPC Backend | ALB(api HTTPS/JWT) → ECS Fargate Backend(FastAPI · x2 AutoScaling) → ElastiCache Redis / RDS PostgreSQL(factory 메타 · RBAC user/access · audit_log) | 0012, 0013→0017, 0030, 0031 |
 | Realtime | DynamoDB Streams → Lambda notifier → Redis PUBLISH → WebSocket Push. notifier 실패 → SQS DLQ(종착 싱크) | 0014, 0015, 0022 |
@@ -49,7 +49,7 @@
 - **Cognito Admin API** 라벨, **RDS RBAC** 테이블(`app_user`/`user_factory_access`/`audit_log`) 명시 (0031)
 - **DynamoDB** 키 모델에 `GRAPH#5M`·`CLOUD#infra` 추가 (0025, 0026)
 - **ECS Fargate Backend** `x2 AutoScaling` 표기 (0030)
-- **Report Generator** 그룹 박스로 일간 보고서 경로 묶음 (0016)
+- **Report Generator** 그룹 박스로 일간 보고서 목표 경로 묶음 (0016). 현재 구현 완료 범위는 S3 `reports/daily/` 조회(0029)
 
 ## 변경 이유
 
@@ -73,4 +73,4 @@
 
 - drawio XML 유효성: `python3 -c "from lxml import etree; etree.parse('docs/architecture/drawio/agiespi_architecture_overview_final1.drawio')"` → valid
 - PNG export 정상 렌더(3945×3809), 4개 영역·Line Legend·신규 컴포넌트 라벨 육안 확인.
-- 표현된 각 컴포넌트가 근거 ADR 및 실제 구현(`apps/`, `infra/data-dashboard/`)과 일치함을 확인.
+- 표현된 각 컴포넌트가 근거 ADR 및 실제 구현(`apps/`, `infra/data-dashboard/`)과 일치함을 확인. Report Generator는 구현 완료가 아니라 후속 목표 그룹으로 해석한다.

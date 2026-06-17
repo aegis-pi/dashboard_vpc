@@ -1,8 +1,9 @@
 # Data Storage Pipeline and Formats
 
 상태: source of truth
-기준일: 2026-06-08
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17  Dashboard 이미지 스냅샷 조회 계약 추가. S3 `image_snapshot/factory_id=.../yyyy=.../mm=.../dd=.../hh=.../` prefix, `/image-snapshots`·`/image-snapshots/range` read-only API, ECS task role `image_snapshot/*` GetObject/ListBucket 기준을 반영.
   - 2026-06-08  Dashboard history 조회 기준 현행화: 10m trend 기본 limit 250, 1h 기본 limit 2000, 자동 refresh는 `since` delta merge 사용.
   - 2026-06-02  S3 Reports Path 섹션 추가. `reports/daily/yyyy=…/{factory_id}/report.md` 경로와 Dashboard Backend S3 조회 기준(ADR 0029) 반영.
   - 2026-06-01  GRAPH#5M Dashboard 응답에 센서 min 필드와 AI mean/max 분리 기준 추가. Environment History 6h/12h/24h 렌더링 기준 현행화.
@@ -21,6 +22,7 @@ S3 raw
 S3 processed
 S3 processed_agg (GRAPH#5M 보조 복사본)
 S3 reports/daily (일간 Markdown 보고서, Dashboard read-only)
+S3 image_snapshot (AI-triggered image review, Dashboard read-only)
 DynamoDB LATEST
 DynamoDB HISTORY#STATE  (short-term 실시간 buffer, TTL 2h 목표)
 DynamoDB GRAPH#5M       (5분 집계 버킷, TTL 48h)
@@ -56,6 +58,8 @@ Dashboard API/Web
   -> DynamoDB LATEST          (현재 상태 카드)
   -> DynamoDB HISTORY#STATE   (window=1h 그래프)
   -> DynamoDB GRAPH#5M        (window=6h/12h/24h 그래프)
+  -> S3 reports/daily         (보고서 조회)
+  -> S3 image_snapshot        (증빙 이미지 presigned URL 조회)
 ```
 
 역할:
@@ -72,6 +76,7 @@ Dashboard API/Web
 | S3 raw | Edge data-plane 원본 JSON 장기 보존 |
 | S3 processed | Lambda 계산 결과와 상태 요약 이력 보존 |
 | S3 processed_agg | GRAPH#5M 보조 JSON 복사본. 장기 재처리용 |
+| S3 image_snapshot | AI 탐지 이벤트와 연동되는 증빙 이미지 객체. Dashboard는 read-only presigned URL로 조회 |
 
 ## 저장 계층 구분
 
@@ -80,6 +85,7 @@ Dashboard API/Web
 | `S3 raw` | Edge data-plane 원본 `factory_state`, `infra_state` | 감사, 재처리, 원본 확인 | 장기 보존 |
 | `S3 processed` | Lambda가 계산한 Risk 결과, pipeline summary, status summary | 리포트, 장기 이력, 재처리 비교 | 장기 보존 |
 | `S3 processed_agg` | GraphAggregator5m이 생성한 GRAPH#5M 보조 JSON | 장기 재처리, 검증 | 장기 보존 |
+| `S3 image_snapshot` | AI 탐지 이벤트 증빙 이미지 | 운영자 확인, 챗봇 evidence | 장기 보존 또는 별도 lifecycle |
 | `DynamoDB LATEST` | 공장별 현재 상태 1건 | 대시보드 상단 카드, 현재 노드 상태 | 계속 overwrite |
 | `DynamoDB HISTORY#STATE` | 최근 1h 그래프용 raw snapshot buffer | window=1h 그래프 | TTL 2h (현재 48h 유지 중) |
 | `DynamoDB GRAPH#5M` | 5분 avg/min/max 집계 버킷 | window=6h/12h/24h 그래프 | TTL 48h |
@@ -183,6 +189,29 @@ reports/daily/yyyy=2026/mm=06/dd=01/factory-a/report.md
 - Dashboard Backend는 이 경로를 read-only로 조회한다(ADR 0029). `GET /reports`는 `reports/daily/` prefix를 `ListObjectsV2`로 나열하고, `GET /reports/{date}/{factory_id}`는 위 key를 `GetObject`로 읽어 `text/markdown`으로 반환한다.
 - ECS task role IAM: `reports/daily/*` 한정 `s3:ListBucket` + `reports/*` `s3:GetObject` (`docs/changes/0028`/`0029`, `infra/data-dashboard/ecs.tf`).
 - 보고서는 `aegis-daily-report` DynamoDB table이 아니라 S3가 1차 조회 대상이다. DDB `aegis-daily-report` table은 잔존하나 Dashboard 조회 경로에서 사용하지 않는다.
+
+## S3 Image Snapshot Path
+
+AI 탐지 이벤트 증빙 이미지는 `processed/`와 별도 prefix인 `image_snapshot/`에 저장한다.
+
+경로:
+
+```text
+image_snapshot/factory_id={factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{image_file}
+```
+
+예시:
+
+```text
+image_snapshot/factory_id=factory-a/yyyy=2026/mm=06/dd=09/hh=14/fall_20260609T143012.jpg
+```
+
+- Dashboard Backend는 이 경로를 read-only로 조회한다.
+- `GET /image-snapshots/range?factory_id=...`는 해당 공장의 S3 partition 범위를 반환해 화면의 시간 선택 범위를 제한한다.
+- `GET /image-snapshots?factory_id=...&start=...&end=...&limit=...`는 시간 범위 안의 이미지 객체를 나열하고, 각 객체에 짧은 만료 시간의 presigned URL을 붙여 반환한다.
+- API 접근은 system-view 권한이 필요하다. 공장별 일반 권한만 있는 사용자는 이미지 스냅샷 목록과 URL을 조회할 수 없다.
+- ECS task role IAM: `image_snapshot/*` `s3:GetObject` + `image_snapshot/*` prefix 한정 `s3:ListBucket` (`infra/data-dashboard/ecs.tf`).
+- 파일명에 ISO/compact timestamp가 있으면 파일명 timestamp로 범위 필터링하고, 없으면 `yyyy/mm/dd/hh` partition 시간으로 보수적으로 필터링한다.
 
 ## DynamoDB Table
 

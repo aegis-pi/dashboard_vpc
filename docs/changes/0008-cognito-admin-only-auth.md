@@ -1,8 +1,10 @@
-# 0008. Dashboard 인증: Cognito User Pool (관리자 전용) + API Gateway Cognito Authorizer
+# 0008. Dashboard 인증: Cognito User Pool (관리자 전용)
 
-상태: accepted
+상태: accepted, amended by ADR 0012/0031
 결정일: 2026-05-15
 관련 범위: M6 Risk Twin/Dashboard, 1번 Data/Dashboard VPC, 인증/인가
+
+> 현재 구현 메모(2026-06-17): API Gateway 기반 Dashboard API는 ADR 0012에서 ECS Fargate + ALB로 supersede됐다. Cognito User Pool/Hosted UI/관리자 생성 정책은 유지하되, API 인증·인가는 FastAPI backend가 JWKS 기반 앱 레벨 JWT 검증을 수행하고 RDS RBAC(`app_user`, `user_factory_access`)로 공장별 접근을 제한한다.
 
 ## 기존 계획
 
@@ -29,19 +31,19 @@ Cognito User Pool 설정:
 - 사용자 추가는 본인이 `aws cognito-idp admin-create-user` 또는 Terraform `aws_cognito_user`로만 수행한다.
 - 시연 시 멘토용 임시 사용자 추가 → 시연 후 disable.
 
-### 인가 = API Gateway Cognito Authorizer
+### 인가 = FastAPI 앱 레벨 JWT 검증 + RDS RBAC
 
 ```text
 SPA
   -> Cognito Hosted UI 로그인 (OIDC PKCE)
   -> JWT (Access Token) 획득
-  -> Authorization: Bearer <JWT>로 API Gateway 호출
-  -> API Gateway Cognito Authorizer가 JWT 서명/만료/audience 검증
-  -> 통과 시 Lambda 실행
+  -> Authorization: Bearer <JWT>로 ALB/ECS FastAPI 호출
+  -> Backend가 JWKS로 JWT 서명/만료/audience 검증
+  -> RDS RBAC로 사용자-공장 권한 확인
 ```
 
-- API Gateway가 JWT 검증을 자동 수행 → Lambda 코드에 인증 로직 0줄
-- Lambda는 검증된 claim(`sub`, `email`, `cognito:groups`)을 event context로 받음
+- API Gateway Cognito Authorizer 초안은 ADR 0012 이후 사용하지 않는다.
+- Backend는 검증된 claim(`sub`, `email`)을 RDS metadata 사용자와 매칭한다.
 
 ### Hosted UI 사용
 
@@ -54,7 +56,7 @@ SPA
 
 - 관제 시스템이라 사용자가 1~5명 규모. Self sign-up이 필요하지 않음
 - AWS 생태계 통합 기준 Cognito가 가장 자연스러움 (외부 IdP 도입 부담 큼)
-- API Gateway Cognito Authorizer = SPA + JWT bearer 패턴의 업계 표준
+- SPA + Cognito Hosted UI + JWT bearer 패턴은 유지하되, 검증 위치는 ECS Backend로 이동했다.
 - ALB built-in 인증은 ALB가 인증 경로에 있을 때만 의미 있음 → 정적 SPA + CloudFront 구성에서는 부자연스러움
 - Hosted UI는 OAuth2/OIDC PKCE flow를 자동 처리 → 보안 구현 실수 회피
 - MFA TOTP를 도입해 "관리자 콘솔이라 MFA를 강제했다"는 보안 마인드 시연
@@ -87,7 +89,7 @@ SPA
 - Self sign-up 활성화 → 채택 안 함 (관제 시스템 정체성과 충돌)
 - WAF IP 화이트리스트로 인증 대체 → 시연 시 IP 추가 운영 부담 큼, 보안 신호도 약함
 - Auth0/Firebase 외부 IdP → AWS 일관성 깨짐, 비용 추가
-- API Gateway Lambda Authorizer로 자체 토큰 검증 → 불필요한 코드, Cognito Authorizer로 충분
+- API Gateway Lambda Authorizer로 자체 토큰 검증 → ADR 0012 이후 API Gateway 자체를 Dashboard API 경로에서 사용하지 않음
 
 ## 업데이트 필요한 문서
 
@@ -101,6 +103,6 @@ SPA
 
 - Cognito User Pool 설정 확인: `AdminCreateUserConfig.AllowAdminCreateUserOnly = true`
 - Hosted UI 접속 시 "Sign up" 링크가 표시되지 않는지 확인
-- 미인증 상태로 API Gateway 호출 시 401 반환 확인
-- 유효 JWT로 호출 시 200 + Lambda event에 claim이 전달되는지 확인
+- 미인증 상태로 FastAPI endpoint 호출 시 401 반환 확인
+- 유효 JWT로 호출 시 200 + backend request context에 claim이 전달되는지 확인
 - 본인 계정에 MFA가 설정되고 로그인 시 TOTP 입력이 강제되는지 확인

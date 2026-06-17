@@ -1,8 +1,8 @@
 ID:        0034
 제목:      llm-routing-for-chat
-상태:      proposed
+상태:      accepted
 결정일:    2026-06-09
-영향 범위: M6, apps/dashboard-backend(/chat: services/chat·bedrock, routers/chat, config), Bedrock(Converse tool-use 추가 1콜), 비용 baseline. 데이터 합류 지점(IoT/DDB/S3/RDS) 무변경.
+영향 범위: M6, apps/dashboard-backend(/chat: services/chat·bedrock, routers/chat, config), apps/dashboard-web(/chat), Bedrock(Converse tool-use 추가 1콜), 비용 baseline. 데이터 합류 지점(IoT/DDB/S3/RDS) 무변경.
 
 > 근거: 대화 2026-06-09 + 외부 모범사례 조사(function calling / agentic RAG / 경량 라우터). ADR 0033의 "결정형 라우팅 우선, LLM tool-calling은 후속 옵션"에서 **후속 옵션을 채택**하는 후속 ADR이다.
 
@@ -12,6 +12,7 @@ ID:        0034
 | --- | --- | --- |
 | 2026-06-09 | v0.1 | 최초 작성(proposed). Phase 1(LLM Resolve) + Phase 2(spike_check) 설계 확정. |
 | 2026-06-09 | v0.2 | 절대 구간(interval) time.mode 추가 + 규칙 파서 spike/interval 보강(아래 §결정 4). "오전 9시~10시"가 trailing 1h로 오해석되던 버그 수정. |
+| 2026-06-17 | v0.3 | 현재 코드 기준으로 accepted 상태 정정. `tests/test_chat_resolve.py`, `tests/test_chat_spike.py`, `/chat/query` 응답 `router` 필드 구현 확인. 모델 기본값은 ADR 0035(Nova 전환)가 후속으로 supersede. |
 
 ## 기존 계획
 
@@ -26,13 +27,13 @@ ADR 0033의 데이터 경로(RBAC → 결정론적 도구 → Evidence → LLM �
 
 ```
 query
- ├─(1) LLM Resolve (Haiku 4.5, Converse tool-use, toolChoice 강제)   ← 신규
+ ├─(1) LLM Resolve (ADR 0035 이후 Nova Micro, Converse tool-use, toolChoice 강제) ← 신규
  │      → resolve_query(intent, factory_id, time{mode,anchor_kst,window,start_kst,end_kst}, metric, threshold, comparison)
  ├─(2) map_resolution + 검증(factory 패턴·시간 미래/범위 clamp·enum)  ← 신규(환각 게이트)
  ├─(3) RBAC factory-scope 체크                                        ← 기존 유지(도구 실행 前)
  ├─(4) 결정론적 데이터 도구(DDB get_latest/get_history + detect_spikes) ← Phase 2 도구 추가
  │      → Evidence(confirmed/inferred/missing)                        ← 기존 유지
- └─(5) LLM Synthesis(Haiku/Sonnet 사용자 선택)                        ← 기존 유지
+ └─(5) LLM Synthesis(ADR 0035 이후 Nova Pro 기본값, rule fallback 유지)         ← 기존 유지
 ```
 
 ### §10 결정 (확정)
@@ -56,10 +57,10 @@ query
 
 | 단계 | 모델 | 근거 |
 | --- | --- | --- |
-| Resolve(추출/라우팅) | Haiku 4.5(`bedrock_resolve_model`, 기본=fast와 동일) | 분류·추출 작업, 추론 불필요, 빠름·저렴 |
-| Synthesis(설명) | Haiku/Sonnet 4.6 사용자 선택(현행 유지) | 근거 위 nuance 설명 |
+| Resolve(추출/라우팅) | ADR 0035 이후 기본값 `apac.amazon.nova-micro-v1:0` | 분류·추출 작업, 추론 불필요, 빠름·저렴 |
+| Synthesis(설명) | ADR 0035 이후 기본값 fast/precise 모두 `apac.amazon.nova-pro-v1:0` | 근거 위 nuance 설명. 비용 최적화/품질 최우선 조합은 ADR 0035 참조 |
 
-- 쿼리당 +1 Haiku Converse 호출(입력 ~1–2K/출력 ~150 토큰). 비용·지연 영향은 `docs/ops/15_aws_cost_baseline.md`에 반영.
+- 쿼리당 +1 resolve Converse 호출(입력 ~1–2K/출력 ~150 토큰). 2026-06-11 이후 기본 모델은 ADR 0035의 Nova Micro이며, 비용·지연 영향은 `docs/ops/15_aws_cost_baseline.md`에 반영.
 
 ## 단계 (Phase)
 

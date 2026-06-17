@@ -3,6 +3,7 @@
 상태: draft
 기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17 v1.1  ADR 0033/0035 AI 채팅 데이터 QA와 S3 image_snapshot read path 추가. Bedrock Nova resolve/explain, S3 processed_agg/reports/image_snapshot evidence 조회 기준을 반영.
   - 2026-06-17 v1.0  ADR 0030 이후 Dashboard Backend ECS task sizing을 1 vCPU / 2 GB, desired/min 2 기준으로 정정.
   - 2026-06-02 v0.9  LLM 보고서 섹션 현행화. Dashboard 보고서 조회 경로(`/reports`, S3 `reports/daily/`)는 구현 완료(ADR 0029), 생성기는 팀원/후속으로 구분.
   - 2026-05-26 v0.8  Step 8을 운영용 Frontend Vite + React 마이그레이션으로 재정의. LLM 일간 보고서는 팀원/후속 목표로 분리.
@@ -141,6 +142,25 @@ Dashboard Web                                    ← 조회 경로 구현 완료
 
 - Dashboard Backend 조회 경로(`/reports`, `/reports/{date}/{factory_id}`)와 S3 `reports/daily/` object key 계약은 ADR 0029로 확정·구현됐다. 생성기가 동일 경로에 `report.md`를 쓰면 추가 배포 없이 표시된다.
 - Dashboard 조회는 DynamoDB `aegis-daily-report`가 아니라 S3를 1차 대상으로 한다(메타 table은 잔존하나 조회 경로에서 미사용).
+
+### AI 채팅 / 이미지 스냅샷 (구현 완료, ADR 0033/0035)
+
+```text
+Dashboard Web /chat
+    -> ALB -> ECS Backend /chat/query
+        -> LLM resolve (Bedrock Nova Micro)
+        -> deterministic data tools (DDB LATEST/HISTORY/GRAPH#5M, S3 processed/processed_agg/reports/image_snapshot)
+        -> LLM explain (Bedrock Nova Pro) or rule fallback
+
+Dashboard Web /image-snapshots
+    -> ALB -> ECS Backend /image-snapshots, /image-snapshots/range
+        -> S3 image_snapshot/factory_id={factory_id}/yyyy=.../mm=.../dd=.../hh=...
+        -> presigned URL 반환
+```
+
+- `/chat/query`는 intent/factory/time을 먼저 구조화한 뒤 RBAC를 재검증하고 DDB/S3 evidence를 조회한다.
+- `/image-snapshots`는 system-view 권한 사용자만 접근한다.
+- 모델 ID는 backend/Terraform 설정값이며 API 응답에는 `model_tier`만 노출한다.
 
 ### 합류 지점 / 팀 합의 영역
 
@@ -291,7 +311,7 @@ Terraform locals 권장:
 - Cognito User Pool + Hosted UI (관리자 전용, MFA Required)
 - Lambda data processor (IoT Rule trigger, 팀 합의 영역, 변경 없음)
 - Lambda report-generator (EventBridge schedule, Bedrock 호출, 팀원/후속)
-- Bedrock Claude 3 Haiku (팀원/후속)
+- Bedrock Nova Micro/Pro (AI 채팅 데이터 QA 구현 완료), 보고서 생성기용 Bedrock은 팀원/후속
 - EventBridge Scheduler (매일 09:00 KST 일간 보고서, 팀원/후속)
 - DynamoDB AEGIS-DynamoDB-FactoryStatus (LATEST + HISTORY, Streams 활성화)
 - DynamoDB aegis-daily-report (PK: report_date, SK: factory_id)
@@ -327,13 +347,13 @@ EventBridge Scheduler (cron 0 0 * * ? * UTC = 09:00 KST)
 Lambda report-generator
     ├── DynamoDB HISTORY (read, 지난 24h)
     ├── S3 processed (read, 추세·이벤트)
-    └── Bedrock Claude 3 Haiku (invoke, 한국어 자연어 요약)
+    └── Bedrock (invoke, 한국어 자연어 요약)
         │
         ▼
-    S3 reports/<YYYY-MM-DD>/<factory_id>.md
+    S3 reports/daily/yyyy={YYYY}/mm={MM}/dd={DD}/{factory_id}/report.md
     DynamoDB aegis-daily-report (메타)
 
-Dashboard 보고서 탭 -> ALB -> ECS Backend -> S3 reports/ (read) -> Markdown 렌더링
+Dashboard 보고서 탭 -> ALB -> ECS Backend -> S3 reports/daily/ (read) -> Markdown 렌더링
 ```
 
 ### 후속 (Phase 2~4)
@@ -500,30 +520,28 @@ ECS Fargate Dashboard Backend (FastAPI)     ADR 0012
 RDS PostgreSQL                              ADR 0017
 ElastiCache Redis (캐시 + Pub/Sub)           ADR 0014
 WebSocket 실시간 (DDB Streams + notifier)    ADR 0015
-Bedrock Claude 3 Haiku 일간 보고서           ADR 0016 (팀원/후속)
+Bedrock 일간 보고서                         ADR 0016 (팀원/후속)
 + 팀 합의 영역 (IoT Core, Lambda data processor, DDB/S3) 변경 없음
 ```
 
 ADR 0007 Dashboard API 부분과 ADR 0011 NAT GW 제거 결정은 ADR 0012로 supersede된다. ADR 0007 Lambda data processor 부분은 그대로 유효하다.
 
-운영 패턴은 데모 직전 `scripts/build/build-data-dashboard.sh`, 직후 `scripts/destroy/destroy-data-dashboard.sh` 사이클로 진행하며, 미가동 시 비용은 0에 수렴한다 (`docs/ops/15_aws_cost_baseline.md`).
+운영 패턴은 데모 직전 `scripts/build/build-data-dashboard.sh`, 직후 `scripts/destroy/destroy-data-dashboard.sh` 사이클로 진행한다. 미가동 시 VPC/NAT/ALB/ECS/RDS/Redis/Lambda 런타임 비용은 0에 수렴하지만, `infra/data-dashboard-permanent`/`infra/data-dashboard-dns` 영구 자원과 RDS final snapshot 비용은 남는다(`docs/ops/15_aws_cost_baseline.md`).
 
 ## 2026-05-26 수정 방향 (Step 6 완료 / Frontend 경로 구분)
 
 ### Dashboard Backend 구현 상태
 
 ```text
-완료 (로컬 구현):
-  apps/dashboard-backend/ — FastAPI (pytest 18 passed, docker build 통과)
-  REST: /healthz / /factories / /factories/{id} / /factories/{id}/history / /reports / /reports/{date}/{id}
+구현 완료:
+  apps/dashboard-backend/ — FastAPI
+  REST: /healthz / /readyz / /factories / /factories/{id} / /factories/{id}/history / /reports / /reports/{date}/{id} / /chat/query / /image-snapshots
   WebSocket: /ws/factories/{factory_id} (JWT via ?token= 파라미터)
-  Cognito JWT 앱 레벨 검증, AEGIS-DynamoDB-FactoryStatus 기준 DDB 조회
+  Cognito JWT 앱 레벨 검증, RDS RBAC, AEGIS-DynamoDB-FactoryStatus 기준 DDB 조회, S3 reports/image_snapshot/processed_agg 조회
 
-미배포 (Step 7 Terraform에서 완성):
-  ECR aegis/dashboard-backend repo
-  ECS Fargate Task Definition / Service
-  ALB HTTPS listener rule (api.<도메인>)
-  현재 ECS/ECR/ALB 비용 미발생
+배포/운영:
+  ECR aegis/dashboard-backend repo, ECS Fargate Task Definition / Service, ALB HTTPS listener rule은 구현·배포 검증 완료
+  현재는 2026-06-16 `infra/data-dashboard` destroy로 API/ECS/ALB runtime 비활성, 재빌드 시 복구
 ```
 
 ### Frontend 경로 구분 (필수)

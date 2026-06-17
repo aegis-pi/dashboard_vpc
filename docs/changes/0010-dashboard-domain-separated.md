@@ -28,10 +28,10 @@ Dashboard 공용 도메인은 **Gabia에서 신규 도메인 1개를 구매**해
   Hosted Zone:   신규 (infra/data-dashboard) — Route53
   ACM:
     us-east-1    CloudFront용 (필수, 글로벌)
-    ap-south-1   API Gateway용
+    ap-south-1   ALB/API용
   서브도메인:
     dashboard.<도메인>     CloudFront → S3 SPA
-    api.<도메인>           API Gateway custom domain
+    api.<도메인>           Route53 Alias → ALB
     auth.<도메인>          Cognito Hosted UI custom domain (선택)
 ```
 
@@ -65,8 +65,8 @@ Dashboard 공용 도메인은 **Gabia에서 신규 도메인 1개를 구매**해
 
 - `infra/data-dashboard/`에 신규 root 추가
   - `aws_route53_zone` (신규 hosted zone, 워크스트림 A 것과 분리)
-  - `aws_acm_certificate` 두 개 (us-east-1: CloudFront, ap-south-1: API GW)
-  - `aws_route53_record` (CloudFront/API GW Alias)
+  - `aws_acm_certificate` 두 개 (us-east-1: CloudFront, ap-south-1: ALB)
+  - `aws_route53_record` (CloudFront/ALB Alias)
 - 워크스트린 A의 `infra/hub/admin_ui_dns.tf`는 변경하지 않는다
 
 ### 운영 절차
@@ -84,7 +84,7 @@ Dashboard 공용 도메인은 **Gabia에서 신규 도메인 1개를 구매**해
 
 ### 보안
 
-- HTTPS 강제 (CloudFront default behavior + API Gateway TLS only)
+- HTTPS 강제 (CloudFront default behavior + ALB HTTPS listener)
 - Route53 hosted zone에 DNSSEC 적용은 후속 검토 (ACM/CloudFront 호환 확인 필요)
 
 ## 업데이트 필요한 문서
@@ -99,6 +99,6 @@ Dashboard 공용 도메인은 **Gabia에서 신규 도메인 1개를 구매**해
 
 - `dig NS <도메인>`이 Route53 NS 4개를 반환
 - `dashboard.<도메인>` 접속 시 CloudFront 응답 + 유효 ACM 인증서
-- `api.<도메인>` 접속 시 API Gateway custom domain 응답 + 유효 ACM 인증서
+- `api.<도메인>` 접속 시 ALB HTTPS 응답 + 유효 ACM 인증서
 - Cognito Hosted UI(`auth.<도메인>` 또는 기본 도메인)에서 OIDC redirect URI가 `dashboard.<도메인>`으로 정상 동작
 - 워크스트림 A의 `argocd.minsoo-tech.cloud` / `grafana.minsoo-tech.cloud`가 본 변경 후에도 영향 없이 동작

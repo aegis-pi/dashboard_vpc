@@ -2,9 +2,16 @@ ID:        0033
 제목:      chatbot-data-qa-architecture
 상태:      accepted
 결정일:    2026-06-08
-영향 범위: M6, apps/dashboard-backend(/chat), apps/dashboard-web, Bedrock(InvokeModel), ECS task role IAM, S3 reports/processed, DynamoDB LATEST/HISTORY#STATE/GRAPH#5M, RDS metadata, (후속) image snapshot 합류 지점
+영향 범위: M6, apps/dashboard-backend(/chat), apps/dashboard-web, Bedrock(InvokeModel/Converse), ECS task role IAM, S3 reports/processed/image_snapshot, DynamoDB LATEST/HISTORY#STATE/GRAPH#5M, RDS metadata. 이미지 생산(capture/upload)은 워크스트림 A 합류 지점, Dashboard 소비(read/presigned URL)는 구현 완료.
 
 > 근거 평가: 본 환경 평가 + Codex 평가 종합(대화 2026-06-08). 핵심 원칙은 "LLM이 데이터를 찾게 하지 말고, Backend가 RBAC 검증 후 데이터를 찾아 LLM에게 설명시킨다".
+
+## 수정 이력
+
+| 날짜 | 버전 | 요약 |
+| --- | --- | --- |
+| 2026-06-08 | v0.1 | 챗봇 데이터 QA 구조 accepted. |
+| 2026-06-17 | v0.2 | 현재 코드 기준으로 S3 `image_snapshot/` 조회 API와 `/chat/query` image_ref 소비 경로 구현 완료 상태를 반영. 이미지 생산 경로는 여전히 워크스트림 A 합류 지점으로 구분. |
 
 ## 기존 계획
 
@@ -27,7 +34,7 @@ ID:        0033
 | 공장/사용자 메타데이터 | RDS | structured query |
 | 일간 보고서 Markdown | S3 `reports/daily/` | 단순 검색 또는 경량 RAG (후속) |
 | 운영 문서/ADR/런북 | repo/문서 | RAG 적합 (후속) |
-| 이미지 | (후속) S3 image_snapshot + metadata | metadata 검색 + presigned URL, 명시 요청 시 multimodal |
+| 이미지 | S3 `image_snapshot/` 객체 | metadata/partition 검색 + presigned URL. Dashboard 소비 경로 구현 완료, multimodal 분석은 후속 |
 | "왜 위험했나" 추론 | 위 structured data | evidence 요약 + LLM reasoning |
 
 ### 2. 라우팅: 결정형(intent/time parser) 우선, LLM tool-calling은 후속 옵션
@@ -42,10 +49,11 @@ ADR 0016은 Claude 3 Haiku(`anthropic.claude-3-haiku-20240307-v1:0`)를 지정�
 
 | tier | 사용 intent | 모델(inference profile id) | 비고 |
 | --- | --- | --- | --- |
-| **fast**(기본) | current_status / history_trend / report | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | 현세대 Haiku, 저비용, 상태/추이 설명 |
-| **precise** | cause_analysis ("왜 위험했나") | `global.anthropic.claude-sonnet-4-6` | 추론 품질 우선 |
+| **resolve** | intent/factory/time 추출 | `apac.amazon.nova-micro-v1:0` | ADR 0035 이후 기본값. 빠르고 저렴한 구조화 추출 |
+| **fast**(기본) | current_status / history_trend / report | `apac.amazon.nova-pro-v1:0` | ADR 0035 이후 데모 기본값. 근거 없는 정상범위 단정 방지 |
+| **precise** | cause_analysis ("왜 위험했나") | `apac.amazon.nova-pro-v1:0` | ADR 0035 이후 품질 균형형 기본값 |
 
-- **실측(2026-06-08, account 611058323802, ap-south-1)**: 두 모델 모두 `bedrock-runtime:Converse` 호출 성공. 단 **on-demand 직접 호출 불가, inference profile 필수**(`inferenceTypesSupported = INFERENCE_PROFILE`). Haiku 4.5·Sonnet 4.6 모두 `apac.` 프로파일은 없고 `global.` 프로파일만 ACTIVE → cross-region 라우팅.
+- **실측(2026-06-08/11, account 611058323802, ap-south-1)**: Claude Haiku/Sonnet과 Nova 후보를 비교했고, ADR 0035에서 Nova Micro/Pro 조합을 기본값으로 채택했다. inference profile 기반 호출을 사용한다.
 - ADR 0016의 Claude 3 Haiku는 on-demand 가능하나 품질 사유로 비채택.
 - **모델 ID는 admin 설정(`BEDROCK_MODEL_FAST`/`BEDROCK_MODEL_PRECISE` env)에만 둔다.** API 응답은 tier 라벨(`fast`/`precise`)만 노출하고 raw model id는 노출하지 않는다.
 - 비채택: OpenAI/외부 API(IAM 통합 불가), 자체 호스팅 LLM(GPU 상시 비용 과잉) — ADR 0016 근거 동일.
@@ -81,18 +89,16 @@ Dashboard Web
 - 답변은 **"확인된 값"과 "추정"을 분리**해 표기한다(관제 도구 신뢰성 필수).
 - 데이터 누락 시 evidence에 명시하고, LLM이 임의 보간하지 않도록 프롬프트로 통제한다.
 
-### 6. 이미지: 소비(read) 계약만 본 환경에서 정의, 생산(capture)은 워크스트림 A 합의 후
+### 6. 이미지: 소비(read)는 Dashboard 구현 완료, 생산(capture)은 워크스트림 A 합의 후
 
-- 현재 카메라가 `available:false`라 표시할 이미지 자체가 없다. **Phase 1 기본 답변에는 이미지를 포함하지 않는다.**
-- 동작 규약(후속 활성화 시):
-  - 특정 시점 이미지가 있으면 답변 하단에 "관련 이미지 있음"으로 **표시만** 한다.
-  - 사용자가 클릭하면 Backend가 RBAC 확인 후 **presigned URL**을 발급한다. LLM에 이미지를 자동 전송하지 않는다.
-  - 사용자가 "그 이미지도 분석해줘"라고 **명시**할 때만 multimodal 모델로 보낸다.
-  - 원본은 S3, Dashboard에는 thumbnail/presigned URL, metadata는 DDB 또는 RDS.
+- 현재 Dashboard Backend는 `/image-snapshots/range`, `/image-snapshots`에서 S3 `image_snapshot/` 객체를 조회하고 presigned URL을 발급한다. 접근은 `can_view_system=true` 권한으로 제한한다.
+- `/chat/query`는 질문에 `사진/이미지/스냅샷/증빙` 키워드가 있고 공장·시간 범위가 해석되면 같은 S3 read 경로로 `image_ref`를 붙인다.
+- LLM에 이미지를 자동 전송하지 않는다. 현재 구현은 이미지 URL과 detection label을 증빙으로 보여주는 소비 경로이며, multimodal 이미지 분석은 후속이다.
+- 원본은 S3, Dashboard에는 presigned URL과 파생 metadata(`s3_key`, `captured_at`, `detection_type`)만 노출한다.
 - **이미지 데이터 계약(소비 측 기준, 박아둠)**:
 
 ```text
-image_snapshot/{factory_id}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.jpg
+image_snapshot/factory_id={factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{message_id}.jpg
 ```
 
 ```json
@@ -122,8 +128,8 @@ image_snapshot/{factory_id}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.jpg
 - **apps/dashboard-web**: `/chat` 독립 페이지를 Workspace에 추가. ChatGPT형 thread + 하단 composer, 공장 선택, 추천 질문, answer/evidence 렌더, generator/tier 라벨 표시. (운영 배포 완료)
 - **IAM (배포 시 필수, Terraform 구현 + 운영 적용 완료)**: ECS task role에 `bedrock:InvokeModel`/`bedrock:GetInferenceProfile` 추가. inference profile 사용이므로 **profile ARN + 프로파일이 라우팅하는 foundation-model ARN**을 함께 허용한다(`global.` 프로파일은 cross-region 라우팅 가능). 구현: `infra/data-dashboard/ecs.tf` + `variables.tf`, profile/FM resource pattern은 변수로 조정 가능. 2026-06-09 targeted apply로 task role policy 적용, IAM simulation allowed 확인.
 - **네트워크 egress (배포 시 필수, 현 구성 확인 완료)**: ECS는 private app subnet에서 `assign_public_ip=false`로 실행되고, private route table은 NAT Gateway 기본 경로를 보유한다. 따라서 Bedrock 호출은 현 Phase 1 NAT 경유로 가능하다. S3/DynamoDB는 gateway endpoint로 NAT 비용을 줄이고, Bedrock interface endpoint는 별도 비용이 있어 현 단계 비채택. NAT 제거 프로파일로 전환하면 `com.amazonaws.<region>.bedrock-runtime` VPC endpoint를 추가해야 한다.
-- **비용**: 상시 자원 없음(요청 기반 Bedrock 과금, fast=Haiku 4.5 / precise=Sonnet 4.6 token 단가). `docs/ops/15_aws_cost_baseline.md`에 tier별 단가·예상 호출량 항목 반영.
-- **이미지**: 소비 계약 고정. 생산 측 미구현 — `get_image_snapshots`/multimodal은 워크스트림 A 합의 후 활성화.
+- **비용**: 상시 자원 없음(요청 기반 Bedrock 과금, ADR 0035 이후 resolve=Nova Micro / fast·precise=Nova Pro 기본값). `docs/ops/15_aws_cost_baseline.md`에 tier별 단가·예상 호출량 항목 반영.
+- **이미지**: Dashboard 소비(read/presigned URL) 구현 완료. 생산 측 캡처·업로드와 multimodal 분석은 워크스트림 A 합의 후 활성화.
 
 ## 도입 순서
 
@@ -133,7 +139,7 @@ image_snapshot/{factory_id}/yyyy=YYYY/mm=MM/dd=DD/hh=HH/{message_id}.jpg
 4. ✅ **Bedrock 호출 추가** — evidence → 자연어(한국어), 추정/확정 분리, intent별 2-tier(fast/precise), 실패 시 rule fallback. (2026-06-08, 라이브 invoke 검증)
 5. ✅ **배포 인프라**: ECS task role IAM(InvokeModel + inference profile/FM ARN) + Bedrock egress(NAT 경유) Terraform 구현. IAM은 2026-06-09 운영 적용 완료. ECS task definition env 반영과 backend image rollout은 `/chat/query` image 배포 단계에서 수행.
 6. ✅ **Dashboard 챗봇 UI**: `/chat` 페이지 + Workspace sidebar 항목 + API client 연결. (운영 배포 완료)
-7. 이미지 snapshot **metadata 조회 + presigned URL**(생산 측 캡처는 워크스트림 A 합의 후).
+7. ✅ 이미지 snapshot S3 조회 + presigned URL + `/chat/query` image_ref 연결(생산 측 캡처는 워크스트림 A 합의 후).
 8. 문서/보고서 **RAG는 마지막**(S3 reports/운영 문서 한정).
 
 ## 업데이트 필요한 문서

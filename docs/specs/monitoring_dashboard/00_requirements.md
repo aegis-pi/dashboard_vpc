@@ -73,7 +73,7 @@ is_danger -> 감지된 소리 레이블 또는 이상 소음
 - API 기반 dashboard는 후속 Hub/Risk Twin 단계에서 다룬다.
 - 현재 `factory-a` dashboard는 단일 공장 운영 관제용이다.
 - AWS Hub의 멀티 공장 Risk Twin dashboard와 혼동하지 않는다.
-- 후속 사용자 대시보드는 Tailscale 접근이 아니라 1번 Data / Dashboard VPC의 ALB/WAF/Auth 뒤에서 제공한다.
+- 후속 사용자 대시보드는 Tailscale 접근이 아니라 1번 Data / Dashboard VPC의 CloudFront/ALB/Auth 뒤에서 제공한다. WAF/Shield는 후속 보안 강화 후보로 둔다.
 - 후속 Dashboard Web/API는 Spoke K3s, ArgoCD, Control / Management VPC의 EKS API, Tailscale 관리망을 직접 조회하지 않고 DynamoDB LATEST/HISTORY와 S3 processed를 조회한다.
 
 후속 계획:

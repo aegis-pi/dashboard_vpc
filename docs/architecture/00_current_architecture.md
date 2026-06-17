@@ -1,9 +1,10 @@
 # 현재 구조 요약
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-17
 
 수정 이력:
+- 2026-06-17 v0.5  2026-06-16 Data/Dashboard 재생성 root destroy 결과 반영. Phase 1 코드/IaC 구현 범위와 현재 AWS 런타임 상태를 분리해, `infra/data-dashboard` state 0 및 permanent/dns root 유지 상태로 정정.
 - 2026-06-04 v0.4  1번 Data/Dashboard VPC(워크스트림 B) Phase 1 구현/운영 배포 완료 반영. "미구축" 서술 정정. Lambda data processor·IoT Rule·S3 processed·DynamoDB·ECS Dashboard 등 후속 항목 중 구현된 것을 분리. 상세 토폴로지는 `01_target_architecture.md`/`../planning/16_data_dashboard_vpc_workplan.md`.
 - 2026-05-20 v0.3  2026-05-15 rebuild 이후 Hub/Foundation/IoT/Admin UI 활성 상태와 워크스트림 B Phase 1 진입 준비 상태 반영.
 - 2026-05-08 v0.2  destroy-all 이후 비용 정리 상태 반영.
@@ -19,7 +20,7 @@
 - M1 Issue 4에서 foundation S3 data bucket `aegis-bucket-data`를 생성했고, M1 Issue 5에서 IoT Thing/certificate/policy 및 K3s Secret 등록, IoT Rule -> S3 raw 적재 검증을 완료했다.
 - 후속 구현 책임 경계는 Terraform = 인프라, Ansible = bootstrap/설정/소프트웨어, GitHub Actions = CI, GitHub+ArgoCD = CD로 고정한다.
 - `factory-b`, `factory-c`, GitHub Actions(워크스트림 A CI)는 아직 구축 전이다. ECR `aegis/edge-agent` repository는 활성 상태이고, M3 Issue 2의 image push/pull 검증은 워크스트림 A에서 진행 중이다.
-- **1번 Data/Dashboard VPC(워크스트림 B)는 Phase 1 구현 완료 후 운영 배포 단계다.** Step 9.5 permanent split 이후 `infra/data-dashboard` 일시 root를 build/destroy 사이클로 운영하며, IoT Rule → Lambda data processor → DynamoDB(`AEGIS-DynamoDB-FactoryStatus`)/S3 processed, DDB Streams → notifier → Redis, ECS Fargate Dashboard Backend(FastAPI) + ALB, CloudFront/S3 SPA(`apps/dashboard-web/`), Cognito + RDS RBAC, Cloud Infra collector가 동작한다. 영구 자원은 `infra/data-dashboard-permanent`/`infra/data-dashboard-dns`. 상세 토폴로지는 `01_target_architecture.md`와 `../planning/16_data_dashboard_vpc_workplan.md`를 본다.
+- **1번 Data/Dashboard VPC(워크스트림 B)는 Phase 1 코드/IaC 구현 완료 후 build/destroy 사이클로 운영한다.** 2026-06-16 사용자 요청으로 `infra/data-dashboard` 일시 root는 destroy 완료(state 0) 상태이며, VPC/NAT/ALB/ECS/RDS/Redis/Lambda/SQS/runtime Secrets/API DNS/ALB ACM 런타임은 다음 build 전까지 내려가 있다. 구현 범위는 IoT Rule → Lambda data processor → DynamoDB(`AEGIS-DynamoDB-FactoryStatus`)/S3 processed, DDB Streams → notifier → Redis, ECS Fargate Dashboard Backend(FastAPI) + ALB, CloudFront/S3 SPA(`apps/dashboard-web/`), Cognito + RDS RBAC, Cloud Infra collector다. 영구 자원은 `infra/data-dashboard-permanent` 25 resources와 `infra/data-dashboard-dns` 1 resource가 유지한다. 상세 토폴로지는 `01_target_architecture.md`와 `../planning/16_data_dashboard_vpc_workplan.md`를 본다.
 - 이 문서는 현재 동작 중인 `factory-a` 로컬 기준선과 rebuild 가능한 Hub 기준선을 기록한다. 1번 Data/Dashboard VPC 상세는 목표 아키텍처 문서로 분리한다.
 
 ## 물리 / 클러스터 구조
