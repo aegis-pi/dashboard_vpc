@@ -1,5 +1,6 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Brain, Check, ChevronDown, Database, ExternalLink, Factory, FileSearch, Image as ImageIcon, Search, Send, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Shell } from '../components/Layout'
 import { useFactories } from '../hooks/useFactories'
@@ -379,6 +380,7 @@ function UserMessage({ text }: { text: string }) {
 }
 
 export function ChatPage() {
+  const location = useLocation()
   const factories = useFactories()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
@@ -415,6 +417,11 @@ export function ChatPage() {
     () => SUGGESTION_TEMPLATES.map((template) => template(suggestionFactoryId)),
     [suggestionFactoryId],
   )
+  const captureMode = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    const value = params.get('capture') ?? params.get('view')
+    return value === 'full' || value === '1' || value === 'true'
+  }, [location.search])
 
   useEffect(() => () => {
     Object.values(progressTimers.current).forEach((timer) => window.clearInterval(timer))
@@ -492,8 +499,12 @@ export function ChatPage() {
   }
 
   return (
-    <Shell factories={sidebarFactories} crumbs={[{ label: 'Workspace' }, { label: 'AI 채팅' }]}>
-      <div className="chat-page">
+    <Shell
+      className={captureMode ? 'capture-shell' : undefined}
+      factories={sidebarFactories}
+      crumbs={[{ label: 'Workspace' }, { label: 'AI 채팅' }]}
+    >
+      <div className={`chat-page${captureMode ? ' capture-full' : ''}`}>
         <section className="chat-surface">
           <div className="chat-thread" aria-live="polite" ref={threadRef}>
             {messages.map((message) => (

@@ -358,6 +358,7 @@ interface ShellProps {
   children: React.ReactNode
   factories?: { factory_id: string; risk_level?: string; risk_score?: number }[]
   crumbs: Crumb[]
+  className?: string
   onBack?: (() => void) | null
   wsStatus?: WsStatus
   wsMessage?: Record<string, unknown> | null
@@ -370,6 +371,7 @@ export function Shell({
   children,
   factories,
   crumbs,
+  className,
   onBack,
   wsStatus,
   wsMessage,
@@ -404,8 +406,15 @@ export function Shell({
     }
   }
 
+  const shellClassName = [
+    'shell',
+    sidebarCollapsed ? 'sidebar-collapsed' : '',
+    mobileSidebarOpen ? 'sidebar-mobile-open' : '',
+    className ?? '',
+  ].filter(Boolean).join(' ')
+
   return (
-    <div className={`shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'sidebar-mobile-open' : ''}`}>
+    <div className={shellClassName}>
       <Sidebar
         factories={factories}
         collapsed={sidebarCollapsed}

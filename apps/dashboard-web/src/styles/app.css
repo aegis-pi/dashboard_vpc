@@ -121,6 +121,25 @@ input, select, textarea { font-family: inherit; }
   min-height: calc(100vh / var(--zoom));
 }
 .shell.sidebar-collapsed { --sidebar-w: 68px; }
+.shell.capture-shell {
+  display: block;
+  min-height: auto;
+}
+.shell.capture-shell .sidebar,
+.shell.capture-shell .sidebar-backdrop,
+.shell.capture-shell .topbar {
+  display: none !important;
+}
+.shell.capture-shell .main {
+  display: block;
+  min-height: auto;
+}
+.shell.capture-shell .content {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 34px 24px 52px;
+}
 
 /* ─── Sidebar ───────────────────────────────────────────────────── */
 .sidebar {
@@ -1968,6 +1987,22 @@ input, select, textarea { font-family: inherit; }
   padding: 8px 0 10px;
   background: var(--bg);
 }
+.chat-page.capture-full {
+  height: auto;
+  min-height: calc(100vh / var(--zoom) - var(--topbar-h) - 20px);
+  margin-bottom: 0;
+  overflow: visible;
+}
+.chat-page.capture-full .chat-surface {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.chat-page.capture-full .chat-thread {
+  flex: 0 1 auto;
+  overflow-y: visible;
+  scrollbar-width: auto;
+}
+.chat-page.capture-full .chat-thread::-webkit-scrollbar { display: initial; }
 .chat-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
