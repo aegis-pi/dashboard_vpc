@@ -1,7 +1,10 @@
 # 프로젝트 보고서 초안
 
 상태: draft
-기준일: 2026-04-28
+기준일: 2026-06-17
+
+수정 이력:
+- 2026-06-17 v0.2  Phase 1 Dashboard 구현/배포 범위와 2026-06-16 Data/Dashboard 일시 root destroy 상태를 반영. 다음 단계 목록에서 완료 항목 제거.
 
 ## 1. 배경
 
@@ -9,7 +12,7 @@
 
 ## 2. 현재 구현 범위
 
-현재 완료된 범위는 `factory-a` 로컬 Safe-Edge 기준선이다.
+현재 완료된 범위는 `factory-a` 로컬 Safe-Edge 기준선과 1번 Data/Dashboard VPC의 Phase 1 Dashboard 코드/운영 배포 기준선이다. 2026-06-16 비용 절감을 위해 재생성 root(`infra/data-dashboard`)는 destroy 완료했고, permanent/dns root는 유지한다.
 
 구성:
 
@@ -24,6 +27,13 @@ BME280
 Integrated AI
 Audio detection
 Failover / Failback automation
+Dashboard Backend FastAPI on ECS Fargate
+Dashboard Web Vite + React
+Cognito + RDS RBAC
+Cloud Infra Fast/Slow collector read model
+Reports S3 Markdown 조회
+Image Snapshot S3 증빙 조회
+AI Chat with Bedrock Nova
 ```
 
 ## 3. 운영 구조
@@ -79,14 +89,13 @@ AI snapshot: 24시간 초과 자동 삭제
 - failover 시 전원 장애 기준 약 65-75초의 데이터 공백이 있었다.
 - failback 전환 구간에서 중복 write 후보가 있다.
 - AWS Hub EKS/VPC/namespace/ArgoCD bootstrap, Hub Prometheus Agent, Grafana/AMP datasource, AWS Load Balancer Controller, Admin UI HTTPS Ingress, foundation S3/AMP/IoT Rule, IRSA S3/AMP 권한은 `build-all --admin-ui`와 `build-hub`로 재생성/검증했고 2026-05-15 rebuild 후 활성 상태다.
-- 1번 Data/Dashboard VPC(워크스트림 B)의 Risk Twin 구조는 Phase 1 Step 0~9.5 구현 완료 후 운영 배포 단계다(2026-06-04 기준). IoT Core → Lambda data processor → DynamoDB/S3, DDB Streams → notifier → Redis, ECS Fargate Dashboard Backend(FastAPI) + ALB, CloudFront/S3 SPA, Cognito + RDS 기반 공장별 RBAC, Cloud Infra 상태 화면(Fast/Slow collector), S3 기반 일간 보고서 조회까지 구현·배포했다. LLM 보고서 생성기(Bedrock)와 factory-a Edge Agent 실시간 송신 검증은 후속이다. 상세는 `docs/issues/SESSION_STATE.md`와 `docs/planning/16_data_dashboard_vpc_workplan.md`.
+- 1번 Data/Dashboard VPC(워크스트림 B)의 Risk Twin 구조는 Phase 1 Step 0~9.5 구현 및 운영 배포를 완료했다. IoT Core → Lambda data processor → DynamoDB/S3, DDB Streams → notifier → Redis, ECS Fargate Dashboard Backend(FastAPI) + ALB, CloudFront/S3 SPA, Cognito + RDS 기반 공장별 RBAC, Cloud Infra 상태 화면(Fast/Slow collector), S3 기반 일간 보고서 조회, S3 이미지 스냅샷 조회, Bedrock AI Chat까지 코드와 배포 workflow가 존재한다. LLM 보고서 자동 생성기(Bedrock)와 factory-a Edge Agent 실시간 송신 검증은 후속이다. 상세는 `docs/issues/SESSION_STATE.md`와 `docs/planning/16_data_dashboard_vpc_workplan.md`.
 - NFS Cold Storage와 Ansible tiering은 보류했다.
 
 ## 7. 다음 단계
 
-1. `runtime-config.yaml`과 Risk 가중치 기준
-2. Hub-Spoke 연결
-3. GitHub Actions CI와 GitHub+ArgoCD CD 코드화
-4. IoT Core/S3 데이터 플레인 검증
-5. Dashboard VPC 기반 관리자 관제 화면
-6. Risk Twin dashboard 구현
+1. 데모 전 `scripts/build/build-data-dashboard.sh`로 Data/Dashboard 일시 root 재생성
+2. 인증 사용자 기준 AI Chat/이미지 스냅샷 실데이터 수기 검증
+3. factory-a Edge Agent 재활성 후 IoT → DDB → Dashboard 실시간 경로 검증
+4. LLM 일간 보고서 자동 생성기(Bedrock) 후속 구현
+5. factory-b/c 테스트베드 Spoke 확장과 멀티 공장 회귀 검증

@@ -1,9 +1,10 @@
 # 데모 시나리오
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-17
 
 수정 이력:
+- 2026-06-17 v0.4  2026-06-16 Data/Dashboard 일시 root destroy 상태와 현재 Dashboard route(Image Snapshots, AI Chat)를 반영. 데모 전 build 필요 조건 명시.
 - 2026-06-04 v0.3  AWS 상태 정정(2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성). 1번 Data/Dashboard VPC Phase 1 운영 배포에 따른 Dashboard 데모 섹션 추가.
 - 2026-05-08 v0.2  destroy-all 이후 비용 정리 상태 반영.
 
@@ -25,7 +26,7 @@ AWS Hub EKS/VPC/namespace/ArgoCD bootstrap 기준선, Hub Prometheus Agent, Graf
 
 ## Phase 1 Dashboard 데모 (1번 Data/Dashboard VPC, 운영 배포)
 
-1번 Data/Dashboard VPC는 build/destroy 사이클로 운영한다(`scripts/build/build-data-dashboard.sh` / `scripts/destroy/destroy-data-dashboard.sh`). 일시 root가 build된 상태에서 아래 관제 화면을 시연한다. 영구 자원(CloudFront/Cognito/S3 web/도메인)은 상시 유지된다.
+1번 Data/Dashboard VPC는 build/destroy 사이클로 운영한다(`scripts/build/build-data-dashboard.sh` / `scripts/destroy/destroy-data-dashboard.sh`). 2026-06-16 기준 일시 root는 destroy 완료 상태이므로 데모 전 build가 필요하다. 일시 root가 build된 상태에서 아래 관제 화면을 시연한다. 영구 자원(CloudFront/Cognito/S3 web/ECR/도메인)은 유지된다.
 
 ```text
 Dashboard Web : https://dashboard.aegis-pi.cloud  (Cognito 로그인)
@@ -40,13 +41,15 @@ Fleet         공장별 위험도(안전점수) 카드, 자동 refresh interval
 Factory       센서 현황 + 이상 항목 + Timeline(10m/1h/custom) + top_causes 원인, WebSocket 실시간 갱신
 Cloud Infra   backend/datastores/data_pipeline/factory_freshness 등 인프라 상태(Fast/Slow collector)
 Reports       S3 reports/daily/ 기반 일간 보고서 조회 (PDF/Word 내보내기)
+Image Snapshots S3 image_snapshot/ 기반 증빙 이미지 조회 (system 권한)
+AI Chat       /chat/query 기반 자연어 질의, Nova Micro resolve + Nova Pro evidence 설명
 Admin Users   /admin/users 관리자 사용자 생성·수정·삭제 및 공장 권한 편집 (super_admin/org_admin)
 ```
 
 전달 메시지:
 - 단일 공장 엣지(factory-a) 데이터가 IoT Core → Lambda data processor → DynamoDB로 적재되고, ECS Dashboard Backend가 이를 REST/WebSocket으로 본사 관제 화면에 제공한다.
 - 실시간 갱신은 준실시간(1~수 초) 기준이며, factory-a Edge Agent 재활성 시 실제 센서 변화가 대시보드에 반영된다(현재 Edge Agent 비활성으로 주입/저장 데이터 기반 시연).
-- LLM 일간 보고서 생성기(Bedrock)는 팀원/후속이며, 본 데모는 S3에 적재된 보고서 조회 화면까지 보여준다.
+- LLM 일간 보고서 자동 생성기(Bedrock)는 팀원/후속이며, 본 데모는 S3에 적재된 보고서 조회와 Bedrock AI Chat 데이터 QA를 보여준다.
 
 ## 데모 순서
 

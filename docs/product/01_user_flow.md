@@ -1,7 +1,10 @@
 # 사용자 플로우
 
 상태: source of truth
-기준일: 2026-04-28
+기준일: 2026-06-17
+
+수정 이력:
+- 2026-06-17 v0.2  운영 Dashboard Web 실제 route와 기능(Fleet, Factory, Cloud Infra, Reports, Image Snapshots, AI Chat, Admin Users)을 반영.
 
 ## 목적
 
@@ -9,13 +12,15 @@
 
 ## 현재 상태
 
-- 현재 구현된 사용자 흐름은 `factory-a` 현장 Grafana 확인 흐름이다.
-- 최종 MVP 사용자 흐름은 본사 관제 담당자가 여러 공장의 위험 상태를 확인하는 흐름이다.
+- 현재 구현된 사용자 흐름은 두 층이다.
+  - 현장/운영자: `factory-a` 현장 Grafana 확인 흐름
+  - 본사 관제 담당자: Dashboard Web(`apps/dashboard-web`)에서 공장 위험 상태, Cloud Infra, 보고서, 이미지 증빙, AI Chat, 사용자 권한을 확인하는 흐름
+- 2026-06-16 기준 Data/Dashboard 일시 root는 비용 절감을 위해 destroy 완료 상태이므로 실제 시연 전 `scripts/build/build-data-dashboard.sh`로 재생성해야 한다.
 
 ## 주요 사용자
 
 - 현재 사용자: `factory-a` 현장 운영자 또는 구축 담당자
-- MVP 사용자: 본사 관제 담당자
+- MVP 사용자: 본사 관제 담당자, 본사 관리자
 
 ## 현재 `factory-a` 흐름
 
@@ -46,14 +51,17 @@
 3. 현장 이상인지, 수집 이상인지, 시스템 이상인지 구분한다.
 4. 필요 시 운영 대응 또는 상세 확인으로 이어진다.
 
-## MVP 기본 흐름
+## Dashboard 기본 흐름
 
-1. 메인 관제 화면 진입
-2. 공장별 현재 위험 상태 확인
-3. 위험이 높은 공장을 우선 식별
-4. 센서 현황과 이상 시스템 목록으로 원인 파악
-5. 최근 로그에서 상태 변화 시간과 흐름 확인
-6. 필요 시 공장 상세 화면 또는 운영 대응으로 이어짐
+1. Cognito Hosted UI로 로그인한다.
+2. `/auth/me` 권한에 따라 접근 가능한 공장과 시스템 메뉴가 결정된다.
+3. `/` Fleet 화면에서 공장별 현재 안전점수와 위험 상태를 확인한다.
+4. `/factory/:factoryId`에서 센서/AI 추세, top_causes, Timeline, WebSocket 상태를 확인한다.
+5. 시스템 권한 사용자는 `/cloud-infra`에서 backend/datastores/data_pipeline/factory_freshness 상태를 확인한다.
+6. `/reports`에서 S3 `reports/daily/` Markdown 보고서를 날짜·공장 기준으로 조회하고 PDF/Word로 내보낸다.
+7. `/image-snapshots`에서 S3 `image_snapshot/` 증빙 이미지를 시간 범위로 필터링한다.
+8. `/chat`에서 자연어로 현재 상태, 원인, 추이, 스파이크, 보고서, 이미지 증빙을 질의한다.
+9. 관리자 권한 사용자는 `/admin/users`에서 사용자 생성·수정·삭제와 공장 접근 권한을 관리한다.
 
 ## 메인 화면 기준 상세 흐름
 
@@ -99,6 +107,14 @@
 - 복구가 있었는가
 - 최근 주요 운영 이벤트가 무엇인가
 
+### 5. 증빙과 설명 확인
+
+사용자는 보고서·이미지·AI Chat으로 판단 근거를 보강한다.
+
+- S3 일간 보고서 Markdown으로 해당 날짜 주요 이벤트를 확인한다.
+- 이미지 스냅샷으로 특정 시간대 AI 감지 증빙을 확인한다.
+- AI Chat은 Backend가 RBAC를 검증한 뒤 DynamoDB/S3/RDS 근거를 조회하고, Bedrock이 확인된 evidence를 설명하는 구조다.
+
 ## 예외 흐름
 
 - 데이터가 들어오지 않음
@@ -109,6 +125,10 @@
   - 자동 롤백 허용
 - 센서값이 `null`
   - `미수신` 또는 `확인 필요` 상태로 처리
+- Bedrock 응답 실패
+  - Backend rule/template 답변으로 degrade
+- WebSocket 연결 실패
+  - 주기적 REST 조회로 보완
 
 ## 사용자 경험 목표
 

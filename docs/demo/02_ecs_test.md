@@ -5,6 +5,8 @@
 
 목표: Dashboard Backend ECS 일부 장애를 의도적으로 만들고, Cloud Infra 페이지에서 이상 상태와 Slack 알람을 확인한 뒤 ECS 복구와 Cloud Infra 정상화를 촬영한다.
 
+> 2026-06-16 기준 `infra/data-dashboard` 재생성 root는 destroy 상태다. 촬영 전 `scripts/build/build-data-dashboard.sh`로 API/ECS/RDS/Redis/Lambda/VPC 런타임을 올리고 `/healthz`, `/readyz`, ECS desired/running 2, ALB target 2개 healthy를 확인한다.
+
 ## 발표 영상 자막 (8컷)
 
 한 편의 연속 영상에 아래 8개 자막을 순서대로 얹는다. (장애 발생 1~4 → 자동 복구 5~8)

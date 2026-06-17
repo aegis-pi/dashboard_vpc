@@ -1,9 +1,10 @@
 # Requirements Definition Traceability
 
 상태: source of truth
-기준일: 2026-05-20
+기준일: 2026-06-17
 
 수정 이력:
+- 2026-06-17 v0.5  현재 코드 기준으로 Reports는 S3 Markdown 조회 구현, LLM 일간 보고서 생성기는 후속으로 구분. AI Chat, Image Snapshot, RBAC 사용자 관리 구현 범위 반영.
 - 2026-05-20 v0.4  Risk Score 의미를 안전점수 기준(100=가장 안전, 0=가장 위험)으로 정정.
 - 2026-05-20 v0.3  Phase 1 통합 결정(ADR 0012~0017) 반영. Cognito/WAF/WebSocket/Bedrock/RDS/Redis를 후속이 아닌 Phase 1 요구로 재분류.
 - 2026-05-14 v0.2  요구사항 추적표와 수치 기준 정리.
@@ -64,7 +65,7 @@
 | 포함 기능과 제외 기능 | MVP 범위 요구사항 |
 | 전송 주기, 지연 목표, 보존 기간 | 비기능 요구사항 |
 | K3s, IoT Core, S3, ArgoCD 같은 채택 기술 | 아키텍처/제약 요구사항 |
-| VPC 분리, Tailscale, IAM, WAF/Auth | 보안/접근 제어 요구사항 |
+| VPC 분리, Tailscale, IAM, Auth, WAF/Shield 후속 | 보안/접근 제어 요구사항 |
 | failover, failback, retention, cleanup | 운영/가용성 요구사항 |
 | 비용 baseline, destroy 절차 | 비용/운영성 요구사항 |
 | 보류한 선택지 | MVP 제외 범위 또는 후속 요구사항 |
@@ -98,7 +99,7 @@
 | DEC-21 | InfluxDB는 1일 retention, AI snapshot은 24시간 cleanup을 적용한다 | 로컬 저장소가 무한히 증가하지 않아야 한다 | 로컬 장기 보존 | `docs/ops/08_data_retention.md` |
 | DEC-22 | AWS Hub 비용은 active/destroy 상태를 기준으로 관리한다 | MVP 운영 비용을 설명하고 필요 시 0에 가깝게 낮출 수 있어야 한다 | 상시 리소스 비용 미관리 | `docs/ops/15_aws_cost_baseline.md` |
 | DEC-23 | Tailscale은 MVP Hub-Spoke 제어망으로 유지한다 | Site-to-Site VPN, TGW, Direct Connect, WireGuard보다 MVP 복잡도가 낮다 | 전용망을 즉시 구현 | `docs/planning/12_two_vpc_mvp_architecture_decision.md`, `docs/ops/20_tailscale_hub_spoke_runbook.md` |
-| DEC-24 | Phase 1 Dashboard는 Cognito, WAF, ECS Backend, RDS PostgreSQL, Redis, WebSocket, Bedrock 일간 보고서를 포함한다 | 발표/검증용 목표를 서버리스 최소 구성과 컨테이너 확장으로 나누지 않고 하나의 통합 배포 목표로 둔다 | Lambda Dashboard API만으로 Phase 1을 종료 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/planning/17_expansion_roadmap.md`, `docs/changes/0012-introduce-container-backend-for-dashboard.md` |
+| DEC-24 | Phase 1 Dashboard는 Cognito, ECS Backend, RDS PostgreSQL, Redis, WebSocket, S3 reports 조회, Image Snapshot 조회, Bedrock AI Chat을 포함한다. LLM 일간 보고서 생성기는 후속으로 둔다 | 발표/검증용 목표를 서버리스 최소 구성과 컨테이너 확장으로 나누지 않고 하나의 통합 배포 목표로 둔다 | Lambda Dashboard API만으로 Phase 1을 종료 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/planning/17_expansion_roadmap.md`, `docs/changes/0012-introduce-container-backend-for-dashboard.md`, `docs/changes/0033-chatbot-data-qa-architecture.md`, `docs/changes/0035-chatbot-nova-model-evaluation.md` |
 | DEC-25 | 장기 분석, Kinesis/Timestream/OpenSearch, Multi-AZ, IdP federation, PrivateLink, 컴플라이언스 기능은 Phase 2~4 트리거 기반 후속으로 둔다 | 현재는 측정값이 필요 기능 도입을 트리거하도록 설계한다 | 모든 고도화 기능을 Phase 1에 포함 | `docs/planning/17_expansion_roadmap.md` |
 
 ## 요구사항 정의
@@ -142,9 +143,9 @@
 | Hub active 고정 비용 | 약 $0.3606/hour | MVP Hub 운영 비용을 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
 | Hub active 24시간 비용 | 약 $8.65/day | 단기 테스트 운영 비용을 예측할 수 있어야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
 | Hub active 월 비용 | 약 $263.24/730h | 상시 운영 비용 규모를 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
-| Data/Dashboard Phase 1 상시 비용 | 약 $125/month | ECS/RDS/Redis/ALB/NAT 기반 사용자 Dashboard 운영 비용을 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
-| Data/Dashboard 데모 운영 비용 | 약 $8~10/month | build/destroy 사이클로 발표·검증 비용을 낮출 수 있어야 한다. | `build-data-dashboard`/`destroy-data-dashboard` 실행 후 Cost Explorer 확인 | `docs/ops/15_aws_cost_baseline.md`, `docs/planning/16_data_dashboard_vpc_workplan.md` |
-| destroy 이후 고정 비용 | $0.0000/hour | 테스트 종료 후 비용을 제거할 수 있어야 한다. | destroy-all 후 리소스 조회 | `docs/ops/15_aws_cost_baseline.md` |
+| Data/Dashboard Phase 1 상시 비용 | 최신 cost baseline 참조 | ECS/RDS/Redis/ALB/NAT 기반 사용자 Dashboard 운영 비용을 설명 가능해야 한다. | 비용 baseline 재계산 | `docs/ops/15_aws_cost_baseline.md` |
+| Data/Dashboard 데모 운영 비용 | 최신 cost baseline 참조 | build/destroy 사이클로 발표·검증 비용을 낮출 수 있어야 한다. | `build-data-dashboard`/`destroy-data-dashboard` 실행 후 Cost Explorer 확인 | `docs/ops/15_aws_cost_baseline.md`, `docs/planning/16_data_dashboard_vpc_workplan.md` |
+| Data/Dashboard destroy 이후 잔여 비용 | permanent/dns root + RDS final snapshot 중심 | 테스트 종료 후 런타임 비용을 제거하되, 영구 자원 잔여 비용을 추적해야 한다. | destroy 후 root별 state/resource 조회 및 Cost Explorer 확인 | `docs/ops/15_aws_cost_baseline.md` |
 
 ### 업무/사용자 요구사항
 
@@ -169,7 +170,9 @@
 | FR-08 | Dashboard Backend는 ALB 뒤의 ECS Fargate FastAPI 서비스로 REST 조회와 WebSocket 연결을 제공해야 한다. | DEC-24 |
 | FR-09 | Dashboard는 Cognito로 인증된 사용자에게 권한이 있는 공장만 보여줘야 한다. | DEC-15, DEC-24 |
 | FR-10 | 상태 변경은 DynamoDB Streams, Lambda notifier, Redis Pub/Sub, WebSocket으로 Dashboard에 전달되어야 한다. | DEC-24 |
-| FR-11 | 매일 09:00 KST 기준 공장별 Markdown 일간 보고서를 생성하고 Dashboard에서 열람할 수 있어야 한다. | DEC-24 |
+| FR-11 | Dashboard는 S3 `reports/daily/` Markdown 일간 보고서를 날짜·공장 기준으로 열람하고 PDF/Word로 내보낼 수 있어야 한다. Bedrock 기반 자동 생성기는 후속으로 둔다. | DEC-24 |
+| FR-12 | Dashboard는 S3 `image_snapshot/` 객체를 시간 범위로 조회하고 presigned URL로 증빙 이미지를 표시할 수 있어야 한다. | DEC-24 |
+| FR-13 | Dashboard AI Chat은 자연어 질의를 공장·시간·의도 단위로 해석하고, 권한 검증 후 DynamoDB/S3/RDS 근거만 사용해 답변해야 한다. | DEC-24 |
 
 ### 비기능 요구사항
 
@@ -208,7 +211,7 @@
 | SEC-03 | Hub-Spoke 제어망은 MVP에서 Tailscale을 사용하되, Dashboard/Risk 접근망으로 확장하지 않아야 한다. | DEC-23 |
 | SEC-04 | Secret 값, MFA OTP, Access Key, Session Token은 Git과 문서에 기록하지 않아야 한다. | DEC-18 |
 | SEC-05 | Phase 1 Dashboard는 Cognito Hosted UI와 앱 레벨 JWT 검증을 사용한다. | DEC-24 |
-| SEC-06 | CloudFront/ALB 진입점은 HTTPS만 허용하고, CloudFront 앞단 WAF는 Phase 1 기본 보호선으로 둔다. | DEC-24 |
+| SEC-06 | CloudFront/ALB 진입점은 HTTPS만 허용한다. WAF/Shield 같은 L7 보호 강화는 Phase 2~4 후속 트리거로 둔다. | DEC-24, DEC-25 |
 
 ### 배포/운영 요구사항
 
@@ -242,7 +245,9 @@
 | FR-05 | IoT Rule이 raw JSON을 `raw/{factory_id}/{source_type}/...` 경로에 저장한다. | M4에서 S3 raw object와 partition 확인 | `docs/planning/05_decision_rationale.md`, `docs/specs/iot_data_format.md` |
 | FR-06, NFR-03, NFR-04 | Dashboard Backend/API가 DynamoDB LATEST/HISTORY와 S3 processed result를 조회한다. | M6에서 일반 상태 10~35초, 장애 판정 40~60초 목표 확인 | `docs/specs/data_storage_pipeline.md`, `docs/planning/03_evaluation_plan.md` |
 | FR-08~FR-10, NFR-08~NFR-09 | ALB + ECS Fargate Backend + Redis + WebSocket 경로를 사용한다. | M6에서 `/healthz`, REST 조회, WebSocket handshake, DDB Streams 이후 push 지연 확인 | `docs/planning/16_data_dashboard_vpc_workplan.md`, `docs/changes/0012-introduce-container-backend-for-dashboard.md`, `docs/changes/0015-websocket-for-dashboard-realtime.md` |
-| FR-11 | Lambda report-generator가 Bedrock으로 일간 보고서를 생성하고 S3/DDB에 기록한다. | 수동 invoke와 다음 09:00 KST 자동 트리거 확인 | `docs/changes/0016-bedrock-for-llm-report.md`, `docs/planning/16_data_dashboard_vpc_workplan.md` |
+| FR-11 | Dashboard Backend가 S3 `reports/daily/` Markdown을 읽고 Dashboard Web이 보고서 조회·PDF/Word 내보내기를 제공한다. 자동 report-generator는 후속이다. | `/reports`, `/reports/{date}/{factory_id}` 테스트와 Web Reports page 확인 | `docs/changes/0029-dashboard-reports-s3-read-path.md`, `apps/dashboard-backend/routers/reports.py`, `apps/dashboard-web/src/pages/ReportsPage.tsx` |
+| FR-12 | Dashboard Backend가 S3 `image_snapshot/` 객체를 조회해 presigned URL을 발급하고 Web이 이미지 증빙을 표시한다. | `/image-snapshots/range`, `/image-snapshots` 테스트와 ImageSnapshots page 확인 | `apps/dashboard-backend/routers/image_snapshots.py`, `apps/dashboard-web/src/pages/ImageSnapshotsPage.tsx` |
+| FR-13 | `/chat/query`가 LLM resolve 또는 rule fallback으로 intent/time을 해석하고 RBAC 후 evidence 기반 답변을 생성한다. | chat resolve/spike/report/image tests, `/chat` page 확인 | `docs/changes/0033-chatbot-data-qa-architecture.md`, `docs/changes/0034-llm-routing-for-chat.md`, `docs/changes/0035-chatbot-nova-model-evaluation.md` |
 | ARC-01, OPS-06 | `factory-a` K3s workload는 worker2 preferred, worker1 failover, 조건부 failback을 유지한다. | failover/failback 테스트 결과와 M0 회귀 확인 | `docs/ops/09_failover_failback_test_results.md` |
 | ARC-02, ARC-03 | K3s + Edge Agent + IoT Core 구조를 사용한다. | Edge Agent 배포와 MQTT publish 확인 | `docs/planning/05_decision_rationale.md` |
 | ARC-04 | IoT Core 이후 IoT Rule/S3 raw와 Lambda/DynamoDB/S3 processed/Dashboard 흐름을 사용한다. | M4, M6, M7 통합 검증 | `docs/specs/data_storage_pipeline.md`, `docs/planning/15_cloud_architecture_final.md` |
@@ -263,7 +268,7 @@
 | M3 | CI/CD와 ArgoCD rollout | OPS-01 ~ OPS-05 |
 | M4 | IoT Core, S3 raw, Lambda data processor, DynamoDB LATEST/HISTORY, S3 processed | FR-01 ~ FR-05, NFR-01, NFR-02 |
 | M5 | `factory-b/c` 테스트베드 추가와 3개 공장 Fleet 인식 | BR-04, FR-07 |
-| M6 | Risk Twin Dashboard, 상태 카드, 원인, 로그, 지연 목표 | BR-01 ~ BR-03, FR-06, NFR-03, NFR-04 |
+| M6 | Risk Twin Dashboard, 상태 카드, 원인, 로그, Cloud Infra, Reports, Image Snapshots, AI Chat, RBAC 사용자 관리 | BR-01 ~ BR-03, FR-06, FR-11~FR-13, NFR-03, NFR-04 |
 | M7 | 운영형/테스트베드형/장애/롤백 통합 시나리오 | 전체 요구사항 회귀 |
 
 ## MVP 제외 범위와 후속 요구사항

@@ -5,6 +5,8 @@
 
 목표: factory-a에서 **온도 상승 + 카메라 화재 감지**가 동시에 일어나 안전점수가 위험 구간으로 떨어지는 상황을, 관제 담당자가 (1) 실시간으로 인지하고 → (2) 증빙 스냅샷을 확인하고 → (3) AI 채팅으로 상황을 요약·확인하는 흐름까지 **영상 3개**로 시연한다.
 
+> 2026-06-16 기준 Data/Dashboard 재생성 root는 destroy 상태다. 이 시나리오는 `scripts/build/build-data-dashboard.sh`로 API/ECS/RDS/Redis/Lambda/VPC 런타임을 복구하고, `/healthz`·`/readyz`·Dashboard 로그인·`/image-snapshots`·`/chat/query` 인증 사용자 경로를 확인한 뒤 촬영한다.
+
 ## 시나리오 개요
 
 - **트리거**: 센서 온도 상승(임계치 **32°C** 초과) + Pi Camera 화재 감지 점수 상승

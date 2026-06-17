@@ -1,11 +1,14 @@
 # 검토 및 발표 요약
 
 상태: source of truth
-기준일: 2026-04-28
+기준일: 2026-06-17
+
+수정 이력:
+- 2026-06-17 v0.2  Safe-Edge 이후 Hub/Data Dashboard 구현 상태를 반영.
 
 ## 핵심 메시지
 
-`factory-a` Safe-Edge 기준선은 실제 구축과 장애 검증까지 완료됐다. Aegis-Pi의 다음 단계는 이 기준선을 AWS Hub/Risk Twin 구조로 확장하는 것이다.
+`factory-a` Safe-Edge 기준선은 실제 구축과 장애 검증까지 완료됐다. 이후 2026-05-15 rebuild로 Hub/Foundation/IoT/Admin UI가 활성화됐고, 1번 Data/Dashboard VPC Phase 1 Dashboard 코드와 운영 배포 기준선도 완료됐다.
 
 ## 발표 포인트
 
@@ -15,6 +18,8 @@
 4. Longhorn 저장소 확인
 5. LAN/전원 장애 테스트 완료
 6. 데이터 공백과 중복 write 후보까지 측정
+7. Dashboard Backend/Web, RBAC, Cloud Infra, Reports, Image Snapshots, AI Chat 구현
+8. Data/Dashboard build/destroy 비용 절감 운영 패턴 정리
 
 ## 수치
 

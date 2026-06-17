@@ -5,6 +5,8 @@
 
 목표: Dashboard 사용자 관리 화면에서 계정 생성, 첫 로그인/비밀번호 변경, 공장 권한 수정, 계정 삭제까지 이어지는 RBAC 흐름을 발표 영상으로 촬영한다.
 
+> 2026-06-16 기준 Cognito/CloudFront 같은 영구 자원은 유지되지만 Dashboard API/ECS/RDS 런타임은 destroy 상태다. 촬영 전 `scripts/build/build-data-dashboard.sh` 실행 후 `/readyz`의 `rds_metadata` 상태와 `/admin/users` 비인증 401을 확인한다.
+
 ## 핵심 메시지
 
 - Cognito는 로그인 주체, 임시 비밀번호, 세션 관리를 담당한다.
