@@ -43,6 +43,15 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Presentation/generated report artifacts
+docs/report/**/*.pptx
+docs/report/**/*.openscreen*
+docs/report/발표 이미지 관련/
+docs/report/발표영상관련/
+
+# Generated/bundled architecture assets
+docs/architecture/images/*.zip
+
 .omx/
 .antigravitycli/
 Aegis-pi/
