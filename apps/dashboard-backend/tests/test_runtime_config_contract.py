@@ -95,3 +95,24 @@ def test_dashboard_task_role_can_read_chat_s3_evidence_prefixes():
 
     for fragment in required_fragments:
         assert fragment in ecs_tf
+
+
+def test_dashboard_task_role_allows_nova_chatbot_profiles():
+    ecs_tf = ECS_TF_PATH.read_text()
+    variables_tf = (REPO_ROOT / "infra" / "data-dashboard" / "variables.tf").read_text()
+
+    required_fragments = [
+        "apac.amazon.nova-micro-v1:0",
+        "apac.amazon.nova-lite-v1:0",
+        "apac.amazon.nova-pro-v1:0",
+        "global.amazon.nova-2-lite-v1:0",
+        "amazon.nova-micro-v1:0",
+        "amazon.nova-lite-v1:0",
+        "amazon.nova-pro-v1:0",
+        "amazon.nova-2-lite-v1:0",
+        "BEDROCK_RESOLVE_MODEL",
+        "CHAT_ROUTING_ENABLED",
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in variables_tf or fragment in ecs_tf

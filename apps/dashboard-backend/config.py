@@ -52,11 +52,11 @@ class Settings(BaseSettings):
     # Bedrock chatbot (ADR 0033 Step 4 / ADR 0016).
     # Model IDs are admin configuration only — never exposed to end users.
     # Tier mapping: fast=default, precise=cause analysis (reasoning quality).
-    # Verified invokable in ap-south-1 (2026-06-08); both require inference profiles.
+    # Verified invokable in ap-south-1 (2026-06-11); all require inference profiles.
     bedrock_enabled: bool = True
     bedrock_region: str = "ap-south-1"
-    bedrock_model_fast: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
-    bedrock_model_precise: str = "global.anthropic.claude-sonnet-4-6"
+    bedrock_model_fast: str = "apac.amazon.nova-pro-v1:0"
+    bedrock_model_precise: str = "apac.amazon.nova-pro-v1:0"
     bedrock_max_tokens: int = 1024
     bedrock_temperature: float = 0.2
     bedrock_connect_timeout_seconds: float = 3.0
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # Falls back to the rule parser when disabled, unavailable, or invalid.
     # Only active when bedrock_enabled is also True (resolve needs Bedrock).
     chat_routing_enabled: bool = True
-    bedrock_resolve_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    bedrock_resolve_model: str = "apac.amazon.nova-micro-v1:0"
     bedrock_resolve_max_tokens: int = 512
     bedrock_resolve_operation_timeout_seconds: float = 12.0
 

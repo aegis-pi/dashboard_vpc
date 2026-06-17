@@ -97,7 +97,33 @@ COGNITO_APP_CLIENT_ID=5tgi86cftt5hu82prq6df87e7c
 RBAC_BOOTSTRAP_SUPER_ADMIN_SUBS=<본인-sub>
 
 AWS_REGION=ap-south-1
+
+# AI 채팅 Bedrock — ADR 0035 Nova 기본 조합
+BEDROCK_ENABLED=true
+BEDROCK_REGION=ap-south-1
+CHAT_ROUTING_ENABLED=true
+BEDROCK_RESOLVE_MODEL=apac.amazon.nova-micro-v1:0
+BEDROCK_MODEL_FAST=apac.amazon.nova-pro-v1:0
+BEDROCK_MODEL_PRECISE=apac.amazon.nova-pro-v1:0
 ```
+
+모델만 바꿔 비교하려면 위 세 줄만 수정한다.
+
+```dotenv
+BEDROCK_RESOLVE_MODEL=apac.amazon.nova-micro-v1:0
+BEDROCK_MODEL_FAST=apac.amazon.nova-pro-v1:0
+BEDROCK_MODEL_PRECISE=apac.amazon.nova-pro-v1:0
+```
+
+기존 Claude 기준선으로 되돌려 비교할 때:
+
+```dotenv
+BEDROCK_RESOLVE_MODEL=global.anthropic.claude-haiku-4-5-20251001-v1:0
+BEDROCK_MODEL_FAST=global.anthropic.claude-haiku-4-5-20251001-v1:0
+BEDROCK_MODEL_PRECISE=global.anthropic.claude-sonnet-4-6
+```
+
+`.env`를 수정한 뒤에는 `uvicorn`을 반드시 재시작한다.
 
 ---
 

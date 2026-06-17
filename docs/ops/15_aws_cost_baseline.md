@@ -1,9 +1,10 @@
 # AWS Cost Baseline
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-11
 리전: `ap-south-1` / Asia Pacific (Mumbai), 글로벌(CloudFront/ACM us-east-1) 일부
 수정 이력:
+  - 2026-06-11 v3.7  ADR 0035 Nova 모델 평가 반영. 챗봇 기본 조합을 `resolve=apac.amazon.nova-micro-v1:0`, `fast/precise=apac.amazon.nova-pro-v1:0`로 전환. 월 720회 기준 기존 Claude 조합 `~$4.3/월`에서 Nova 조합 `~$1.5/월`로 약 65% 절감. 상시 리소스 변화 없음. ECS task role IAM allowlist에 Nova inference profile/foundation model pattern 추가.
   - 2026-06-09 v3.6  ADR 0034 LLM 라우팅 반영. 챗봇 1콜당 앞단 **resolve(Haiku 4.5 Converse tool-use)** 1콜이 추가됨(입력 ~1.2k/출력 ~150 토큰). 월 720회 기준 resolve 비용 `~$1.4/월`(입력 720×1.2k×$1/M ≈ $0.86 + 출력 720×150×$5/M ≈ $0.54) 추가로, 챗봇 사용량 비용은 v3.5 `~$2.88/월` → `~$4.3/월` 수준. 고정 비용 무변경(상시 리소스 없음, IAM 권한도 기존 Bedrock 권한 재사용). `chat_routing_enabled=false`로 끄면 규칙 파서만 사용해 resolve 비용 0.
   - 2026-06-09 v3.5  ADR 0033 Bedrock 챗봇 backend/배포 인프라 구현 반영. ECS task role `bedrock:InvokeModel`과 backend env 추가는 고정 비용 없음. 현 VPC는 private app subnet → NAT Gateway 기본 경로가 있어 Bedrock egress 가능하며, Bedrock interface endpoint는 비용 대비 현 단계 비채택. 사용량 기준에 fast(Haiku 4.5) `$1/M input + $5/M output`, precise(Sonnet 4.6) `$3/M input + $15/M output` 가정과 월 720회 챗봇 예시 비용 `~$2.88/월` 추가. Phase 1 합계는 v3.4 고정비 기준으로 상시 `~$183.15/월`, 데모 운영 `~$12.53/월`로 보정.
   - 2026-06-04 v3.4  ADR 0030 **apply + 롤아웃 완료**. `terraform apply`(autoscaling target/policy 2 + task def revision 31), `update-service --task-definition kjw-aegis-data-backend:31 --force-new-deployment` → `services-stable` STABLE. 검증: 서비스 desired/running 2, rolloutState COMPLETED, task 2개 cpu 1024/memory 2048/HEALTHY, AZ 1a+1c 분산, scalable target min 2/max 2. 고정 비용 ~$178.35/월(상시) · 데모 ~$7.73/월(16h) 적용 시작. 리소스 상태 표 active 갱신.
@@ -97,7 +98,7 @@
 | Data/Dashboard VPC | ECR `aegis/dashboard-backend` | 1 repo | active, permanent root. Image tag `sha-3c20ec3` push 확인 |
 | Data/Dashboard VPC | ECS Fargate Cluster/TaskDef/Service | 1 service / 2 running task | active, desired/running 2, task def **revision 31** (1 vCPU/2 GB), AZ 1a+1c 분산, HEALTHY (ADR 0030, 2026-06-04 apply+롤아웃 완료) |
 | Data/Dashboard VPC | ECS backend Application Auto Scaling (target + 2 policy) | target min 2/max 2 핀, policy 2 (inert) | active (ADR 0030). min==max=2 라 현재 inert. 프로덕션 전환 시 max 3~4 로 활성 |
-| Data/Dashboard VPC | Bedrock chatbot `/chat/query` | fast Haiku 4.5 / precise Sonnet 4.6 | Terraform 구현 완료, apply/rollout 대기. 상시 리소스 없음, 요청 기반 과금 |
+| Data/Dashboard VPC | Bedrock chatbot `/chat/query` | resolve Nova Micro / fast+precise Nova Pro | ADR 0035 평가 완료, Terraform 기본값 반영. 상시 리소스 없음, 요청 기반 과금 |
 | Data/Dashboard VPC | CloudWatch Logs `/ecs/kjw-aegis-data-backend` | 1 log group | active |
 | Data/Dashboard VPC | Secrets Manager `kjw-aegis-data-database-url`, `kjw-aegis-data-redis-url` | 2 | active |
 | Data/Dashboard VPC | IAM OIDC roles (ECR push + web deploy) | 2 roles | active, permanent root. IAM: 무료 |
@@ -224,12 +225,12 @@ ADR 0011(NAT GW 제거)는 ADR 0012로 supersede됨 → Phase 1에서 NAT Gatewa
 | Lambda notifier invocations (DDB Streams) | `$0.20 / 1M` | < 200k/월 | `~$0.00` |
 | Lambda report-generator invocations | `$0.20 / 1M` | 팀원/후속 LLM 보고서 도입 시 3 호출/일 × 30 = 90/월 | `~$0.00` |
 | Lambda compute (GB-sec) | `$0.0000166667 / GB-sec` (400k 무료) | < 100k GB-sec | `~$0.00` |
-| Bedrock chatbot fast — Claude Haiku 4.5 input | `$1.00 / 1M tokens` | 600 queries/월 × 1.2k input | `~$0.72` |
-| Bedrock chatbot fast — Claude Haiku 4.5 output | `$5.00 / 1M tokens` | 600 queries/월 × 300 output | `~$0.90` |
-| Bedrock chatbot precise — Claude Sonnet 4.6 input | `$3.00 / 1M tokens` | 120 queries/월 × 1.5k input | `~$0.54` |
-| Bedrock chatbot precise — Claude Sonnet 4.6 output | `$15.00 / 1M tokens` | 120 queries/월 × 400 output | `~$0.72` |
-| Bedrock chatbot resolve — Claude Haiku 4.5 input (ADR 0034) | `$1.00 / 1M tokens` | 720 queries/월 × 1.2k input | `~$0.86` |
-| Bedrock chatbot resolve — Claude Haiku 4.5 output (ADR 0034) | `$5.00 / 1M tokens` | 720 queries/월 × 150 output | `~$0.54` |
+| Bedrock chatbot resolve — Nova Micro input (ADR 0035) | `$0.035 / 1M tokens` | 720 queries/월 × 1.2k input | `~$0.03` |
+| Bedrock chatbot resolve — Nova Micro output (ADR 0035) | `$0.14 / 1M tokens` | 720 queries/월 × 150 output | `~$0.02` |
+| Bedrock chatbot fast — Nova Pro input (ADR 0035) | `$0.80 / 1M tokens` | 600 queries/월 × 1.2k input | `~$0.58` |
+| Bedrock chatbot fast — Nova Pro output (ADR 0035) | `$3.20 / 1M tokens` | 600 queries/월 × 300 output | `~$0.58` |
+| Bedrock chatbot precise — Nova Pro input (ADR 0035) | `$0.80 / 1M tokens` | 120 queries/월 × 1.5k input | `~$0.14` |
+| Bedrock chatbot precise — Nova Pro output (ADR 0035) | `$3.20 / 1M tokens` | 120 queries/월 × 400 output | `~$0.15` |
 | DynamoDB on-demand write | `$1.25 / 1M WCU` | factory-a 3s/20s 주기 = ~120k write/월 | `~$0.15` |
 | DynamoDB GRAPH#5M write/read/storage | on-demand/storage | 3공장 기준 5분 bucket ~25,920 write/월 + < 1GB | `~$0.03` |
 | DynamoDB on-demand read | `$0.25 / 1M RCU` | Backend 캐시 hit으로 read 감소 ~50k/월 | `~$0.013` |

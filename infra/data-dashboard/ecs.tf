@@ -272,7 +272,7 @@ resource "aws_iam_role_policy" "ecs_task_inline" {
 
 # ---------------------------------------------------------------------------
 # ECS Task Definition
-# 0.5 vCPU / 1 GB, awsvpc, FARGATE, LINUX/X86_64
+# Default after ADR 0030: 1 vCPU / 2 GB, awsvpc, FARGATE, LINUX/X86_64
 # Secrets injected at launch: DATABASE_URL, REDIS_URL (from Secrets Manager)
 # ---------------------------------------------------------------------------
 
@@ -345,6 +345,10 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "BEDROCK_READ_TIMEOUT_SECONDS", value = "20" },
         { name = "BEDROCK_OPERATION_TIMEOUT_SECONDS", value = "25" },
         { name = "BEDROCK_MAX_ATTEMPTS", value = "2" },
+        { name = "CHAT_ROUTING_ENABLED", value = tostring(var.chat_routing_enabled) },
+        { name = "BEDROCK_RESOLVE_MODEL", value = var.bedrock_resolve_model },
+        { name = "BEDROCK_RESOLVE_MAX_TOKENS", value = "512" },
+        { name = "BEDROCK_RESOLVE_OPERATION_TIMEOUT_SECONDS", value = "12" },
       ]
 
       # Sensitive values injected from Secrets Manager at container launch.
@@ -387,7 +391,7 @@ resource "aws_ecs_task_definition" "backend" {
 
 # ---------------------------------------------------------------------------
 # ECS Service
-# desired_count=1, private_app subnets, deployment circuit breaker
+# desired_count defaults to 2 after ADR 0030, private_app subnets, deployment circuit breaker
 # ALB target group wired in alb.tf (port 8000, health check /healthz)
 # ---------------------------------------------------------------------------
 

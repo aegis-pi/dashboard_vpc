@@ -170,13 +170,25 @@ variable "bedrock_enabled" {
 variable "bedrock_model_fast" {
   description = "Bedrock inference profile ID for the fast chatbot tier."
   type        = string
-  default     = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  default     = "apac.amazon.nova-pro-v1:0"
 }
 
 variable "bedrock_model_precise" {
   description = "Bedrock inference profile ID for the precise chatbot tier."
   type        = string
-  default     = "global.anthropic.claude-sonnet-4-6"
+  default     = "apac.amazon.nova-pro-v1:0"
+}
+
+variable "bedrock_resolve_model" {
+  description = "Bedrock inference profile ID for chat query resolution/tool-use."
+  type        = string
+  default     = "apac.amazon.nova-micro-v1:0"
+}
+
+variable "chat_routing_enabled" {
+  description = "Enable LLM query resolution before the deterministic chat parser."
+  type        = bool
+  default     = true
 }
 
 variable "bedrock_inference_profile_resource_patterns" {
@@ -185,6 +197,10 @@ variable "bedrock_inference_profile_resource_patterns" {
   default = [
     "global.anthropic.claude-haiku-4-5-20251001-v1:0",
     "global.anthropic.claude-sonnet-4-6*",
+    "apac.amazon.nova-micro-v1:0",
+    "apac.amazon.nova-lite-v1:0",
+    "apac.amazon.nova-pro-v1:0",
+    "global.amazon.nova-2-lite-v1:0",
   ]
 }
 
@@ -194,6 +210,10 @@ variable "bedrock_foundation_model_resource_patterns" {
   default = [
     "anthropic.claude-haiku-4-5-*",
     "anthropic.claude-sonnet-4-6*",
+    "amazon.nova-micro-v1:0",
+    "amazon.nova-lite-v1:0",
+    "amazon.nova-pro-v1:0",
+    "amazon.nova-2-lite-v1:0",
   ]
 }
 

@@ -50,7 +50,7 @@
 
 | window | 조회 경로 | 최대 아이템 수 |
 | --- | --- | --- |
-| `1h` | `HISTORY#STATE#` + max_items=500 cap | 500개 (ScanIndexForward=False) |
+| `1h` | `HISTORY#STATE#` + window-aware default limit | 기본 2000개 (명시 limit 최대 2000) |
 | `6h` | `GRAPH#5M#` | 최대 72개 |
 | `12h` | `GRAPH#5M#` | 최대 144개 |
 | `24h` | `GRAPH#5M#` | 최대 288개 |
@@ -59,7 +59,7 @@
 - 현재: 48h (data-processor 환경변수 미변경)
 - 목표: 2h (ADR 0025 기준)
 - TTL 변경은 `HISTORY_TTL_HOURS=2` data-pipeline 재배포 필요. 기존 아이템 자연 만료까지 시간 소요.
-- TTL 2h 적용 전까지는 max_items=500 cap 유지.
+- TTL 2h 적용 전까지는 테이블 아이템 수가 많을 수 있으므로 1h 조회는 기본 2000개 limit과 `since` delta refresh를 유지한다.
 
 **GRAPH#5M 데이터 현황 (2026-05-29)**:
 - factory-b, factory-c: Lambda GraphAggregator5m 배포 후 GRAPH#5M 데이터 적재 중
@@ -85,7 +85,7 @@
 - 이벤트는 risk level 변경, risk score 10점 이상 급락, risk score 10점 이상 회복을 표시한다.
 
 **잔여 한계**:
-- `window=1h` max_items=500 cap 유지: 1h 이내에서도 500개 초과 구간 스파이크 유실 가능
+- `window=1h` 기본 limit은 2000개로 상향 완료. 명시 limit은 최대 2000까지 허용
 - HISTORY#STATE TTL이 48h인 동안은 테이블 아이템 수 여전히 많음
 - GRAPH#5M 조회는 해당 공장에 GRAPH#5M 데이터가 없으면 빈 배열 반환
 
@@ -131,14 +131,81 @@ scripts/destroy/destroy-hub.sh
 scripts/destroy/destroy-all.sh
 ```
 
-## 현재 Active 기준 (2026-06-10)
+## 현재 Active 기준 (2026-06-11)
 
 - Dashboard Web: `https://dashboard.aegis-pi.cloud`
 - Dashboard API: `https://api.aegis-pi.cloud`
 - Backend: ECS Fargate desired/running 2 기준으로 운영
 - 인증/권한: Cognito + RDS RBAC (`app_user`, `factory`, `user_factory_access`, `audit_log`)
 - 운영 기능: Fleet/Factory, Cloud Infra, Reports S3 조회, 이미지 스냅샷, AI 채팅 데이터 QA
-- 후속: 인증 사용자로 실제 Bedrock tool-use 질의 및 `/image-snapshots` 실데이터 수기 확인, LLM 보고서 생성기
+- 후속: 인증 사용자로 실제 Bedrock Nova 질의 및 `/image-snapshots` 실데이터 수기 확인, LLM 보고서 생성기
+
+## AI 채팅 Bedrock 모델 평가
+
+기준:
+
+```text
+Resolve   apac.amazon.nova-micro-v1:0
+Fast      apac.amazon.nova-pro-v1:0
+Precise   apac.amazon.nova-pro-v1:0
+```
+
+평가 스크립트:
+
+```bash
+apps/dashboard-backend/scripts/evaluate_bedrock_chat_models.py \
+  --preset nova-quality \
+  --mode all \
+  --yes-live-bedrock \
+  --output /tmp/aegis-nova-quality-eval.jsonl
+```
+
+Dashboard `/chat` quick start 추천 문항 4개만 확인:
+
+```bash
+apps/dashboard-backend/scripts/evaluate_bedrock_chat_models.py \
+  --preset nova-quality \
+  --mode resolve \
+  --case-set quickstart \
+  --yes-live-bedrock \
+  --output /tmp/aegis-nova-quality-quickstart-eval.jsonl
+```
+
+비교 preset:
+
+```text
+baseline         기존 Claude Haiku/Sonnet 기준선
+nova-low-cost    resolve Micro / fast Lite / precise Pro
+nova-balanced    resolve Micro / fast Micro / precise Pro
+nova-aggressive  resolve Micro / fast Micro / precise Lite
+nova-2-lite      global Nova 2 Lite 단일 모델
+nova-quality     resolve Micro / fast Pro / precise Pro (채택)
+```
+
+운영 기준:
+
+- raw 평가 결과는 `/tmp` 등 git 추적 외부에 둔다.
+- 문서에는 case id, pass/fail, 지연, 비용 추정만 요약한다.
+- 모델 교체 후에도 `/chat/query` 응답은 `model_tier`만 노출한다. raw model id는 API 응답에 노출하지 않는다.
+- 운영 배포 전 `terraform -chdir=infra/data-dashboard plan`에서 ECS task definition env와 Bedrock IAM allowlist 변경만 포함되는지 확인한다.
+
+2026-06-11 평가 요약:
+
+| 후보 | 결과 |
+| --- | --- |
+| `nova-low-cost` | Resolve 5/5. fast Lite가 센서 정상범위를 근거 없이 단정해 기본값 비채택 |
+| `nova-aggressive` | 비용 최저. precise Lite가 원인 표현을 다소 강하게 단정해 운영 기본값 비채택 |
+| `nova-2-lite` | global profile. 정상범위/권고 생성 경향과 residency 이유로 비채택 |
+| `nova-quality` | Resolve 5/5, fast/precise 모두 확인·추정·missing 분리 양호. 기본값 채택 |
+
+Quick start 4문항 평가:
+
+| 문항 | Nova Micro resolve 결과 |
+| --- | --- |
+| 증빙 사진 + 09:35 위험 점수 spike 요약 | `spike_check` / `point` / `factory-a` 일치 |
+| 2026-06-09 보고서 주요 이벤트 요약 | `report` / `point` / `factory-a` 일치 |
+| 오후 3시 안전 점수 급락 원인 | `cause_analysis` / `point` / `factory-a` 일치 |
+| 오후 2시~4시 안전 점수·AI 탐지 추이 비교 | `history_trend` / `interval` / `factory-a` 일치 |
 
 ## Dashboard RBAC 사용자 관리
 
@@ -178,7 +245,7 @@ Dashboard Web          /admin/users 사용자 관리 화면
 
 - Cognito sub 값은 개인 식별자이므로 문서에 기록하지 않는다.
 - 사용자 비밀번호는 Cognito 임시 비밀번호/초기 설정 흐름으로만 다룬다. RDS에 비밀번호를 저장하지 않는다.
-- `DELETE /admin/users/{user_id}`는 Cognito 사용자를 disable하고 RDS 사용자를 `disabled`로 표시하는 soft-delete다.
+- `DELETE /admin/users/{user_id}`는 Cognito `AdminDeleteUser` 실행 후 RDS `app_user`와 `user_factory_access` row를 삭제한다. 현재 운영 기준은 hard delete이며, 같은 email의 과거 disabled 잔여 row가 있으면 생성 시 best-effort 정리한다.
 - Backend startup은 `DATABASE_AUTO_CREATE_METADATA=true`일 때 RBAC metadata table을 idempotent하게 생성하고 `DASHBOARD_FACTORY_IDS`의 공장 ID를 `factory` table에 동기화한다.
 
 운영 확인:
@@ -670,7 +737,7 @@ git diff --check
 # 1. IAM role apply (infra/data-dashboard)
 terraform -chdir=infra/data-dashboard apply \
   -var="dashboard_domain_name=aegis-pi.cloud" \
-  -var="ecs_backend_desired_count=1" \
+  -var="ecs_backend_desired_count=2" \
   -var="backend_container_image=<account>.dkr.ecr.ap-south-1.amazonaws.com/aegis/dashboard-backend:sha-9d2c200"
 
 # 2. apply 후 output 확인 (ARN/ID만, 실제 값 문서 기록 금지)
