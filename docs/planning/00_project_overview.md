@@ -1,9 +1,10 @@
 # 프로젝트 개요
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-17
 
 수정 이력:
+- 2026-06-17 v0.7  2026-06-16 Data/Dashboard 재생성 root destroy 상태 반영. Phase 1 Step 10은 자동화/문서 대부분 완료, 남은 작업은 재빌드 후 데모 리허설·인증 사용자 수기 검증·캡처로 정리.
 - 2026-06-04 v0.6  워크스트림 B Phase 1 Step 0~9.5 완료 + Step 10 진행 반영. Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회 운영 배포, 코드 UI 마무리 보정만 잔여. "Risk Twin / Dashboard VPC 진입 준비" 표 항목을 운영 배포 상태로 정정.
 - 2026-05-22 v0.5  워크스트림 B Phase 1 Step 2~5.5 완료 및 Data/Dashboard VPC destroy 상태, Step 6 진입 준비 반영.
 - 2026-05-20 v0.4  2026-05-15 rebuild, 워크스트림 B Phase 1 통합 목표, M3 Issue 1/4 완료 상태 반영.
@@ -28,7 +29,7 @@ Aegis-Pi 프로젝트의 문제 정의, 목표, 사용자, 핵심 기능, 현재
 - M1 Issue 12에서 `configs/runtime/runtime-config.yaml`과 VM dummy data 추천값을 작성했다.
 - M2 Issue 1~6에서 Tailnet/tag/Auth Key 정책 수립, `factory-a-master` Tailscale 참여, EKS Hub Tailscale Operator/egress 구성, `factory-a` kubeconfig/ArgoCD cluster 등록, `factory-a-podinfo-smoke` Sync/Healthy, Tailscale egress 장애/복구 검증을 완료했다.
 - 워크스트림 A는 M3 Issue 2 ECR image push/pull 검증과 Spoke imagePullSecret 방식을 진행 중이다. 본 환경에서는 워크스트림 A 자산을 수정/실행하지 않는다.
-- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~9.5를 구현 완료하고 운영 배포(Backend/Web/Cloud Infra/RBAC/보고서 조회)까지 마쳤다. 현재는 Step 10 운영 자동화/데모 진행 단계이며, 코드는 UI 마무리 보정만 남았다. 상세는 `docs/planning/16_data_dashboard_vpc_workplan.md`와 `docs/issues/SESSION_STATE.md`.
+- 본 환경(워크스트림 B)은 1번 Data/Dashboard VPC Phase 1 Step 0~10의 코드/IaC/운영 문서 자동화 대부분을 구현 완료했다. Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회/이미지 스냅샷/AI 채팅 데이터 QA는 배포 검증을 마쳤고, 2026-06-16 비용 절감을 위해 `infra/data-dashboard` 재생성 root를 destroy했다. 현재는 다음 데모 전 재빌드 후 수기 검증·캡처·리허설을 남겨 둔 상태다. 상세는 `docs/planning/16_data_dashboard_vpc_workplan.md`와 `docs/issues/SESSION_STATE.md`.
 - LLM 일간 보고서 생성기(Bedrock, ADR 0016), `factory-b`/`factory-c`, factory-a Edge Agent 실시간 송신 측, 일부 CI/CD 마무리는 워크스트림 A 또는 후속 확장 단계다.
 
 ## 프로젝트명

@@ -419,7 +419,7 @@ M0~M7 전체 구현이 완료된 상태에서 `docs/`와 `configs/` 기준 문�
 - [ ] `config-management.md` - 최종 `runtime-config.yaml` 구조 반영
 - [ ] `deploy-pipeline.md` - 배포 지연 시간 실측값 및 정책 반영
 - [ ] `hub-cloud.md` - 실제 네임스페이스 구조 및 서비스 배치 반영
-- [ ] `data-dashboard-vpc.md` - Data / Dashboard VPC, ALB/WAF/Auth, 조회 경계 반영
+- [ ] `data-dashboard-vpc.md` - Data / Dashboard VPC, CloudFront/ALB/Auth, 조회 경계 반영 (WAF/Shield는 후속 보안 강화)
 - [ ] `mesh-vpn.md` - 최종 Tailscale 구성 및 접근 정책 반영
 - [ ] `safe-edge-setup-plan.md` - 실제 설치 과정에서 달라진 부분 보정
 - [ ] `README.md` - 전체 구현 완료 상태 반영 및 운영 시작 선언

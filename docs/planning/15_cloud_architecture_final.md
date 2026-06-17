@@ -1,9 +1,10 @@
 # Cloud Architecture Final
 
 상태: source of truth
-기준일: 2026-05-21
+기준일: 2026-06-17
 
 수정 이력:
+- 2026-06-17 v0.6  ADR 0033/0035 AI 채팅 데이터 QA와 S3 image_snapshot read path를 Phase 1 Dashboard Backend 기능으로 추가. LLM 일간 보고서 생성기는 ADR 0016 팀원/후속으로 유지하고, 보고서 조회 경로는 S3 `reports/daily/` read-only 구현 기준으로 정정.
 - 2026-05-21 v0.5  워크스트림 B 신규 Terraform 리소스 네이밍에 개인 작업 prefix `KJW` 적용. 1번 VPC 신규 리소스 기본 prefix를 `KJW-AEGIS-Data-*`로 고정.
 - 2026-05-20 v0.4  Phase 1 통합 결정(ADR 0012~0017)을 본문에 반영. 1번 VPC의 서버리스 MVP/비어 있는 VPC 표현 제거.
 - 2026-05-15 v0.3  워크스트림 분리와 1번 VPC MVP 토폴로지 반영.
@@ -249,12 +250,12 @@ DynamoDB와 S3는 VPC 밖 managed service로 유지한다. 1번 VPC에는 S3/Dyn
 - ACM (us-east-1: CloudFront, ap-south-1: ALB)
 - Cognito User Pool + Hosted UI
 - Lambda data processor (IoT Rule trigger, 팀 합의 영역)
-- Lambda report-generator (EventBridge schedule)
-- Bedrock Claude 3 Haiku
+- Lambda report-generator (EventBridge schedule, 팀원/후속)
+- Bedrock (AI 채팅 데이터 QA는 Nova Micro/Pro, 일간 보고서 생성기는 팀원/후속)
 - EventBridge Scheduler
 - DynamoDB AEGIS-DynamoDB-FactoryStatus (LATEST + HISTORY + Streams)
 - DynamoDB aegis-daily-report
-- S3 aegis-bucket-data raw/processed/reports prefix
+- S3 aegis-bucket-data raw/processed/processed_agg/reports/image_snapshot prefix
 ```
 
 ### 데이터 흐름
@@ -342,11 +343,11 @@ VPC 외부 / 글로벌 (1번 VPC와 한 영역으로 다이어그램 표기)
   - S3 dashboard-web bucket (정적 SPA 호스팅, OAC, `aegis-bucket-data`와 분리된 신규 bucket)
   - CloudFront (+ WAF) → S3 dashboard-web bucket
   - Lambda data processor (IoT Rule trigger)
-  - Lambda report-generator + EventBridge Scheduler
-  - Bedrock Claude 3 Haiku
+  - Lambda report-generator + EventBridge Scheduler (팀원/후속)
+  - Bedrock Nova chatbot (구현 완료) / 보고서 생성기용 Bedrock (팀원/후속)
   - DynamoDB LATEST/HISTORY (`AEGIS-DynamoDB-FactoryStatus`)
   - DynamoDB daily report metadata (`aegis-daily-report`)
-  - S3 raw / S3 processed (단일 bucket `aegis-bucket-data` + prefix, ADR 0009)
+  - S3 raw / processed / processed_agg / reports / image_snapshot (단일 bucket `aegis-bucket-data` + prefix, ADR 0009/0029/0033)
   - Cognito User Pool (관리자 전용, MFA Required)
   - Route53 (신규 도메인) + ACM
 ```
@@ -467,10 +468,16 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
                            └ DynamoDB Streams → Lambda notifier → Redis → WebSocket
 
 보고서 흐름:
-  EventBridge Scheduler (09:00 KST)
+  EventBridge Scheduler (09:00 KST, 팀원/후속)
     → Lambda report-generator
-    → Bedrock Claude 3 Haiku
-    → S3 reports/ + DynamoDB aegis-daily-report
+    → Bedrock
+    → S3 reports/daily/
+
+AI 채팅 / 증빙 조회:
+  Dashboard Web
+    → ECS Backend /chat/query
+    → Bedrock Nova resolve/explain + DDB/S3 evidence
+    → S3 processed, processed_agg, reports/daily, image_snapshot read
 ```
 
 확정 결정:
@@ -481,12 +488,13 @@ VPC Peering / Transit Gateway 등으로 두 VPC를 네트워크 연결하지 않
 | API 런타임 | ECS Fargate Dashboard Backend + ALB. ADR 0007의 Dashboard API 부분 supersede | 0012 |
 | Lambda data processor | IoT Rule trigger Lambda. ADR 0007 중 이 부분은 유효 | 0007 |
 | 인증 | Cognito User Pool (Self sign-up Disabled, MFA Required) + 앱 레벨 JWT 검증 | 0008 |
-| S3 | 단일 bucket `aegis-bucket-data` + raw/processed prefix 분리 | 0009 |
+| S3 | 단일 bucket `aegis-bucket-data` + raw/processed/processed_agg/reports/image_snapshot prefix 분리 | 0009/0029/0033 |
 | 도메인 | Gabia 신규 + Route53 위임, Admin UI(`*.minsoo-tech.cloud`)와 분리 | 0010 |
 | 1번 VPC NAT Gateway | ADR 0011 supersede. NAT GW × 1 단일 AZ 재도입 | 0012 |
 | 메타 저장소 | RDS PostgreSQL `db.t4g.micro`, Single-AZ, gp3 20GiB | 0017 |
 | 캐시/실시간 | ElastiCache Redis + DynamoDB Streams + Lambda notifier + WebSocket | 0014/0015 |
-| 일간 보고서 | Bedrock Claude 3 Haiku + EventBridge + Lambda report-generator | 0016 |
+| AI 채팅 데이터 QA | ECS Backend `/chat/query` + Bedrock Nova resolve/explain + DDB/S3 evidence | 0033/0035 |
+| 일간 보고서 | S3 `reports/daily/` 조회 경로 구현 완료. Bedrock + EventBridge + Lambda report-generator 생성기는 팀원/후속 | 0016/0029 |
 | Replay/Near-miss/AI Worker | Phase 1 범위 외. Phase 3 트리거 기반 검토 | 17 로드맵 |
 
 ## 2026-05-14 수정 방향

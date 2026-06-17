@@ -1,8 +1,9 @@
 # Data / Dashboard VPC 확장 로드맵
 
 상태: source of truth
-기준일: 2026-05-19
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17 v0.4  ADR 0030/0035와 2026-06-16 Data/Dashboard destroy 상태 반영. Phase 1 비용을 ECS 1 vCPU/2 GB min 2, Nova chatbot, permanent/dns root 잔여 기준으로 정정하고 상세 산정은 `docs/ops/15_aws_cost_baseline.md` v3.8을 따르도록 갱신.
   - 2026-05-19 v0.3  ADR 0017 반영. 메타 저장소를 RDS PostgreSQL로 변경하고 비용·Phase 2 Multi-AZ 표현 조정.
   - 2026-05-18 v0.2  Phase 1 MVP(서버리스 최소 구성)와 Phase 1.5(컨테이너 확장)를 통합. Phase 1 = 통합된 목표.
   - 2026-05-18 v0.1  초안. Phase 1 → 1.5 → 2 → 3 → 4 단계와 정량 트리거 정의.
@@ -63,8 +64,11 @@ factory-a/b/c → Edge Agent → IoT Core (3s sensor, 20s heartbeat)
 실시간 푸시               DDB Streams → Lambda notifier (VPC-attach)
                           → Redis Pub/Sub → ECS WebSocket fan-out
 
+AI 채팅 데이터 QA          ECS Backend → Bedrock Nova Micro/Pro
+                          → DDB/S3 evidence 기반 응답
+
 LLM 일간 보고서            EventBridge schedule → Lambda report-generator
-                          → Bedrock Claude 3 Haiku → S3 reports/
+                          → Bedrock → S3 reports/ (팀원/후속)
 ```
 
 ### 관련 ADR
@@ -88,13 +92,13 @@ ADR 0007(Dashboard API Lambda)과 ADR 0011(NAT GW 제거)는 Phase 1에서 **Das
 ### 운영 패턴 (확정)
 
 ```text
-데모 직전:  scripts/build/build-data-dashboard.sh   (예정 — Terraform apply)
-데모 직후:  scripts/destroy/destroy-data-dashboard.sh (예정 — snapshot 후 destroy)
+데모 직전:  scripts/build/build-data-dashboard.sh   (Terraform apply)
+데모 직후:  scripts/destroy/destroy-data-dashboard.sh (RDS final snapshot 후 destroy)
 ```
 
-- 월 데모 2회 × 8시간 가동 기준 ~$8~10/월
-- 상시 가동 시 ~$125/월
-- destroy 후 비용 ~$2~3 (RDS snapshot 보존 시)
+- 월 데모 2회 × 8시간 가동 기준 최신 추정은 `docs/ops/15_aws_cost_baseline.md` v3.8 기준을 따른다.
+- 상시 가동 시 최신 추정은 ECS 1 vCPU/2 GB min 2와 Bedrock Nova chatbot 사용량을 포함한 비용 baseline을 따른다.
+- 2026-06-16 기준 `infra/data-dashboard` 재생성 root는 destroy 완료(state 0). destroy 후 비용은 permanent/dns root 잔여 `~$0.55/월` + RDS final snapshot storage 중심이다.
 
 ### 비용 baseline
 
@@ -102,22 +106,22 @@ ADR 0007(Dashboard API Lambda)과 ADR 0011(NAT GW 제거)는 Phase 1에서 **Das
 | --- | --- | --- | --- |
 | NAT Gateway × 1 | $0.056 | $40.88 | $0.90 |
 | ALB | $0.0225 + LCU | $18~22 | $0.50 |
-| ECS Fargate (0.5 vCPU / 1GB) | $0.025 | $18.25 | $0.40 |
+| ECS Fargate (1 vCPU / 2GB, min 2) | ~$0.0987 | ~$72.08 | ~$1.58 |
 | RDS PostgreSQL `db.t4g.micro` | $0.021 | $15.33 | $0.34 |
 | RDS PostgreSQL gp3 20GiB | — | $2.62 | $2.62 |
 | ElastiCache Redis (cache.t4g.micro) | $0.016 | $11.68 | $0.26 |
-| Bedrock Claude 3 Haiku (일 3 호출) | — | $0.22 | $0.22 |
-| Lambda + DDB + S3 + CloudFront + Cognito + API GW | — | ~$2 | ~$2 |
-| **합계** | — | **~$125** | **~$6.55 + 사용량 ~$2 = ~$8~10** |
+| Bedrock chatbot Nova Micro/Pro (월 720회 예시) | — | usage-based | usage-based |
+| Lambda + DDB + S3 + CloudFront + Cognito | — | usage-based | usage-based |
+| **합계** | — | **최신 baseline 참조** | **최신 baseline 참조** |
 
-데모 운영 패턴은 ALB·RDS PostgreSQL compute·Redis·Fargate가 idle인 시간이 길어 실제 청구는 더 낮을 수 있다. RDS gp3 storage와 snapshot은 월정액 성격이 있으므로 첫 운영 사이클 후 Cost Explorer로 보정.
+상세 숫자는 `docs/ops/15_aws_cost_baseline.md`가 source of truth다. 데모 운영 패턴은 ALB·RDS PostgreSQL compute·Redis·Fargate를 필요할 때만 올려 고정 비용을 줄인다. RDS gp3 storage와 final snapshot은 월정액 성격이 있으므로 운영 사이클 후 Cost Explorer로 보정한다.
 
 ### 성공 기준
 
-- factory-a 실제 센서 값이 IoT Core를 거쳐 1초 이내 대시보드 WebSocket으로 push됨
+- 재생성 root build 후 DDB Streams → notifier → Redis → Dashboard WebSocket push가 1~2초 목표 안에 들어옴. factory-a Edge Agent → IoT Core → DDB end-to-end 실시간 경로는 Edge Agent 재활성 후 별도 검증
 - factory-b/c dummy 값이 동일 경로로 표시됨
 - RDS PostgreSQL의 사용자·공장·권한 관계로 권한 기반 공장 목록 필터링 정상
-- 매일 09:00 KST 자동 일간 보고서 생성 + Dashboard 보고서 탭에서 열람
+- S3 `reports/daily/`에 존재하는 보고서를 Dashboard 보고서 탭에서 열람. 자동 일간 보고서 생성기는 ADR 0016 팀원/후속
 - `destroy-data-dashboard.sh` 후 AWS Cost Explorer에서 24h 이내 실행 리소스 비용이 0에 수렴. RDS snapshot 보존 비용은 별도 추적
 
 ## Phase 2 — Production-Ready 강화

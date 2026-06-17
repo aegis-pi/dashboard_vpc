@@ -1,8 +1,9 @@
 # AI Agent Harness — Aegis-Pi Risk Twin
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17  `docs/issues/SESSION_STATE.md` 2026-06-16 스냅샷과 정렬. Data/Dashboard 재생성 root(`infra/data-dashboard`)는 사용자 요청으로 destroy 완료(state 0)했고, `infra/data-dashboard-permanent` 25 resources와 `infra/data-dashboard-dns` 1 resource만 유지 중임을 반영. Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회/이미지 스냅샷/AI 채팅 코드는 구현 완료 상태이나, API/ECS/RDS/Redis/Lambda/VPC 런타임은 `scripts/build/build-data-dashboard.sh` 재실행 전 비활성 상태로 구분.
   - 2026-06-04  Phase 1 Step 0~9.5 완료 후 Step 10 진행 + Dashboard 운영 기능 반복 배포 반영. Cloud Infra 화면 + Fast/Slow collector(ADR 0027), Factory Timeline/top_causes, GRAPH#5M(ADR 0025/0026), staleness 통일(ADR 0028), S3 보고서 조회(ADR 0029), ECS Auto Scaling(ADR 0030), RBAC 사용자 관리(ADR 0031). 운영 backend image `sha-e96bf81`(ECS revision 37), desired/running 2. TL;DR·§ 2 갱신. 코드는 UI 마무리 보정만 잔여, LLM 보고서 생성기(ADR 0016)만 팀원/후속.
   - 2026-05-27  Aegis-frontend reference 추가와 운영 Dashboard UI 포팅 진행 상태 반영. web `e055583`, backend ECS image `sha-3b8439f`, `/healthz` 200, post-apply plan No changes.
   - 2026-05-27  Dashboard 운영 UI/실데이터 shape 정합성 수정 배포 반영. commit `439e27a`, backend/web CI 성공, ECS backend image `sha-439e27a`, `/healthz` 200, post-apply plan No changes.
@@ -29,7 +30,7 @@
 
 - **프로젝트**: Aegis-Pi Risk Twin — Safe-Edge 단일 공장 엣지를 멀티 공장 중앙 관제로 확장하는 Risk Twin 플랫폼
 - **본 작업 환경(워크스트림 B)**: 1번 Data / Dashboard VPC 구현 (Phase 1 통합 결정)
-- **본 환경의 다음 작업**: Phase 1 Step 0~9.5 완료. Dashboard Backend/Web/Cloud Infra/RBAC/보고서 조회 운영 배포 완료(backend `sha-e96bf81`, ECS revision 37, desired/running 2). 다음: UI 마무리 보정, Step 10 운영 자동화(build/destroy 스크립트는 존재, drawio 갱신 잔여)/데모 준비, 사용자 수동 화면 검증/캡처. LLM 보고서 생성기(ADR 0016)만 팀원/후속
+- **본 환경의 다음 작업**: Phase 1 Step 0~10의 코드·IaC·문서 자동화 대부분 완료. 2026-06-16 기준 `infra/data-dashboard` 재생성 root는 destroy 완료(state 0)했고, `infra/data-dashboard-permanent`와 `infra/data-dashboard-dns`만 유지 중이다. 다음 데모/수기 검증 전에는 `scripts/build/build-data-dashboard.sh`로 API/ECS/RDS/Redis/Lambda/VPC 런타임을 재생성한다. LLM 보고서 생성기(ADR 0016)는 팀원/후속
 - **본 환경이 손대지 않는 영역(워크스트림 A)**: `infra/hub/`, `infra/foundation/`, `infra/mesh-vpn/`, `charts/aegis-hub/`, `charts/aegis-spoke/`, `scripts/build/build-hub.sh`, `scripts/destroy/destroy-hub.sh`, Admin UI 도메인 (`*.minsoo-tech.cloud`), `aegis/edge-agent` ECR repo, Tailscale ACL/태그
 - **금지**: 비밀번호 / token / private key / certificate / MFA OTP / 계정 세부 ARN 의 문서 기록, `kubectl apply` 직결로 GitOps drift 만들기, 미완료 마일스톤을 "complete" 마킹, 사용자 승인 없이 `destroy-*.sh` 실행
 - **세션 시작 시 우선 읽기**: `docs/issues/SESSION_STATE.md` → 본 문서 § 3·5·6 → `docs/planning/16_data_dashboard_vpc_workplan.md`
@@ -51,15 +52,15 @@
 
 ---
 
-## 2. 현재 구현 상태 (Current Implemented State, 2026-06-04 기준)
+## 2. 현재 구현 상태 (Current Implemented State, 2026-06-17 기준)
 
 - **완료**: M0 전체, M1 Issue 0~10/12, M2 Issue 1~6, M3 Issue 1/4
 - **진행 중(워크스트림 A · 본 환경 미진행)**: M3 Issue 2 (ECR push/pull 검증, Spoke imagePullSecret)
 - **완료(워크스트림 B · 본 환경)**: Phase 1 Step 0~9.5 완료. Step 9 end-to-end 통합 검증(2026-05-26, cloud-side 주입 기반), Step 9.5 permanent resource split(`infra/data-dashboard-permanent/` 25 resources). 이후 운영 배포로 추가: Cloud Infra 화면 + Fast/Slow collector(`apps/cloud-infra-collector/`, ADR 0027), Factory Timeline/top_causes, GRAPH#5M(ADR 0025/0026), staleness 통일(ADR 0028), S3 보고서 조회(ADR 0029), ECS Auto Scaling(ADR 0030), RBAC 사용자 관리(ADR 0031). M4 소비측(Lambda data processor/notifier/pipeline_status)·M6 Dashboard 화면 구현 완료
-- **진행 중(워크스트림 B)**: Phase 1 Step 10 운영 자동화/데모, UI 마무리 보정
+- **진행 중(워크스트림 B)**: Phase 1 Step 10 데모 리허설·인증 사용자 수기 검증·캡처 후속
 - **보류**: M0 Issue 6 (NFS), M1 Issue 11 (운영 보안 강화), EKS API endpoint CIDR 축소
-- **후속(워크스트림 B)**: LLM 일간 보고서 생성기(Bedrock, ADR 0016 · 팀원/후속), factory-a Edge Agent 재활성 후 IoT→DDB 실시간 경로 검증
-- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Data/Dashboard는 Step 9.5 이후 `infra/data-dashboard` 일시 root를 build/destroy 사이클로 운영(Backend ECS `sha-e96bf81`/revision 37, desired/running 2, `/healthz`·`/readyz` ok). 영구 자원은 `infra/data-dashboard-permanent`/`infra/data-dashboard-dns`. https://dashboard.aegis-pi.cloud / https://api.aegis-pi.cloud 활성
+- **후속(워크스트림 B)**: LLM 일간 보고서 생성기(Bedrock, ADR 0016 · 팀원/후속), factory-a Edge Agent 재활성 후 IoT→DDB 실시간 경로 검증, 인증 사용자로 실제 Bedrock Nova 질의 및 `/image-snapshots` 실데이터 수기 확인
+- **현재 AWS 상태**: 2026-05-15 rebuild 후 Hub/Foundation/IoT/Admin UI 활성. Data/Dashboard는 2026-06-16 사용자 요청으로 `infra/data-dashboard` 재생성 root destroy 완료(state 0). VPC/NAT/ALB/ECS/RDS/Redis/Lambda/SQS/runtime Secrets/API DNS/ALB ACM은 내려간 상태이며, `infra/data-dashboard-permanent`(25 resources)와 `infra/data-dashboard-dns`(1 resource)는 유지한다. Dashboard Web/인증/도메인/ECR/report table 같은 영구 자원은 유지되지만 API 런타임은 `scripts/build/build-data-dashboard.sh` 재실행 전 비활성이다.
 
 본 환경의 시점별 정확한 상태 스냅샷은 항상 `docs/issues/SESSION_STATE.md`를 우선한다. 본 harness 본문은 phase 경계와 책임 경계만 정의한다.
 
@@ -532,13 +533,13 @@
 - M0 Issue 12 — `start_test` 자동화 부분 완료. Hot/Cold 티어링 자동화 미완
 - M1 Issue 11 — Admin UI 운영 보안 강화 (WAF / Cognito / OIDC): 보류
 - EKS API endpoint public CIDR 축소: 보류
-- `apps/dashboard-backend/` — **완료** (Phase 1 Step 6~7, 2026-05-26). pytest 18 passed, docker build 통과, ECS Fargate 배포 및 `/healthz` 200 확인
-- `apps/dashboard-web/` — **완료** (Phase 1 Step 8, 2026-05-26). Vite+React SPA, npm build/lint/test 통과.
-- `.github/workflows/dashboard-web.yml` — **구현/배포 완료** (Phase 1 Step 9, 2026-05-26). test + build-and-deploy jobs 성공. Terraform apply 2 add 0 change. repo-level Secret/Variable 등록 완료
+- `apps/dashboard-backend/` — **구현 완료** (Phase 1 Step 6~7 이후 반복 배포). `/chat/query`, `/image-snapshots`, RBAC, Cloud Infra, Reports 조회 포함. 현재 API 런타임은 2026-06-16 destroy 후 비활성
+- `apps/dashboard-web/` — **구현 완료** (Phase 1 Step 8 이후 반복 배포). Vite+React SPA, CloudFront/S3 영구 root 유지
+- `.github/workflows/dashboard-web.yml` — **구현/배포 완료** (Phase 1 Step 9). Node 24 test + build-and-deploy, S3 sync, CloudFront invalidation 기준
 - `infra/data-dashboard/ecr.tf` — Step 9: `github_oidc_web_deploy` IAM role 추가 완료 (ADR 0023)
 - `apps/lambda-report-generator/` 디렉터리 미존재 — LLM 일간 보고서는 팀원/후속 작업으로 분리
 - `infra/data-dashboard-permanent/` — **신설 완료** (Phase 1 Step 9.5, 2026-05-26). 25 resources import 완료. 2026-05-27 post-migration 3개 in-place change 적용 후 permanent plan No changes
-- `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` 미존재 — Phase 1 Step 10 신설
+- `scripts/build/build-data-dashboard.sh`, `scripts/destroy/destroy-data-dashboard.sh` — **구현 완료**. build는 DNS/permanent root preflight 후 재생성 root apply, destroy는 확인 입력 또는 `--yes` 후 재생성 root만 destroy
 - `frontend/` = 화면 설계 prototype/reference. `apps/dashboard-web/` = 운영 배포용 공식 SPA (**Step 8 완료**)
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` — `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
 - Markdown 린트 / 문서 테스트 도구 미설정 — § 7.1 수기 체크리스트로 대체
@@ -555,8 +556,8 @@
 
 ### 10.3 알려진 문서 모순 / 보강 필요
 
-- 본 harness 작성 시점(2026-05-19) 의 `CLAUDE.md` / `AGENTS.md` / `README.md` 의 "현재 단계 = M3 Issue 2 진행 중" 표기는 **본 환경 한정으로는 부정확** — 본 환경은 Phase 1 Step 0~3 진입 단계다. § 2 가 우선
-- `docs/architecture/00_current_architecture.md` 기준일 2026-05-08 ↔ Hub 재생성(2026-05-15) 사이의 격차는 Phase 1 Step 10 단계에서 한 번에 갱신 권고
+- 일부 하위 `AGENTS.md` / `CLAUDE.md`가 오래된 단계명을 담고 있을 수 있다. 본 환경 최신 상태는 `docs/issues/SESSION_STATE.md`, 본 harness § 2, `docs/planning/16_data_dashboard_vpc_workplan.md`를 우선한다.
+- `docs/architecture/00_current_architecture.md`는 factory-a 현재 기준 위주 문서다. Data/Dashboard 최신 상태는 `docs/issues/SESSION_STATE.md`, 본 harness, `docs/ops/22_data_dashboard_vpc_runbook.md`를 우선한다
 - `docs/planning/02_implementation_plan.md` 의 Phase 표는 마일스톤 기반이라 워크스트림 분리 이후 본 환경 작업 매핑을 보강할 필요 (본 harness § 4 / § 5.6 가 임시 매핑)
 
 ---

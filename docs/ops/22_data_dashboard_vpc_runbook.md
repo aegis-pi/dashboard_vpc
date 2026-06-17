@@ -1,8 +1,9 @@
 # Data/Dashboard VPC Runbook
 
 상태: source of truth
-기준일: 2026-06-09
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17 v3.7  2026-06-16 사용자 요청으로 `infra/data-dashboard` 재생성 root destroy 완료 상태 반영. VPC/NAT/ALB/ECS/RDS/Redis/Lambda/SQS/runtime Secrets/API DNS/ALB ACM은 비활성, `infra/data-dashboard-permanent` 25 resources와 `infra/data-dashboard-dns` 1 resource는 유지. 다음 데모/수기 검증 전 `scripts/build/build-data-dashboard.sh` 실행 필요.
   - 2026-06-10 v3.6  운영 빠른 실행 절차 정리. `build-data-dashboard.sh`는 DNS/permanent root preflight 후 재생성 root를 apply하고, `destroy-data-dashboard.sh`는 기본 대화형 확인 후 재생성 root만 destroy하도록 정리. Foundation과 Data/Dashboard root 경계를 명시.
   - 2026-06-09 v3.5  Dashboard backend ECR image를 ECS service에 반영하는 운영 스크립트 `scripts/ops/deploy-dashboard-backend.sh` 추가. GitHub Actions가 push한 `sha-<7char>` 태그를 입력하면 ECR 확인, Terraform task definition 등록, ECS service update, health check, post-apply plan 확인을 수행한다.
   - 2026-06-08 v3.4  Cloud Infra 일간 보고서 접근 제어와 Reports selector 운영 배포 완료. `factory_id=cloud-infra` 보고서는 공장 권한 대신 system-view 권한으로 list/get 접근을 허용. backend image `sha-71bbe1d`, ECS task definition revision 40, desired/running 2, `/healthz`와 `/readyz` 정상, Dashboard web HTTP 200, Terraform post-apply plan No changes.
@@ -131,13 +132,14 @@ scripts/destroy/destroy-hub.sh
 scripts/destroy/destroy-all.sh
 ```
 
-## 현재 Active 기준 (2026-06-11)
+## 현재 상태 기준 (2026-06-17)
 
-- Dashboard Web: `https://dashboard.aegis-pi.cloud`
-- Dashboard API: `https://api.aegis-pi.cloud`
-- Backend: ECS Fargate desired/running 2 기준으로 운영
-- 인증/권한: Cognito + RDS RBAC (`app_user`, `factory`, `user_factory_access`, `audit_log`)
-- 운영 기능: Fleet/Factory, Cloud Infra, Reports S3 조회, 이미지 스냅샷, AI 채팅 데이터 QA
+- Dashboard Web/인증/도메인/ECR/report table 등 영구 자원: `infra/data-dashboard-permanent`와 `infra/data-dashboard-dns`에서 유지
+- Dashboard API/ECS/RDS/Redis/Lambda/VPC runtime: 2026-06-16 `infra/data-dashboard` destroy 완료 후 비활성
+- 재생성 root state: 0 resources
+- 영구 root state: `infra/data-dashboard-permanent` 25 resources, `infra/data-dashboard-dns` 1 resource
+- 다음 데모/수기 검증 전: `scripts/build/build-data-dashboard.sh`로 재생성 root apply 필요
+- 운영 기능 구현 범위: Fleet/Factory, Cloud Infra, Reports S3 조회, 이미지 스냅샷, AI 채팅 데이터 QA
 - 후속: 인증 사용자로 실제 Bedrock Nova 질의 및 `/image-snapshots` 실데이터 수기 확인, LLM 보고서 생성기
 
 ## AI 채팅 Bedrock 모델 평가
@@ -279,6 +281,8 @@ post-apply terraform plan = No changes
 
 ## Dashboard Backend Image Rollout
 
+전제: `infra/data-dashboard` 재생성 root가 active이고 ECS service가 존재해야 한다. 2026-06-16 destroy 상태에서는 먼저 `scripts/build/build-data-dashboard.sh`로 재생성 root를 올린 뒤 이 절차를 수행한다.
+
 backend 코드가 `main`에 push되면 GitHub Actions `dashboard-backend` workflow가 테스트 후 ECR에 아래 두 태그를 push한다.
 
 ```text
@@ -329,7 +333,7 @@ scripts/ops/deploy-dashboard-backend.sh acd6717
 5. ECS service `KJW-AEGIS-Data-Service-Backend` rolling update
 6. `services-stable` 대기
 7. running task image/health, ALB target health 확인
-8. `/healthz`, `/readyz`, 비인증 `/chat/query` 401, Dashboard `/chat` 200 확인
+8. `/healthz`, `/readyz`, 비인증 `/chat/query` 401, 인증 후 `/chat/query`·`/image-snapshots`·Dashboard `/chat` 200 확인
 9. 동일 image override 기준 Terraform post-apply plan `No changes` 확인
 ```
 

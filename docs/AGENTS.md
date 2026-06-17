@@ -1,7 +1,7 @@
 # docs/ AGENTS.md
 
 > Aegis-Pi 문서 디렉터리 전반 가이드 (도구 중립).
-> 기준일: 2026-05-15 / 언어: 한국어 (개조식)
+> 기준일: 2026-06-17 / 언어: 한국어 (개조식)
 > Claude 전용 규칙은 `CLAUDE.md`.
 
 ## 역할
@@ -49,11 +49,11 @@ report/        결과 보고서
 
 ## 갱신 우선순위 (현재)
 
-1. `architecture/00_current_architecture.md`
-2. `architecture/01_target_architecture.md`
-3. `specs/monitoring_dashboard/00_requirements.md`
-4. `demo/01_demo_scenario.md`
-5. `report/00_executive_summary.md`
+1. `AI_AGENT_HARNESS.md`
+2. `issues/SESSION_STATE.md`
+3. `planning/16_data_dashboard_vpc_workplan.md`
+4. `ops/22_data_dashboard_vpc_runbook.md`
+5. 변경 대상 폴더의 `README.md`와 실제 문서
 
 ## 작업 흐름
 

@@ -1,8 +1,9 @@
 # Quick Start
 
 상태: source of truth
-기준일: 2026-06-10
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17  2026-06-16 Data/Dashboard 재생성 root destroy 완료 상태를 반영. 영구 root와 재생성 root 상태를 분리하고, API 런타임은 build 전 비활성임을 명시.
   - 2026-06-10  Data/Dashboard VPC 운영 빠른 실행, destroy 절차, Foundation/Data-Dashboard 책임 경계 요약 추가.
 
 ## 목적
@@ -15,13 +16,13 @@
 - ArgoCD, Longhorn, Grafana, InfluxDB, AI/Audio/BME280 워크로드가 동작한다.
 - AWS Hub EKS/VPC/namespace/ArgoCD bootstrap 기준선은 2026-05-15 rebuild 이후 Hub/Foundation/IoT/Admin UI 기준으로 관리한다. 워크스트림 A 자산은 본 문서에서 실행하지 않는다.
 - Foundation은 여러 워크스트림이 공유하는 AWS 기반 자원 묶음이다. 대표적으로 `aegis-bucket-data`, IoT Core raw 적재 Rule, AMP/ECR/OIDC 같은 공용 자원이 포함된다. Data/Dashboard VPC build/destroy 대상이 아니다.
-- Data/Dashboard는 워크스트림 B의 1번 VPC 운영 영역이다. `infra/data-dashboard/`는 재생성 자원, `infra/data-dashboard-dns/`와 `infra/data-dashboard-permanent/`는 destroy 후에도 유지하는 영구 자원이다.
+- Data/Dashboard는 워크스트림 B의 1번 VPC 운영 영역이다. `infra/data-dashboard/`는 재생성 자원, `infra/data-dashboard-dns/`와 `infra/data-dashboard-permanent/`는 destroy 후에도 유지하는 영구 자원이다. 2026-06-16 기준 재생성 root는 destroy 완료 상태다.
 - IoT Core `factory-a` Thing/certificate/policy와 K3s Secret은 워크스트림 A/Foundation 기준으로 관리한다. 인증서·Secret 원문은 문서에 기록하지 않는다.
 - `risk/risk-normalizer` IRSA S3 권한과 `observability/prometheus-agent` AMP remote_write 수신은 검증 완료 상태다. 단, `risk/risk-normalizer`는 M1 권한 검증 이력이며 최신 데이터 처리 구현 대상은 Lambda data processor와 DynamoDB/S3 processed다.
 - Hub Prometheus Agent는 rebuild 시 `observability` 네임스페이스에서 재설치되며, 이전 검증에서는 AMP Query API로 `up{cluster="AEGIS-EKS"}` 수신을 확인했다.
 - 내부 Grafana는 rebuild 시 `observability` 네임스페이스에서 재설치되며, 이전 검증에서는 AMP datasource `AEGIS-AMP`가 SigV4 + IRSA로 query 가능했다.
 - AWS Load Balancer Controller와 Admin UI HTTPS Ingress는 워크스트림 A 기준 운영 문서를 따른다. 본 환경의 Data/Dashboard build/destroy에서 수정하지 않는다.
-- Dashboard VPC, GitHub Actions CI, CloudFront/S3 Dashboard Web, ECS Dashboard Backend, Cognito/RBAC, Cloud Infra/보고서/챗봇 기능은 운영 배포 완료 상태다. 인증 사용자 수기 검증과 LLM 보고서 생성기는 후속이다.
+- Dashboard VPC, GitHub Actions CI, CloudFront/S3 Dashboard Web, ECS Dashboard Backend, Cognito/RBAC, Cloud Infra/보고서/챗봇 기능은 구현·배포 검증 완료 상태다. 다만 현재 API/ECS/RDS/Redis/Lambda 런타임은 재생성 root destroy 후 비활성이다. 인증 사용자 수기 검증과 LLM 보고서 생성기는 후속이다.
 - 후속 구현은 Terraform = 인프라, Ansible = bootstrap/설정/소프트웨어, GitHub Actions = CI, GitHub+ArgoCD = CD 기준을 따른다.
 
 ## 현재 운영 주소
@@ -56,6 +57,14 @@
 재생성 root: infra/data-dashboard/
 영구 root:   infra/data-dashboard-dns/, infra/data-dashboard-permanent/
 상세 절차:   docs/ops/22_data_dashboard_vpc_runbook.md
+```
+
+현재 상태:
+
+```text
+infra/data-dashboard/            destroy 완료(state 0) — 데모/검증 전 build 필요
+infra/data-dashboard-dns/        유지
+infra/data-dashboard-permanent/  유지
 ```
 
 올리기:

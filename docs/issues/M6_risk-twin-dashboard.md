@@ -1,6 +1,7 @@
 # M6. Risk Twin + 관제 화면
 
 수정 이력:
+- 2026-06-17 v1.2  이미지 스냅샷 조회를 로컬 구현 표기에서 backend/web 구현·배포 검증 완료 범위로 정정하고, 2026-06-16 `infra/data-dashboard` destroy 후 API/ECS/RDS/Redis/Lambda runtime 비활성 상태를 GitHub Issue Comment Draft에 반영.
 - 2026-06-11 v1.1  ADR 0035 AI 채팅 Nova 모델 평가 결과와 기본 Bedrock tier(resolve Nova Micro / fast+precise Nova Pro) 반영.
 - 2026-06-09 v1.0  System 이미지 스냅샷 조회 페이지 로컬 구현 및 검증 결과 반영.
 - 2026-06-09 v0.9  ADR 0033 챗봇 데이터 QA backend 로컬 구현, Bedrock 2-tier, ECS task role IAM 운영 적용 및 검증 결과 반영.
@@ -15,7 +16,7 @@
 > **마일스톤 목표**: 수집된 데이터를 기반으로 Risk Score를 계산하고 본사 관제 담당자가 사용할 Dashboard VPC 기반 관제 화면을 완성한다.
 > M2(Hub-Spoke 연결)와 M4(데이터 플레인) 완료 후 진행한다.  
 > 이 마일스톤이 완료되면 공장 상태 변화 → Risk Score 변화 → 관제 화면 반영이 end-to-end로 동작한다.
-> 외부 관리자 화면은 Grafana public 노출이 아니라 Route53/ALB/WAF/Auth 뒤의 Dashboard Web/API를 기본 방향으로 한다.
+> 외부 관리자 화면은 Grafana public 노출이 아니라 Route53/CloudFront/ALB/Auth 뒤의 Dashboard Web/API를 기본 방향으로 한다. WAF/Shield는 후속 보안 강화 트리거로 둔다.
 
 ---
 
@@ -207,7 +208,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 ### ✅ 완료 조건 (Definition of Done)
 
 - [ ] Dashboard Web/API 생성 (본사 관제 메인)
-- [ ] Route53 -> ALB -> WAF/Auth -> Dashboard 접근 경로 구성
+- [ ] Route53 -> CloudFront/ALB -> Auth -> Dashboard 접근 경로 구성 (WAF/Shield는 후속 보안 강화)
 - [ ] 공장별 위험도 카드 패널 구현 (3개 공장)
   - 공장명 (`factory-a`, `factory-b`, `factory-c`)
   - 현재 상태 (안전 🟢 / 주의 🟡 / 위험 🔴)
@@ -338,8 +339,8 @@ M6 구현 시 `risk-score-engine` ECR 이미지나 Kubernetes 파드 완료 조�
 
 ## GitHub Issue Comment Draft
 
-- 상태: 부분 완료 (관제 화면 및 챗봇 backend/web 운영 배포 완료, 이미지 스냅샷 조회 페이지 로컬 구현 완료, 인증 사용자 수기 질의·실시간 시나리오 검증 후속)
-- 진행 요약: Dashboard VPC 기반 관제 화면을 운영 배포까지 완료했다. Fleet·Factory·Cloud Infra·S3 `reports/daily/` 기반 보고서 조회/Word `.docx` 내보내기·Cognito/RDS RBAC와 `/admin/users`를 제공한다. 추가로 ADR 0033/0035 기준 `/chat/query` backend를 배포해 RBAC 이후 DDB evidence를 만들고, Bedrock Nova tier(resolve Nova Micro / fast+precise Nova Pro) 또는 rule fallback으로 답변한다. dashboard-web에는 Workspace `AI 채팅` 독립 페이지를 운영 배포했다. System 영역에는 S3 `image_snapshot/factory_id=.../yyyy=.../mm=.../dd=.../hh=.../` 이미지를 시간대별로 확인하는 페이지를 로컬 구현했다.
+- 상태: 부분 완료 (관제 화면, 챗봇 backend/web, 이미지 스냅샷 조회 backend/web 구현·배포 검증 완료. 2026-06-16 비용 절감을 위해 `infra/data-dashboard` 재생성 root는 destroy 상태. 인증 사용자 수기 질의·실시간 시나리오 검증 후속)
+- 진행 요약: Dashboard VPC 기반 관제 화면을 운영 배포까지 완료했다. Fleet·Factory·Cloud Infra·S3 `reports/daily/` 기반 보고서 조회/Word `.docx` 내보내기·Cognito/RDS RBAC와 `/admin/users`를 제공한다. 추가로 ADR 0033/0035 기준 `/chat/query` backend를 배포해 RBAC 이후 DDB/S3 evidence를 만들고, Bedrock Nova tier(resolve Nova Micro / fast+precise Nova Pro) 또는 rule fallback으로 답변한다. dashboard-web에는 Workspace `AI 채팅` 독립 페이지를 운영 배포했다. System 영역에는 S3 `image_snapshot/factory_id=.../yyyy=.../mm=.../dd=.../hh=.../` 이미지를 시간대별로 확인하는 `/image-snapshots` 페이지와 backend presigned URL API를 구현했다. 현재 API/ECS/RDS/Redis/Lambda runtime은 destroy 상태이므로 다음 수기 검증 전 `scripts/build/build-data-dashboard.sh`가 필요하다.
 - 변경/확인: `apps/dashboard-backend/`(routers: factories·reports·ws·cloud_infra·admin_users·auth_me·chat·image_snapshots / services: ddb·redis·s3·cloud_infra·metadata·rbac_seed·cognito_admin·chat·bedrock / deps: auth·rbac / db RBAC 모델; history `since` delta query와 window별 기본 limit; history/GRAPH#5M numeric string 정규화; `cloud-infra` 보고서 system-view 권한 분리; `/chat/query` intent/time parser·Evidence·Bedrock explain·rule fallback; `/image-snapshots` system-view 권한·S3 presigned URL), `apps/dashboard-web/`(Fleet·Factory·Reports·CloudInfra·ImageSnapshots·AdminUsers·Login·Callback; history delta merge/dedupe, Factory header 10m trend, WebSocket LATEST chart append; numeric string 정규화; Reports Markdown parser 공용화와 실제 `.docx` export; system-view 사용자용 Cloud Infra report selector), `apps/cloud-infra-collector/`, `infra/data-dashboard/`(ECS Auto Scaling·task role Cognito/Bedrock/S3 image_snapshot read 권한·metadata/Bedrock env), 관련 ADR 0025/0026/0028/0029/0030/0031/0033, `docs/ops/15_aws_cost_baseline.md`, `docs/ops/22_data_dashboard_vpc_runbook.md`.
 - 검증: backend `pytest -q` 209 passed, dashboard-web `npm run lint` 통과, `npm test -- --run` 82 passed, `npm run build` 통과(Vite chunk warning only), `terraform -chdir=infra/data-dashboard fmt -check` 통과, `terraform -chdir=infra/data-dashboard validate` 통과, `git diff --check` 통과. Bedrock IAM targeted apply 완료, `bedrock:InvokeModel`/`bedrock:GetInferenceProfile` simulation allowed. dashboard-backend/web GitHub Actions success, backend image `sha-990ab6a` push, Terraform apply로 ECS task definition revision 41 등록, service rollout COMPLETED, desired/running 2, target 2개 HEALTHY, post-apply plan No changes. 운영 API `/healthz` ok, `/readyz` dynamodb/redis/rds_metadata ok, `/chat/query` OpenAPI 노출 및 비인증 401, dashboard `/chat` HTTP 200.
 - 후속: 인증 사용자로 실제 `/chat` Bedrock 질의 수기 확인, Cloud Infra UI 보정 배포/수기 캡처, Cognito super_admin bootstrap 후 실제 사용자 생성/권한 수정/삭제 수기 확인, factory-a Edge Agent 재활성화 후 IoT → DDB → Redis → WebSocket 실시간 시나리오(Issue 8) 검증, LLM 일간 보고서 생성기(ADR 0016), 알림룰 관리 화면.

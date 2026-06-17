@@ -1,8 +1,9 @@
 # Session State
 
 상태: working tracker
-기준일: 2026-06-09
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17  문서-코드 정합성 검토 결과 반영. 과거 Step 6/8 스냅샷에 남아 있던 `/reports` 및 ReportsPage skeleton 표현을 현재 코드 기준(S3 reports 조회, Cloud Infra, RBAC, AI Chat, Image Snapshot 구현 완료)으로 정정.
   - 2026-06-16  사용자 요청으로 Data/Dashboard VPC 일시 root destroy 완료. `scripts/destroy/destroy-data-dashboard.sh --yes` 실행 결과 Terraform apply `0 added, 0 changed, 68 destroyed`. RDS final snapshot 생성 포함 RDS 삭제 완료, NAT Gateway/EIP/ALB/ECS/Redis/Lambda/SQS/runtime Secrets/API DNS/ALB ACM/VPC/subnets/SG 삭제 완료. Lambda notifier VPC ENI 해제 지연으로 private_app subnet/SG 삭제가 약 20분 대기됐으나 최종 완료. 검증: `infra/data-dashboard` state count 0, `infra/data-dashboard-permanent` state count 25, `infra/data-dashboard-dns` state count 1, `Component=data-dashboard` 태그 VPC 조회 결과 없음. Foundation/Hub root는 실행하지 않음.
   - 2026-06-11  AI 채팅 Bedrock Nova 모델 평가/전환 로컬 구현 완료(미배포). 멘토 요청에 따라 현 Claude Haiku/Sonnet 조합과 Nova 후보를 비교할 수 있도록 `apps/dashboard-backend/scripts/evaluate_bedrock_chat_models.py` 추가, Terraform에 `BEDROCK_RESOLVE_MODEL`/`CHAT_ROUTING_ENABLED` ECS env와 Nova inference profile/foundation-model IAM allowlist 추가. 라이브 평가: `baseline`, `nova-low-cost`, `nova-aggressive`, `nova-2-lite`, `nova-quality` 실행. Dashboard Web `/chat` quick start 추천 문항 4개도 `--case-set quickstart`로 추가 평가해 Nova Micro resolve가 intent/factory/time을 모두 일치시킴. `apac.amazon.nova-micro-v1:0` resolve는 core 5/5 + quick start 4/4 정확, fast Lite/Micro/Nova2는 일부 샘플에서 센서 정상범위 단정이 있어 탈락, `resolve=Nova Micro`, `fast/precise=Nova Pro`(`nova-quality`)를 기본값으로 채택. 예상 비용은 월 720회 기준 기존 Claude `~$4.3/월` → Nova `~$1.5/월`로 약 65% 절감. 신규 ADR 0035, 비용 baseline, data-dashboard runbook 갱신. 운영 배포는 아직 수행하지 않음.
   - 2026-06-10  Data/Dashboard 운영 문서 마무리 진행. README, docs/README, ops/00_quick_start, ops/22_data_dashboard_vpc_runbook, ops/README, planning/16에 빠른 build/destroy 방법, `infra/data-dashboard`/`infra/data-dashboard-dns`/`infra/data-dashboard-permanent` root 역할, Foundation 경계, destroy 후 잔여 자원 기준을 정리. `scripts/build/build-data-dashboard.sh`는 DNS/permanent root preflight 후 재생성 root apply로 보강했고, `scripts/destroy/destroy-data-dashboard.sh`는 `--yes` 없는 기본 실행에서 `destroy-data-dashboard` 입력 확인 후 재생성 root만 destroy하도록 보강. 검증: `bash -n` 2개 스크립트 통과, `git diff --check` 통과. 실제 build/destroy는 실행하지 않음.
@@ -313,9 +314,12 @@ Step 6 — Dashboard Backend FastAPI 구현 ✅ 완료 (2026-05-26)
     - GET /healthz (인증 불필요)
     - GET /factories (Cognito JWT 필수)
     - GET /factories/{factory_id} (Cognito JWT 필수)
-    - GET /factories/{factory_id}/history?window=1h (HISTORY#STATE#* 조회, HISTORY#RISK/FACTORY/INFRA 미사용)
-    - GET /reports (skeleton, LLM report-generator 팀원/후속 작업 이후 구현)
-    - GET /reports/{report_date}/{factory_id} (skeleton, S3 reports/ prefix는 후속 작업 이후 생성)
+    - GET /factories/{factory_id}/history?window=1h (HISTORY#STATE#* / GRAPH#5M 조회)
+    - GET /reports, GET /reports/{report_date}/{factory_id} (S3 reports/daily Markdown 조회)
+    - GET /cloud-infra, GET /cloud-infra/history
+    - GET /image-snapshots, GET /image-snapshots/range
+    - GET /auth/me, GET/POST/PATCH/DELETE /admin/users
+    - POST /chat/query
   + WebSocket:
     - /ws/factories/{factory_id} (JWT는 ?token= 쿼리 파라미터로 전달 — 브라우저 WS 헤더 제약 대응)
     - Redis Pub/Sub factory:update:{factory_id} subscribe
@@ -339,7 +343,7 @@ Step 6 — Dashboard Backend FastAPI 구현 ✅ 완료 (2026-05-26)
    - frontend/ = 화면 설계 prototype/reference (기존 Aegis-pi/, Aegis-pi2/ → frontend/ 정리됨)
    - apps/dashboard-web/ = 운영 배포용 공식 Vite + React SPA
    - frontend/를 배포/CI/S3 source path로 직접 사용하지 않음
-   - Cognito Hosted UI / WebSocket client / 보고서 탭 skeleton 구현
+   - Cognito Hosted UI / WebSocket client / 보고서 조회 / Cloud Infra / 이미지 스냅샷 / 사용자 관리 / AI 채팅 화면 구현
 
 4. Step 4 (Lambda data processor 협의) — 워크스트림 A와 합류 지점
    - IoT Rule trigger 방식 확정 (기존 Rule 확장 vs 신규 Rule)

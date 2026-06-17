@@ -332,7 +332,7 @@ M4의 cloud-side 구현 대상은 Lambda data processor와 DynamoDB/S3 저장 �
 ## GitHub Issue Comment Draft
 
 - 상태: 부분 완료 (cloud-side 완료, factory-a 실시간 edge 경로 후속)
-- 진행 요약: 본 환경(워크스트림 B)의 소비측 데이터 플레인을 구현·검증 완료했다. IoT Rule → Lambda data processor → DynamoDB(LATEST/HISTORY) + S3 processed, 그리고 DDB Streams → notifier → Redis PUBLISH 경로가 동작한다. Issue 1~5(Edge Agent → IoT Core → S3 raw)는 워크스트림 A 팀 합의 영역으로 본 환경에서 직접 검증하지 않는다.
+- 진행 요약: 본 환경(워크스트림 B)의 소비측 데이터 플레인을 구현·검증 완료했다. IoT Rule → Lambda data processor → DynamoDB(LATEST/HISTORY) + S3 processed, 그리고 DDB Streams → notifier → Redis PUBLISH 경로는 과거 cloud-side 검증을 통과했다. 현재는 2026-06-16 `infra/data-dashboard` destroy로 Lambda/notifier/Redis 런타임이 비활성이다. Issue 1~5(Edge Agent → IoT Core → S3 raw)는 워크스트림 A 팀 합의 영역으로 본 환경에서 직접 검증하지 않는다.
 - 변경/확인: `apps/data-processor/`(envelope·normalizer·risk·pipeline_status·dynamo·s3_writer), `apps/lambda-notifier/`, `infra/data-dashboard/`(lambda_data_processor.tf·iot_rule.tf·lambda_notifier.tf·iam), 공식 hot store `AEGIS-DynamoDB-FactoryStatus`(ADR 0022), S3 processed 경로 스펙(ADR 0020), staleness 60/120초(ADR 0028).
-- 검증: data-processor pytest 통과, IoT Rule 2개 active, 직접 invoke 및 IoT Rule 경유 DDB LATEST/HISTORY + S3 processed 생성 확인, DDB write → Redis PUBLISH ~0.45초(ADR 0021/Step 5), notifier DLQ=0.
+- 검증: data-processor pytest 통과, IoT Rule 2개 active였던 재생성 root 가동 상태에서 직접 invoke 및 IoT Rule 경유 DDB LATEST/HISTORY + S3 processed 생성 확인, DDB write → Redis PUBLISH ~0.45초(ADR 0021/Step 5), notifier DLQ=0. 다음 재검증 전 `scripts/build/build-data-dashboard.sh` 필요.
 - 후속: factory-a Edge Agent 재활성 후 Edge → IoT Core → DDB 실시간 경로(Issue 8) end-to-end 검증.

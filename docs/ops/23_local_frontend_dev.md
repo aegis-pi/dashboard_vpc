@@ -1,9 +1,10 @@
 # 로컬 프론트엔드 개발 환경 런북
 
 상태: source of truth
-기준일: 2026-06-09
+기준일: 2026-06-17
 적용 범위: 워크스트림 B (1번 Data/Dashboard VPC) — `apps/dashboard-web` + `apps/dashboard-backend` 로컬 구동
 수정 이력:
+  - 2026-06-17 v1.1  2026-06-16 `infra/data-dashboard` destroy 상태 반영. 원격 `https://api.aegis-pi.cloud`는 재생성 root build 전 사용할 수 없으므로 로컬 개발은 로컬 backend를 띄우거나 먼저 `build-data-dashboard.sh`를 실행해야 함을 명시.
   - 2026-06-09 v1.0  로컬 개발 환경 최초 정리. Cognito 콜백 URL 추가, frontend `.env.local`, backend `.env`, `aiosqlite` 설치, RBAC sub 부트스트랩, 실행/트러블슈팅 절차 반영.
 
 ---
@@ -16,6 +17,7 @@
 - 데이터: 실제 AWS DynamoDB(`AEGIS-DynamoDB-FactoryStatus`)/S3에서 **읽기**
 - 메타DB(RBAC 사용자): 로컬은 메모리 sqlite (재시작 시 비워짐) → 권한은 부트스트랩 sub로 우회
 - Redis: 운영 ElastiCache는 VPC 내부라 접속 불가. 로컬 Redis는 선택(WS/실시간 PUBSUB용)
+- 원격 API: 2026-06-16 기준 `infra/data-dashboard` 재생성 root destroy로 비활성이다. 프론트만 로컬로 띄워 운영 API에 붙이는 방식은 `scripts/build/build-data-dashboard.sh` 재실행 전 동작하지 않는다.
 
 > 주의: 로컬 백엔드도 실제 AWS 리소스에 붙는다. DynamoDB/S3는 읽기지만, `/admin/users` 화면의 사용자 생성/비활성/삭제는 **실제 Cognito User Pool에 반영**되므로 테스트 시 주의한다.
 

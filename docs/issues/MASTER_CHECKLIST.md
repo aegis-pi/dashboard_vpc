@@ -1,10 +1,12 @@
 # Aegis-Pi Master Checklist
 
 상태: working tracker
-기준일: 2026-06-04
+기준일: 2026-06-17
 기준 문서: `docs/issues/M0_factory-a_safe-edge-baseline.md` ~ `docs/issues/M7_integration-test.md`
 세션 이어받기: `docs/issues/SESSION_STATE.md`
 **AI 에이전트 진입점**: `docs/AI_AGENT_HARNESS.md` — phase별 DoD · 허용/금지 파일 · 검증 명령 · 프롬프트 가이드
+수정 이력:
+- 2026-06-17  Phase 1 Step 10 진행 문구를 `build/destroy` 스크립트·runbook·drawio·architecture·비용 baseline v3.8 완료 기준으로 갱신. 현재 `infra/data-dashboard` 재생성 root는 2026-06-16 destroy 상태이며, 남은 작업은 재빌드 후 데모 리허설·인증 사용자 수기 검증·캡처임을 반영.
 
 ## 사용 방식
 
@@ -101,17 +103,17 @@
 - [x] Step 8 - [Frontend] 운영용 Vite + React SPA 마이그레이션 (`apps/dashboard-web/`)
 - [x] Step 9 - [배포/검증] S3+CloudFront 배포 CI/CD(ADR 0023) + End-to-end 통합 검증 (cloud-side 주입 기반; IoT → DDB 실시간 경로는 factory-a Edge Agent 비활성으로 미검증)
 - [x] Step 9.5 - [Terraform] Permanent resource split (`infra/data-dashboard-permanent/` 25 resources, ADR 0024)
-- [ ] Step 10 - [운영] build/destroy 스크립트, runbook, drawio·architecture 문서 최종 갱신, 비용 baseline 실측 재갱신 (진행 중: runbook `ops/22` 작성·비용 baseline v3.4 갱신 완료, build/destroy 스크립트 잔여)
+- [ ] Step 10 - [운영] build/destroy 스크립트, runbook, drawio·architecture 문서 최종 갱신, 비용 baseline 실측 재갱신 (대부분 완료: `build-data-dashboard.sh`/`destroy-data-dashboard.sh`, runbook `ops/22`, overview drawio/architecture, 비용 baseline v3.8 갱신 완료. 남은 작업은 재빌드 후 데모 리허설·인증 사용자 수기 검증·캡처)
 - [ ] (별도) [LLM] Lambda report-generator + EventBridge schedule + Bedrock 일간 보고서 생성기 (ADR 0016, 팀원/후속 — Dashboard 측 S3 `reports/daily/` 조회 경로는 ADR 0029로 구현 완료)
 
-> Phase 1 이후 운영 배포로 추가된 Dashboard 기능: Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시, GRAPH#5M multi-resolution history(ADR 0025/0026), Cloud Infra 상태 화면 + Fast/Slow collector(ADR 0027, `apps/cloud-infra-collector/`), staleness 60/120초 통일(ADR 0028), S3 기반 일간 보고서 조회 UI(ADR 0029), ECS backend right-sizing + Auto Scaling(ADR 0030), RBAC 사용자 관리(ADR 0031).
+> Phase 1 이후 운영 배포로 추가된 Dashboard 기능: Factory Timeline `10m/1h/custom` + `top_causes` 원인 표시, GRAPH#5M multi-resolution history(ADR 0025/0026), Cloud Infra 상태 화면 + Fast/Slow collector(ADR 0027, `apps/cloud-infra-collector/`), staleness 60/120초 통일(ADR 0028), S3 기반 일간 보고서 조회 UI(ADR 0029), ECS backend right-sizing + Auto Scaling(ADR 0030), RBAC 사용자 관리(ADR 0031), AI 채팅 데이터 QA(ADR 0033/0035), S3 image_snapshot 조회.
 
 Phase 1 데모 시연 시나리오:
 
 1. factory-a 실제 센서 변화 → 1~2초 내 대시보드 WebSocket 갱신
 2. 사용자 권한 변경 (RDS PostgreSQL) → Cognito 다음 로그인 시 반영
-3. Bedrock 일간 보고서 자동 생성 (수동 invoke 데모 가능)
-4. build/destroy 사이클로 비용 ~$8~10/월 입증
+3. AI 채팅 데이터 QA로 특정 시각/스파이크/보고서/이미지 스냅샷 evidence 질의
+4. build/destroy 사이클로 비용 baseline v3.8 기준 데모 운영 비용 입증
 
 ## M4. 데이터 플레인 - `factory-a` 단일 Spoke 기준
 
@@ -124,7 +126,7 @@ Phase 1 데모 시연 시나리오:
 - [ ] Issue 3 - [데이터/Container] `factory-a` Edge Agent 컨테이너화 및 K3s 배포 준비 (워크스트림 A · 팀 합의)
 - [ ] Issue 4 - [데이터/IoT Core] Edge Agent → IoT Core 연결 및 수신 확인 (워크스트림 A · 팀 합의)
 - [ ] Issue 5 - [데이터/S3] IoT Core → S3 적재 확인 (워크스트림 A · 팀 합의)
-- [x] Issue 6 - [데이터/Lambda] IoT Core Lambda data processor 구현 → Phase 1 Step 4 (ADR 0021/0022). `apps/data-processor/` 구현, IoT Rule 2개 active, DDB LATEST/HISTORY + S3 processed e2e 검증
+- [x] Issue 6 - [데이터/Lambda] IoT Core Lambda data processor 구현 → Phase 1 Step 4 (ADR 0021/0022). `apps/data-processor/` 구현, IoT Rule 2개와 DDB LATEST/HISTORY + S3 processed e2e 검증 완료. 현재 runtime은 2026-06-16 `infra/data-dashboard` destroy로 비활성
 - [x] Issue 7 - [데이터/Pipeline] `pipeline_status` Lambda 처리 검증 (`apps/data-processor/pipeline_status.py`, staleness 60/120초 ADR 0028)
 - [ ] Issue 8 - [검증/데이터] `factory-a` 데이터 플레인 end-to-end 검증 → cloud-side(주입 → DDB → S3 → Dashboard) 검증 완료. factory-a Edge Agent → IoT Core 실시간 경로는 Edge Agent 비활성으로 미검증 (후속)
 

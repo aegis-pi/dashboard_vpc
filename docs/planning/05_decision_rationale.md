@@ -308,7 +308,7 @@ Risk Score Engine
 Data / Dashboard VPC를 제어 plane과 분리하면 아래 이점이 있다.
 
 ```text
-Route53/ALB/WAF/Auth 기반 관리자 접근
+Route53/CloudFront/ALB/Auth 기반 관리자 접근 (WAF/Shield는 후속 보안 강화)
 Control / Management VPC public ingress 최소화
 Dashboard Web/API가 ArgoCD/Tailscale/EKS API에 직접 접근하지 않음
 DynamoDB LATEST/HISTORY와 S3 processed만 read-only 조회

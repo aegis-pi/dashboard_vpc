@@ -1,8 +1,10 @@
 # Data / Dashboard VPC Workplan (이 작업 환경)
 
 상태: source of truth
-기준일: 2026-06-04
+기준일: 2026-06-17
 수정 이력:
+  - 2026-06-17 v2.1  코드 정합성 재검토 결과 반영. Step 6/8의 과거 `reports` skeleton 표현을 현재 구현 기준(S3 `reports/daily/` 조회, Cloud Infra, RBAC 사용자 관리, AI Chat, Image Snapshot 화면/API 구현 완료)으로 정정.
+  - 2026-06-17 v2.0  2026-06-16 사용자 요청 destroy 결과와 정렬. `infra/data-dashboard` 재생성 root는 state 0으로 비활성 상태이며, API/ECS/RDS/Redis/Lambda/VPC 런타임은 다음 `build-data-dashboard.sh` 전까지 내려간 상태다. `infra/data-dashboard-permanent` 25 resources와 `infra/data-dashboard-dns` 1 resource는 유지된다. Step 10 자동화/다이어그램/운영 문서 갱신은 완료로 정리하고, 남은 작업은 데모 리허설·인증 사용자 수기 검증·캡처로 축소.
   - 2026-06-10 v1.9  Data/Dashboard 운영 문서 마무리. README/Quick Start/runbook에 빠른 build/destroy, DNS/permanent/data-dashboard root 역할, Foundation 경계, destroy 후 잔여 자원을 정리. `build-data-dashboard.sh`는 DNS/permanent root preflight 후 재생성 root apply, `destroy-data-dashboard.sh`는 기본 대화형 확인 후 재생성 root destroy로 보강.
   - 2026-06-04 v1.8  Step 0~9.5 완료 후 Step 10 진행 단계 반영. 일시 root 재기동 상태에서 Dashboard 운영 기능 반복 배포 완료: Cloud Infra 화면 + Fast/Slow collector(ADR 0027), Factory Timeline/top_causes, GRAPH#5M(ADR 0025/0026), staleness 통일(ADR 0028), S3 보고서 조회(ADR 0029), ECS Auto Scaling(ADR 0030), RBAC 사용자 관리(ADR 0031). 운영 backend image `sha-e96bf81`(ECS revision 37), desired/running 2. Step 10은 runbook `ops/22`·비용 baseline v3.4 갱신 완료, build/destroy 스크립트와 drawio 갱신 잔여. LLM 보고서 생성기(ADR 0016)만 팀원/후속.
   - 2026-05-27 v1.7  post-migration permanent diff 정리 완료 반영. infra/data-dashboard-permanent apply 0 add, 3 change, 0 destroy 후 permanent/dns plan No changes. state count 0/25/1 확인.
@@ -108,9 +110,9 @@
 데모 직후:  scripts/destroy/destroy-data-dashboard.sh (RDS PostgreSQL snapshot 후 destroy, 약 10~15분)
 ```
 
-- 데모 운영(월 2회 × 8h) 시 ~$8~10/월
-- 상시 운영 시 ~$125/월
-- destroy 후 잔여 비용은 Terraform backend S3 + RDS snapshot storage 중심. S3 web bucket / Secrets Manager는 destroy 대상
+- 데모 운영(월 2회 × 8h) 시 비용은 최신 `docs/ops/15_aws_cost_baseline.md` 기준을 따른다.
+- 상시 운영 시 비용은 ECS min 2 / 1 vCPU / 2 GB right-sizing 이후 최신 비용 baseline 기준을 따른다.
+- destroy 후 잔여 비용은 Terraform backend S3 + Route53 hosted zone + permanent root의 S3 web/CloudFront/Cognito/ECR/report table + RDS final snapshot storage 중심이다. Secrets Manager / NAT GW / ALB / ECS / RDS instance / Redis / Lambda / SQS / API DNS record는 재생성 root destroy 대상이다.
 - **Route53 hosted zone(aegis-pi.cloud)은 Step 7.5 이후 영구 자원으로 destroy 대상에서 제외** — `infra/data-dashboard-dns/` root가 별도로 관리, `$0.50/월` 비용 상시 발생
 
 ## 확정 진입 순서 (Phase 1 구현 Step)
@@ -245,9 +247,14 @@ Step 1 진행 시:
     GET /healthz (인증 불필요, 헬스체크)
     GET /factories
     GET /factories/{factory_id}
-    GET /factories/{factory_id}/history?window=1h  (HISTORY#STATE#* 조회)
-    GET /reports  (skeleton — LLM report-generator 팀원/후속 작업 이후 구현)
-    GET /reports/{report_date}/{factory_id}  (skeleton — S3 reports/ 후속 작업 이후)
+    GET /factories/{factory_id}/history?window=1h  (HISTORY#STATE#* / GRAPH#5M 조회)
+    GET /reports  (S3 reports/daily 목록 조회, cloud-infra 보고서는 system-view 권한)
+    GET /reports/{report_date}/{factory_id}  (S3 reports/daily Markdown 본문 조회)
+    GET /cloud-infra / GET /cloud-infra/history
+    GET /image-snapshots / GET /image-snapshots/range
+    GET /auth/me
+    GET/POST/PATCH/DELETE /admin/users
+    POST /chat/query
 - WebSocket: /ws/factories/{factory_id}
     JWT는 ?token= 쿼리 파라미터로 전달 (브라우저 WS 헤더 제약)
     Redis Pub/Sub factory:update:{factory_id} subscribe
@@ -257,7 +264,8 @@ Step 1 진행 시:
 - .env.example (gitignore 예외로 commit)
 - GitHub Actions: .github/workflows/dashboard-backend.yml (pytest CI + ECR sha-<7char> push 골격)
   AWS_OIDC_DASHBOARD_ROLE_ARN GitHub Secret은 Step 7 IAM 생성 후 등록 필요
-- pytest -q: 18 passed / docker build: 통과
+- 이후 반복 구현/배포로 RBAC, Cloud Infra, Reports S3 조회, Image Snapshot, AI Chat까지 확장 완료
+- 최신 검증 이력: backend pytest 209 passed, dashboard-web lint/test/build 통과, Terraform fmt/validate 통과
 
 미배포 (Step 7에서 완성):
 - ECR aegis/dashboard-backend repo 신설 — Step 7 완료
@@ -333,7 +341,11 @@ Step 1 진행 시:
 - 페이지:
     FleetPage — Fleet Safety Pulse 트랙 + 공장 카드 그리드
     FactoryPage — Overview/Environment/Infrastructure/Timeline 4탭 + WS 실시간
-    ReportsPage — LLM 일간 보고서 팀원/후속 작업 대기 skeleton
+    ReportsPage — S3 reports/daily Markdown 조회 + PDF/Word 내보내기
+    CloudInfraPage — CLOUD#infra 최신/이력 조회
+    ImageSnapshotsPage — S3 image_snapshot presigned URL 조회
+    AdminUsersPage — Cognito/RDS RBAC 사용자 관리
+    ChatPage — /chat/query 기반 AI Chat
     LoginPage / CallbackPage — Cognito PKCE 흐름
 - 컴포넌트:
     Badge (LevelBadge, PipelineBadge, StaleBadge, riskColor, relTime)
@@ -354,7 +366,7 @@ Step 1 진행 시:
 - S3 dashboard-web bucket upload
 - CloudFront distribution invalidation
 
-LLM 일간 보고서(ADR 0016, Lambda report-generator + Bedrock)는 팀원/후속 작업으로 분리한다.
+LLM 일간 보고서 자동 생성기(ADR 0016, Lambda report-generator + Bedrock)는 팀원/후속 작업으로 분리한다. Dashboard의 S3 보고서 조회 경로는 ADR 0029로 구현 완료됐다.
 ```
 
 ### Step 9 — S3+CloudFront 배포 CI/CD + End-to-end 통합 검증
@@ -489,7 +501,7 @@ RDS 미영구화 결정:
   3. Step 10 build/destroy 자동화에 permanent/dns root 순서 반영
 ```
 
-### Step 10 — 운영 문서화 + 자동화 스크립트 (진행 중)
+### Step 10 — 운영 문서화 + 자동화 스크립트 (대부분 완료, 데모 검증 후속)
 
 ```text
 - scripts/build/build-data-dashboard.sh (DNS/permanent preflight 후 재생성 root apply 자동화) ✅ 구현 완료
@@ -498,10 +510,18 @@ RDS 미영구화 결정:
 - docs/architecture/drawio/ 신규 다이어그램 ✅ 완료 — `agiespi_architecture_overview_final1.drawio` / `images/agiespi_architecture_overview_final3.drawio.png` 단일 overview로 통합. Cloud Infra Collector·notifier DLQ·OIDC 웹배포·RBAC·`CLOUD#infra`·`GRAPH#5M`·ECS Auto Scaling 반영 (ADR 0032)
 - docs/architecture/01_target_architecture.md 갱신 ✅ 완료
 - README.md / docs/ops/00_quick_start.md / docs/ops/22_data_dashboard_vpc_runbook.md (빠른 build/destroy + Foundation/root 경계 + 도메인/ACM/Cognito + 트러블슈팅) ✅ 작성 완료
-- docs/ops/15_aws_cost_baseline.md 실측 후 재갱신 ✅ v3.4까지 갱신 완료
+- docs/ops/15_aws_cost_baseline.md 실측 후 재갱신 ✅ v3.8까지 갱신 완료(Nova 모델 비용 + 2026-06-16 destroy 상태 포함)
 ```
 
-남은 Step 10 작업: 데모 시나리오/리허설 최종 정리, 인증 사용자 수기 검증 캡처. port-forward 스크립트는 현재 운영 경로가 CloudFront/API 도메인 기준이라 필요 시에만 추가.
+2026-06-16 기준 현재 상태:
+
+```text
+infra/data-dashboard            state 0, destroy 완료
+infra/data-dashboard-permanent  state 25, 영구 자원 유지
+infra/data-dashboard-dns        state 1, hosted zone 유지
+```
+
+남은 Step 10 작업: 다음 데모 전 `scripts/build/build-data-dashboard.sh`로 재생성 root를 올린 뒤 인증 사용자 수기 검증, Bedrock Nova `/chat/query`, `/image-snapshots` 실데이터, 화면 캡처, 리허설 결과를 남긴다. port-forward 스크립트는 현재 운영 경로가 CloudFront/API 도메인 기준이라 필요 시에만 추가.
 
 ## 합류 지점 운영 규칙
 
@@ -535,4 +555,4 @@ RDS 미영구화 결정:
 - ECS Backend p95 응답시간 < 500ms (캐시 hit 시 < 100ms)
 - RDS PostgreSQL connection pool overflow 0
 - 운영 SPA 빌드 산출물(dist/) 배포 후 Cognito 로그인 / API 조회 / WebSocket push 확인
-- destroy 사이클 후 잔존 자원: Terraform backend S3 bucket, Route53 hosted zone(`infra/data-dashboard-dns/` 영구 자원), RDS PostgreSQL snapshot. S3 web bucket / Secrets Manager / NAT GW / ALB / ECS / RDS PostgreSQL instance / Redis / Lambda 는 0
+- destroy 사이클 후 잔존 자원: Terraform backend S3 bucket, Route53 hosted zone(`infra/data-dashboard-dns/`), permanent root의 S3 web bucket/CloudFront/Cognito/ECR/report table/GitHub OIDC roles, RDS PostgreSQL final snapshot. Secrets Manager / NAT GW / ALB / ECS / RDS PostgreSQL instance / Redis / Lambda / SQS / API DNS record는 0
