@@ -2,12 +2,18 @@
 
 > Safe-Edge 단일 공장 엣지를 AWS 기반 멀티 공장 중앙 관제 구조로 확장하는 Risk Twin 플랫폼
 
+> [!NOTE]
+> 이 저장소는 MSP 최종 팀 프로젝트 **Aegis-Pi Risk Twin**(팀명 일터방패)의 **data/dashboard plane 개인 구현 저장소**입니다 — [@JJong-03](https://github.com/JJong-03) 작성.
+> 범위: data/dashboard plane Terraform infra, FastAPI dashboard backend, React dashboard, Safety Score pipeline(risk-normalizer · risk-score-engine · data-processor), Slack alert notifier.
+> Edge(K3s Spoke)·control plane(EKS Hub) 등 팀 통합 구현은 [팀 저장소 msp-team03](https://github.com/Team-msp-architect-2026/msp-team03)과 [프로젝트 Wiki](https://github.com/Team-msp-architect-2026/msp-team03/wiki)를, 프로젝트 소개는 [포트폴리오 상세 페이지](https://kjw-cloud-portfolio.vercel.app/projects/aegis-pi-risk-twin)를 참고하세요.
+
 ![Aegis-Pi architecture overview](docs/architecture/images/agiespi_architecture_overview_final3.drawio.png)
 
 Aegis-Pi는 Raspberry Pi 3-node K3s로 구성한 `factory-a` 현장 엣지에서 센서·AI·운영 상태를 수집하고, AWS IoT/Lambda/DynamoDB/S3/Data Dashboard로 연결해 본사 관제자가 공장별 위험도와 인프라 상태를 확인할 수 있게 만든 프로젝트입니다.
 
 - Dashboard: `https://dashboard.aegis-pi.cloud`
 - API: `https://api.aegis-pi.cloud`
+- 위 URL은 비용 제어를 위해 상시 운영하지 않는 rebuildable demo이며, `scripts/build/`로 재생성합니다.
 - 운영 문서: [Data/Dashboard VPC Runbook](docs/ops/22_data_dashboard_vpc_runbook.md)
 - 현재 상태: [Session State](docs/issues/SESSION_STATE.md)
 
