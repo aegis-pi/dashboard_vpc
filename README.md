@@ -3,9 +3,10 @@
 > Safe-Edge 단일 공장 엣지를 AWS 기반 멀티 공장 중앙 관제 구조로 확장하는 Risk Twin 플랫폼
 
 > [!NOTE]
-> 이 저장소는 MSP 최종 팀 프로젝트 **Aegis-Pi Risk Twin**(팀명 일터방패)의 **data/dashboard plane 개인 구현 저장소**입니다 — [@JJong-03](https://github.com/JJong-03) 작성.
-> 범위: data/dashboard plane Terraform infra, FastAPI dashboard backend, React dashboard, Safety Score pipeline(risk-normalizer · risk-score-engine · data-processor), Slack alert notifier.
-> Edge(K3s Spoke)·control plane(EKS Hub) 등 팀 통합 구현은 [팀 저장소 msp-team03](https://github.com/Team-msp-architect-2026/msp-team03)과 [프로젝트 Wiki](https://github.com/Team-msp-architect-2026/msp-team03/wiki)를, 프로젝트 소개는 [포트폴리오 상세 페이지](https://kjw-cloud-portfolio.vercel.app/projects/aegis-pi-risk-twin)를 참고하세요.
+> 이 저장소는 MSP 최종 팀 프로젝트 **Aegis-Pi Risk Twin**(팀명 일터방패)의 Data/Dashboard workstream 저장소이며, 개인 구현과 팀원 동기화 컴포넌트가 함께 있습니다.
+> 개인 구현: Data/Dashboard VPC Terraform, FastAPI dashboard backend, React dashboard, DynamoDB Streams→Redis Pub/Sub notifier, history window·chart fallback.
+> 팀 통합: DataProcessor, GraphAggregator5m, RiskAlertDispatcher(Slack), Edge(K3s Spoke), control plane(EKS Hub). 근거는 [팀 저장소 msp-team03](https://github.com/Team-msp-architect-2026/msp-team03)과 [프로젝트 Wiki](https://github.com/Team-msp-architect-2026/msp-team03/wiki)를 참고하세요.
+> 프로젝트 소개와 기여 범위 요약은 [포트폴리오 상세 페이지](https://kjw-cloud-portfolio.vercel.app/projects/aegis-pi-risk-twin)에 정리했습니다.
 
 ![Aegis-Pi architecture overview](docs/architecture/images/agiespi_architecture_overview_final3.drawio.png)
 
@@ -98,7 +99,7 @@ factory-a K3s
 apps/
   dashboard-backend/        FastAPI Dashboard API
   dashboard-web/            Vite + React Dashboard SPA
-  data-processor/           IoT -> DDB/S3 Lambda processor
+  data-processor/           IoT -> DDB/S3 Lambda processor (팀원 구현 동기화)
   lambda-notifier/          DDB Streams -> Redis Pub/Sub
   cloud-infra-collector/    AWS 상태 수집 Lambda
 
