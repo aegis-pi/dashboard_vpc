@@ -71,12 +71,12 @@ Edge AI / Sensor 이벤트
 
 ## Issue 1 - [배포/Helm] GitHub 저장소 구조 설계 (베이스 + 공장별 values)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 공통 베이스 Helm 차트와 공장별 values 파일을 분리하는 저장소 구조를 확정한다.  
 이 구조가 ArgoCD ApplicationSet 자동화와 공장별 독립 배포 관리의 기반이 된다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] 저장소 구조 확정 및 초기화
   ```
@@ -109,7 +109,7 @@ Edge AI / Sensor 이벤트
   - `factory-c` = `dummy`
 - [x] 베이스 차트와 values 경계 역할 분리 문서화
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `helm template charts/aegis-spoke -f envs/factory-a/values.yaml` 정상 렌더링
 - 기준 앱이 차트/values 구조 안에서 일관되게 표현됨
@@ -128,14 +128,14 @@ Edge AI / Sensor 이벤트
 
 ## Issue 2 - [배포/ECR] 저장소 구성 및 이미지 태그 전략
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 컨테이너 이미지를 저장하고 ArgoCD가 참조할 ECR 저장소를 구성한다.  
 `git sha` 기반 태그로 배포 이력을 추적하고, 보조 태그로 운영 편의를 확보한다.
 
 M3 기준 컨테이너 registry는 Docker Hub가 아니라 AWS ECR이다. Docker Hub는 초기 실습/로컬 검증 경로로만 취급하고, Hub ArgoCD가 Spoke로 배포할 운영 이미지는 ECR image reference를 사용한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] 서비스별 ECR 저장소 범위 확정
   - Edge Agent
@@ -157,7 +157,7 @@ M3 기준 컨테이너 registry는 Docker Hub가 아니라 AWS ECR이다. Docker
   - Terraform source 기준 `scan_on_push = true`
 - [x] Terraform apply/destroy로 ECR repository 생성 절차 검증
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `terraform validate` 통과
 - AWS CLI/콘솔에서 ECR 저장소 생성 확인
@@ -232,12 +232,12 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 
 ## Issue 3 - [배포/GitHub Actions] 빌드/푸시 워크플로우 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 코드 변경 시 컨테이너 이미지를 자동으로 빌드하고 ECR에 푸시하는 워크플로우를 구성한다.  
 서비스별 변경 감지나 세부 분기는 후속 단계에서 추가할 수 있게 구조만 열어둔다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] M3 배포 검증용 기준 앱 Dockerfile 및 빌드 대상 확정
 - [ ] `.github/workflows/build-push.yaml` 생성
@@ -248,7 +248,7 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 - [ ] ARM64 빌드 지원 확인 (Raspberry Pi 대상 이미지)
 - [ ] 빌드 성공/실패 알림 설정 (선택)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - main 브랜치 push 후 GitHub Actions 워크플로우 `Success`
 - ECR 저장소에 `sha-<커밋해시>` 태그 이미지 확인
@@ -259,12 +259,12 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 
 ## Issue 4 - [배포/ArgoCD] ApplicationSet 구성 (`factory-a` 기준)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 공장별 values 목록을 기준으로 ApplicationSet을 생성하여 공장 추가 시 자동으로 Application이 생기는 구조를 만든다.  
 `factory-a`를 기준으로 먼저 검증하고, M5(VM Spoke 확장) 시 `factory-b`, `factory-c`를 추가한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] ArgoCD ApplicationSet 매니페스트 작성
   - Generator: `Git` 또는 `List` 기반 (공장별 values 경로 기준)
@@ -274,7 +274,7 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 - [x] 기준 앱이 `factory-a` values 경로를 통해 실제 배포 대상으로 연결됨 확인
 - [x] Sync 정책 설정: 운영형 `factory-a`는 보수적 수동 Sync
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - ArgoCD UI에서 `aegis-spoke-factory-a` Application 자동 생성 확인
 - Application이 `factory-a` Spoke 클러스터를 대상으로 설정되어 있음
@@ -303,12 +303,12 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 
 ## Issue 5 - [배포/ArgoCD] 운영형 동기화 정책 및 롤백 정책 적용
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `factory-a` 운영형 Spoke에 맞는 보수적 동기화 정책과 배포 실패 시 수동 확인 원칙을 적용한다.  
 테스트베드형 Spoke(M5에서 추가)와 차별화된 정책을 명확히 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 운영형 Spoke 동기화 정책 확정 및 적용
   - 자동 Sync with Prune 또는 수동 Sync 방식 결정
@@ -318,7 +318,7 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 - [ ] RollingUpdate 전략 설정 (파드 교체 방식)
 - [ ] 정책 내용을 배포 파이프라인 관련 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 의도적으로 잘못된 이미지 태그 배포 시 기존 파드 유지 확인
 - ArgoCD에서 배포 실패 상태 명확히 표시
@@ -328,7 +328,7 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 
 ## Issue 6 - [배포/GitHub Actions] manifest 갱신 워크플로우 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 빌드된 이미지 태그를 Helm values 파일에 자동으로 반영하는 워크플로우를 구성한다.  
 이 단계가 없으면 ArgoCD는 새 이미지를 자동으로 감지하지 못한다.
@@ -336,7 +336,7 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 > 주의:
 > 이 워크플로우는 자동 커밋 후 자기 자신을 다시 트리거하지 않도록 loop 방지 규칙을 포함해야 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `.github/workflows/update-manifest.yaml` 생성
 - [ ] 빌드 워크플로우 완료 후 연계 트리거 설정
@@ -348,7 +348,7 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
   - 봇 커밋 메시지 필터 또는 경로 필터
   - 자기 자신이 만든 커밋에 재반응하지 않도록 설정
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 빌드 워크플로우 완료 후 `envs/factory-a/values.yaml` 이미지 태그 자동 갱신
 - 갱신된 커밋이 저장소 히스토리에 기록
@@ -359,12 +359,12 @@ Helm chart는 ECR image reference와 `imagePullSecrets`를 values로 받을 수 
 
 ## Issue 7 - [배포/GitHub Actions] 배포 검증 워크플로우 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 ArgoCD Sync 완료 후 배포 성공 여부를 자동으로 확인하는 워크플로우를 구성한다.  
 성공 기준(`Sync` + `Healthy` + 대상 파드 `Running`)을 코드로 정의한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `.github/workflows/verify-deploy.yaml` 생성
 - [ ] 검증 경로 확정
@@ -378,7 +378,7 @@ ArgoCD Sync 완료 후 배포 성공 여부를 자동으로 확인하는 워크�
 - [ ] 타임아웃 설정 (배포 대기 최대 시간)
 - [ ] 검증 실패 시 Slack/이메일 알림 설정 (선택)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 배포 성공 시 워크플로우 `Success` 종료
 - 기준 앱 Deployment/Pod 상태를 `kubectl`로 검증 가능
@@ -389,12 +389,12 @@ ArgoCD Sync 완료 후 배포 성공 여부를 자동으로 확인하는 워크�
 
 ## Issue 8 - [검증/ArgoCD] `factory-a` end-to-end 배포 검증
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 GitHub push부터 `factory-a` Spoke 파드 롤아웃까지 전체 파이프라인이 자동으로 흐르는지 검증한다.  
 이 검증이 완료되어야 M3 마일스톤이 완료된다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 기준 앱 코드 또는 이미지 태그에 실제 변경을 만들어 main 브랜치 push
 - [ ] 빌드 → ECR 푸시 → manifest 갱신 → ArgoCD Sync → Spoke 롤아웃 전체 흐름 자동 완료 확인
@@ -403,7 +403,7 @@ GitHub push부터 `factory-a` Spoke 파드 롤아웃까지 전체 파이프라�
   - push 시각 → `factory-a` 파드 Running 시각
 - [ ] 측정 결과를 배포 파이프라인 관련 문서에 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - GitHub Actions 3개 워크플로우 전부 `Success`
 - ArgoCD `aegis-spoke-factory-a` Application `Synced` + `Healthy`

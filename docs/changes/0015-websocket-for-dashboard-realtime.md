@@ -86,7 +86,7 @@ factory-a/b/c
 
 | 옵션 | 장점 | 단점 |
 | --- | --- | --- |
-| **WebSocket on Fargate** ★ | 양방향, Backend·언어 자유, Redis Pub/Sub 자연스러움 | LB sticky session 필요(ALB로 해결) |
+| **WebSocket on Fargate** (선택) | 양방향, Backend·언어 자유, Redis Pub/Sub 자연스러움 | LB sticky session 필요(ALB로 해결) |
 | Server-Sent Events (SSE) | 구현 단순, HTTP/1.1 기반 | 단방향, 일부 프록시 호환성 |
 | AppSync GraphQL | 관리형, schema 강제 | 학습 곡선, 자유도 낮음, Cognito federation 별도 |
 | API Gateway WebSocket | 서버리스, 자동 스케일 | $1.00/M msg, 동시 연결 비용, 백엔드 통합 복잡 |

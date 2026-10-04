@@ -64,13 +64,13 @@ MVP에서 제외하는 범위는 유지한다.
 
 ## Issue 1 - [Risk/Lambda] Lambda Risk 계산 로직 구현 (가중치 초기안)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 IoT Core 메시지를 처리하는 Lambda data processor 안에 공장별 Risk Score(0~100)를 계산하고 상태(안전/주의/위험)를 판정하는 로직을 구현한다.
 이 이슈에서는 초기 하드코딩 가중치와 임계시간을 기준으로 먼저 동작 가능한 계산 로직을 만든다.
 설정 파일 연동과 세부 제어는 다음 이슈에서 확장한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Lambda data processor의 Risk 계산 로직 구현
 - [ ] 가중치 초기안 하드코딩 적용
@@ -95,7 +95,7 @@ IoT Core 메시지를 처리하는 Lambda data processor 안에 공장별 Risk S
   - 데이터 수집 파이프라인: 2분
 - [ ] `event` 계열은 구조만 수용, 점수 반영은 후속 단계
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Lambda data processor 실행 및 CloudWatch Logs 정상 처리 확인
 - 정상 입력 시 Risk Score 85~100 범위 출력
@@ -107,12 +107,12 @@ IoT Core 메시지를 처리하는 Lambda data processor 안에 공장별 Risk S
 
 ## Issue 2 - [Risk/Config] `runtime-config.yaml` 전역 설정 적용 및 필드 제어 구현
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 M1에서 작성한 `runtime-config.yaml` 구조를 Lambda data processor의 Risk 계산 로직이 실제로 읽어 동작하도록 연결한다.
 `display` / `risk_enabled` 필드 제어가 관제 화면 표시와 Risk 계산에 실제로 반영되어야 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Lambda data processor에서 `runtime-config.yaml` 읽기 로직 구현
   - ConfigMap 또는 파일 마운트 방식
@@ -121,7 +121,7 @@ M1에서 작성한 `runtime-config.yaml` 구조를 Lambda data processor의 Risk
 - [ ] 공장별 override 구조 동작 확인 (현재는 전역 설정만 사용, override 구조만 검증)
 - [ ] 설정 변경 시 재시작 없이 반영 가능한지 여부 결정 및 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `runtime-config.yaml`에서 특정 필드 `risk_enabled: false` 설정 후 해당 필드 점수 미반영 확인
 - 설정 파일 변경 반영 방식 문서화 완료
@@ -130,12 +130,12 @@ M1에서 작성한 `runtime-config.yaml` 구조를 Lambda data processor의 Risk
 
 ## Issue 3 - [Risk/Config] 온도/습도 이상 기준값 초안 적용
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Risk Score 계산에서 온도/습도 이상 판정에 사용할 기준값 초안을 결정하고 적용한다.  
 구체 수치는 실측 기반 보정 대상이므로, 초안을 적용 후 M7(통합 검증)에서 보정한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 온도 이상 기준값 초안 결정 및 적용
   - 정상 / 주의 / 위험 구간 수치 설정
@@ -145,7 +145,7 @@ Risk Score 계산에서 온도/습도 이상 판정에 사용할 기준값 초�
 - [ ] `runtime-config.yaml`에 기준값 반영
 - [ ] 기준값을 `docs/ops/03_test_checklist.md`에 보정 대상으로 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 온도/습도 초안 기준값이 `runtime-config.yaml`에 반영됨
 - Lambda data processor에서 기준값 기반 이상 판정 동작 확인
@@ -154,13 +154,13 @@ Risk Score 계산에서 온도/습도 이상 판정에 사용할 기준값 초�
 
 ## Issue 4 - [Risk/Twin] Risk Twin 출력 구조 구현
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Lambda data processor의 공식 Risk Twin 출력 구조를 구현한다.
 관제 화면과 이후 확장 서비스(LLM 보고서 등)가 이 출력을 기준으로 데이터를 읽는다.  
 MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed에 기록한다. Dashboard Web/API는 DynamoDB와 S3 processed를 read-only로 조회한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Risk Twin 출력 구조 구현
   ```json
@@ -187,7 +187,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
   - 예: `risk_score`, `risk_status`, `risk_cause_weight`, `risk_cause_rank`
 - [ ] Dashboard Web/API에서 조회 가능한 구조로 정리
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Risk Twin 출력 JSON 구조 유효성 확인
 - Top 3 원인이 가중치 기여도 순으로 정렬됨 확인
@@ -199,25 +199,25 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 
 ## Issue 5 - [관제/Dashboard] 메인 대시보드 - 공장별 위험도 카드
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 관제 담당자가 가장 먼저 보는 상단 위험도 카드를 Dashboard Web에서 구현한다.
 각 공장의 현재 상태, 변화 방향, 이상 시스템 개수를 한눈에 파악할 수 있어야 한다.  
 이 패널은 DynamoDB LATEST의 Risk Twin 결과를 기준으로 구성한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Dashboard Web/API 생성 (본사 관제 메인)
 - [ ] Route53 -> CloudFront/ALB -> Auth -> Dashboard 접근 경로 구성 (WAF/Shield는 후속 보안 강화)
 - [ ] 공장별 위험도 카드 패널 구현 (3개 공장)
   - 공장명 (`factory-a`, `factory-b`, `factory-c`)
-  - 현재 상태 (안전 🟢 / 주의 🟡 / 위험 🔴)
+  - 현재 상태 (안전: 초록 / 주의: 노랑 / 위험: 빨강)
   - 최근 10분 변화 방향 (상승 ↑ / 유지 → / 하락 ↓)
   - 현재 이상 시스템 개수
 - [ ] 상태별 색상 구분 적용 (안전: 녹색, 주의: 노랑, 위험: 빨강)
 - [ ] 카드에 점수 직접 노출하지 않음 (상태 중심 표시)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Dashboard에서 3개 공장 위험도 카드 확인
 - 실제 Risk Score 변화 시 카드 상태 자동 갱신 확인
@@ -227,7 +227,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 
 ## Issue 6 - [관제/Dashboard] 메인 대시보드 - 센서 현황 + 이상 시스템 목록
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 관제 화면 중단의 센서 현황과 이상 시스템 목록 패널을 구현한다.  
 온도/습도 추세와 현재 이상이 발생한 시스템을 빠르게 파악할 수 있어야 한다.  
@@ -235,7 +235,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 센서 현황은 원시 센서 시계열(M4 데이터 플레인)에서 조회하고,
 이상 시스템 목록은 Risk Twin latest 결과 기반으로 구성한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 센서 현황 패널 구현 (중단 왼쪽)
   - 공장별 현재 온도 / 현재 습도
@@ -247,7 +247,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
   - 목록 표시 방식: 구성요소 개수형 (메인 카드 기준)
   - 데이터 소스: DynamoDB LATEST (`top_causes`, 상태 값)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Dashboard에서 3개 공장 온도/습도 추세선 확인
 - 이상 시스템 발생 시 목록에 자동 표시
@@ -258,13 +258,13 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 
 ## Issue 7 - [관제/Dashboard] 메인 대시보드 - 하단 이벤트/상태 변화 로그
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 관제 화면 하단의 실시간 상태 변화 로그 패널을 구현한다.  
 공장 위험 상태 변화, 시스템 정상→이상, 이상→복구 이벤트를 시간순으로 표시한다.  
 이 로그는 별도 이벤트 저장소를 두지 않고, Risk Twin의 이전 상태와 현재 상태를 비교하여 파생 생성한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 하단 로그 패널 구현
   - 핵심 상태 변화 표시
@@ -280,7 +280,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 - [ ] 확장 대비형 구조 (향후 이벤트형 입력 수용 가능하게)
 - [ ] 최근 N개 또는 N분 범위 표시 방식 결정
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 실제 시스템 이상 발생 시 로그 패널에 자동 기록
 - 복구 이벤트도 로그에 기록됨 확인
@@ -291,12 +291,12 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
 
 ## Issue 8 - [검증/Risk] 시나리오별 Risk Score 변화 확인
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 여러 이상 시나리오를 적용했을 때 Risk Score와 관제 화면이 의도대로 반응하는지 검증한다.  
 이 검증이 완료되어야 M6 마일스톤이 완료되고 M7(통합 검증)으로 넘어갈 수 있다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 시나리오별 Risk Score 변화 확인
   - 시나리오 1: 정상 상태 → Risk Score 85~100 (안전)
@@ -312,7 +312,7 @@ MVP 단계에서는 Risk Twin 결과를 DynamoDB LATEST/HISTORY와 S3 processed�
   - 장애 판정 목표: 40~60초
 - [ ] 검증 결과를 Risk 관련 문서와 `docs/ops/03_test_checklist.md`에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 5개 시나리오 전부 예상 Risk Score 범위 내 결과 확인
 - 기준값 초과/복구에 따라 위험도 카드 상태가 기대대로 변경됨 확인

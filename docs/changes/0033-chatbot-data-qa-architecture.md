@@ -22,7 +22,7 @@ ID:        0033
 
 ## 결정 기준 (제안)
 
-### 1. 형태: Tool-based QA + 제한적 RAG (프롬프트-only ✗ / 일반 RAG ✗)
+### 1. 형태: Tool-based QA + 제한적 RAG (프롬프트-only 제외 / 일반 RAG 제외)
 
 - 센서값·위험도·타임라인은 **정형 조회(structured query)** 대상이지 벡터 검색 대상이 아니다. 5분마다 바뀌는 수치를 임베딩하는 것은 비용·정합성 모두 손해다.
 - LLM은 **데이터를 찾지 않는다.** Backend가 RBAC를 거쳐 도구로 데이터를 조회하고, 요약된 evidence만 LLM에 전달해 자연어로 설명시킨다.
@@ -134,12 +134,12 @@ image_snapshot/factory_id={factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{mess
 ## 도입 순서
 
 1. 본 ADR(`0033`)을 candidate→accepted로 승급(사용자 승인).
-2. ✅ Backend `POST /chat/query` 라우터 + intent/time parser + data tool 래퍼 추가.
-3. ✅ **LLM 없이 rule/template 기반 답변 먼저 구현** — 도구·RBAC·window 해석을 단위 테스트로 확보.
-4. ✅ **Bedrock 호출 추가** — evidence → 자연어(한국어), 추정/확정 분리, intent별 2-tier(fast/precise), 실패 시 rule fallback. (2026-06-08, 라이브 invoke 검증)
-5. ✅ **배포 인프라**: ECS task role IAM(InvokeModel + inference profile/FM ARN) + Bedrock egress(NAT 경유) Terraform 구현. IAM은 2026-06-09 운영 적용 완료. ECS task definition env 반영과 backend image rollout은 `/chat/query` image 배포 단계에서 수행.
-6. ✅ **Dashboard 챗봇 UI**: `/chat` 페이지 + Workspace sidebar 항목 + API client 연결. (운영 배포 완료)
-7. ✅ 이미지 snapshot S3 조회 + presigned URL + `/chat/query` image_ref 연결(생산 측 캡처는 워크스트림 A 합의 후).
+2. (완료) Backend `POST /chat/query` 라우터 + intent/time parser + data tool 래퍼 추가.
+3. (완료) **LLM 없이 rule/template 기반 답변 먼저 구현** — 도구·RBAC·window 해석을 단위 테스트로 확보.
+4. (완료) **Bedrock 호출 추가** — evidence → 자연어(한국어), 추정/확정 분리, intent별 2-tier(fast/precise), 실패 시 rule fallback. (2026-06-08, 라이브 invoke 검증)
+5. (완료) **배포 인프라**: ECS task role IAM(InvokeModel + inference profile/FM ARN) + Bedrock egress(NAT 경유) Terraform 구현. IAM은 2026-06-09 운영 적용 완료. ECS task definition env 반영과 backend image rollout은 `/chat/query` image 배포 단계에서 수행.
+6. (완료) **Dashboard 챗봇 UI**: `/chat` 페이지 + Workspace sidebar 항목 + API client 연결. (운영 배포 완료)
+7. (완료) 이미지 snapshot S3 조회 + presigned URL + `/chat/query` image_ref 연결(생산 측 캡처는 워크스트림 A 합의 후).
 8. 문서/보고서 **RAG는 마지막**(S3 reports/운영 문서 한정).
 
 ## 업데이트 필요한 문서
@@ -153,8 +153,8 @@ image_snapshot/factory_id={factory_id}/yyyy={YYYY}/mm={MM}/dd={DD}/hh={HH}/{mess
 
 ## 검증
 
-- ✅ Backend (2026-06-08): `tests/test_chat.py`(31) + `tests/test_chat_bedrock.py`(9). intent/factory/KST time 파싱, Evidence 빌더, RBAC 차단(403, LLM 미호출), Bedrock tier 선택(cause→precise), 실패 시 rule fallback, DDB 504. 전체 백엔드 **146 passed**. 테스트는 `BEDROCK_ENABLED=false` + generate_answer stub으로 네트워크 미사용.
-- ✅ 라이브 Bedrock invoke (ap-south-1, account 611058323802): fast(Haiku 4.5)·precise(Sonnet 4.6) 두 tier 실제 호출 성공. confirmed 값만 단정, inferred는 "추정:" 분리, missing은 데이터 한계 명시 — 시스템 프롬프트 규칙 준수 확인.
-- ✅ Web (2026-06-09): `/chat` 페이지 렌더/API client/sidebar route 구현. `npm run lint`, `npm test -- --run`(80 passed), `npm run build` 통과(Vite chunk size warning only).
-- ✅ 운영 IAM/egress (2026-06-09): ECS task role policy targeted apply 완료, `bedrock:InvokeModel`/`bedrock:GetInferenceProfile` simulation allowed. ECS private app subnet은 NAT Gateway default route 보유, `/healthz` 200, `/readyz` dynamodb/redis/rds_metadata ok.
-- ✅ 운영 rollout (2026-06-09): dashboard-backend/web GitHub Actions success. Backend image `sha-990ab6a` push, Terraform apply로 ECS task definition revision 41 등록, service rollout COMPLETED, target 2개 HEALTHY, `/healthz` 200, `/readyz` ok. `/chat/query` OpenAPI 노출 및 비인증 401 확인. `/chat` SPA route 200.
+- (완료) Backend (2026-06-08): `tests/test_chat.py`(31) + `tests/test_chat_bedrock.py`(9). intent/factory/KST time 파싱, Evidence 빌더, RBAC 차단(403, LLM 미호출), Bedrock tier 선택(cause→precise), 실패 시 rule fallback, DDB 504. 전체 백엔드 **146 passed**. 테스트는 `BEDROCK_ENABLED=false` + generate_answer stub으로 네트워크 미사용.
+- (완료) 라이브 Bedrock invoke (ap-south-1, account 611058323802): fast(Haiku 4.5)·precise(Sonnet 4.6) 두 tier 실제 호출 성공. confirmed 값만 단정, inferred는 "추정:" 분리, missing은 데이터 한계 명시 — 시스템 프롬프트 규칙 준수 확인.
+- (완료) Web (2026-06-09): `/chat` 페이지 렌더/API client/sidebar route 구현. `npm run lint`, `npm test -- --run`(80 passed), `npm run build` 통과(Vite chunk size warning only).
+- (완료) 운영 IAM/egress (2026-06-09): ECS task role policy targeted apply 완료, `bedrock:InvokeModel`/`bedrock:GetInferenceProfile` simulation allowed. ECS private app subnet은 NAT Gateway default route 보유, `/healthz` 200, `/readyz` dynamodb/redis/rds_metadata ok.
+- (완료) 운영 rollout (2026-06-09): dashboard-backend/web GitHub Actions success. Backend image `sha-990ab6a` push, Terraform apply로 ECS task definition revision 41 등록, service rollout COMPLETED, target 2개 HEALTHY, `/healthz` 200, `/readyz` ok. `/chat/query` OpenAPI 노출 및 비인증 401 확인. `/chat` SPA route 200.

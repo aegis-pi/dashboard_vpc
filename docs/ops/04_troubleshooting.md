@@ -1484,7 +1484,7 @@ Grafana의 AI/YOLO 결과 패널이 갱신되지 않는다.
 [INFO] InfluxDB (safe_edge_db) 연결 성공!
 [INFO] YOLO 화재 및 Pose 모델 로딩 중...
 [INFO] Picamera2 연결 시도 중...
-[INFO] ✅ 카메라 연결 및 설정 완료!
+[INFO] 카메라 연결 및 설정 완료!
 Camera frontend has timed out!
 Please check that your camera sensor connector is attached securely.
 ```
@@ -2286,8 +2286,8 @@ HISTORY#STATE 1h window items: ~1,700개/공장 (max_items=500 cap으로 제한)
 
 현재 재발 상태:
 
-- `window=6h/12h/24h` 요청은 GRAPH#5M 경로로 분기 → semaphore 포화 없음 ✅
-- `window=1h` 요청은 max_items=500 cap 유지 → 최신 데이터 500개만 반환 ✅
+- `window=6h/12h/24h` 요청은 GRAPH#5M 경로로 분기 → semaphore 포화 없음
+- `window=1h` 요청은 max_items=500 cap 유지 → 최신 데이터 500개만 반환
 
 HISTORY#STATE TTL 2h 변경 시 추가 작업:
 

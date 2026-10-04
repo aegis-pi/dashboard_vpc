@@ -8,11 +8,11 @@ ID:        0030
 
 | 값 | 결정 | 이유 (한 줄) |
 | --- | --- | --- |
-| **1 vCPU** (cpu 512→1024) | 사양 상향 ✅ | 이미지가 `uvicorn --workers 2` 인데 0.5 vCPU 라 worker 2개가 반 코어를 두고 경쟁(oversubscription). history 파싱은 GIL-bound Python CPU → vCPU 가 요청당 속도를 직접 좌우. 1 vCPU = worker 당 ~0.5 코어 + I/O overlap |
+| **1 vCPU** (cpu 512→1024) | 사양 상향 | 이미지가 `uvicorn --workers 2` 인데 0.5 vCPU 라 worker 2개가 반 코어를 두고 경쟁(oversubscription). history 파싱은 GIL-bound Python CPU → vCPU 가 요청당 속도를 직접 좌우. 1 vCPU = worker 당 ~0.5 코어 + I/O overlap |
 | **2 GB** (mem 1024→2048) | 동반 상향(필요해서 아님) | 관측 메모리 max ~40% → 병목 아님. 2 GB 는 1 vCPU 의 **Fargate 최소 동반 메모리**라 자동으로 따라온 값 (메모리 증설이 목적 아님) |
-| **min 2** | 상시 2개 warm ✅ | 단일 1분 버스트는 반응형 autoscaling(메트릭 60s + 콜드스타트)으로 못 따라잡음 → 미리 2개 떠 있어야 함. AZ 분산(HA) + 버스트 분산(102 req/min → task 당 ~51) + 재배포 무중단 |
-| **max 2 (=min, 핀)** | 데모는 scale 고정 ✅ | 데모 시간 척도(분~1h)에선 scale-out 이 의미 없고, 데모 중 scale-in(task kill)/out(콜드스타트 잭)이 화면을 끊을 수 있음 → 2개로 핀해 churn 제거. target-tracking 정책은 남기되 min==max 동안 inert |
-| **메모리 증설** | ❌ 안 함 | max 40% 라 효과 없음 |
+| **min 2** | 상시 2개 warm | 단일 1분 버스트는 반응형 autoscaling(메트릭 60s + 콜드스타트)으로 못 따라잡음 → 미리 2개 떠 있어야 함. AZ 분산(HA) + 버스트 분산(102 req/min → task 당 ~51) + 재배포 무중단 |
+| **max 2 (=min, 핀)** | 데모는 scale 고정 | 데모 시간 척도(분~1h)에선 scale-out 이 의미 없고, 데모 중 scale-in(task kill)/out(콜드스타트 잭)이 화면을 끊을 수 있음 → 2개로 핀해 churn 제거. target-tracking 정책은 남기되 min==max 동안 inert |
+| **메모리 증설** | 안 함 | max 40% 라 효과 없음 |
 
 대상 프로파일 = **데모(build/destroy, 사용자 ≤3명, 짧은 버스트)**. 상시 프로덕션 전환 시에는 `ecs_backend_max_capacity` 만 3~4 로 올려 target-tracking 을 활성화하면 된다(코드 변경 불요). 비용은 데모 패턴(16h/월)에서 min 1 대비 세션당 ~$0.79 차이라 데모에서 min 을 줄일 이유가 없어 min 2 를 유지.
 

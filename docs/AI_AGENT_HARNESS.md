@@ -276,7 +276,7 @@
   - `curl -I https://api.<도메인>/healthz` → 200
   - `wscat -c wss://api.<도메인>/ws/factories/factory-a` → handshake OK
 
-#### Phase 1 Step 7.5 — Route53 Hosted Zone 영구 분리 ✅ 완료 (2026-05-26)
+#### Phase 1 Step 7.5 — Route53 Hosted Zone 영구 분리 완료 (2026-05-26)
 
 - 목표: `infra/data-dashboard destroy/apply` 반복 시 Gabia NS 위임이 깨지지 않도록 Route53 hosted zone을 별도 영구 Terraform root로 분리한다.
 - DoD:
@@ -302,7 +302,7 @@
 - 허용 파일: `infra/data-dashboard-dns/**`, `infra/data-dashboard/route53.tf`, `infra/data-dashboard/acm.tf`, `infra/data-dashboard/outputs.tf`
 - 금지: infra/foundation으로 hosted zone 이전 금지 (워크스트림 A 영역). destroy 실행 금지
 
-#### Phase 1 Step 8 — 운영용 Frontend Vite + React 마이그레이션 ✅ 완료 (2026-05-26)
+#### Phase 1 Step 8 — 운영용 Frontend Vite + React 마이그레이션 완료 (2026-05-26)
 
 - 목표: `frontend/` prototype reference의 화면 설계를 공식 소스 경로 `apps/dashboard-web/` 의 Vite + React 정적 SPA로 이전하고 S3 + CloudFront 배포 가능한 `dist/` 산출물을 만든다.
 - DoD: `apps/dashboard-web/`에서 `npm run build` 성공, `dist/` 산출물 생성, Cognito Hosted UI / API base URL / WebSocket base URL이 환경변수로 분리됨, `frontend/` prototype과 주요 화면 흐름이 일치함
@@ -337,19 +337,19 @@
 - **설계 및 migration 완료** (2026-05-26, ADR 0024).
 - 목표: destroy/apply 반복 시 재설정 비용이 큰 자원을 `infra/data-dashboard-permanent/` 영구 root로 분리. Step 7.5의 Route53 분리 패턴 동일 적용 (import → state rm, No changes 확인).
 - 완료 결과:
-  - `infra/data-dashboard-permanent/` 신규 root 생성 (providers: ap-south-1 + us-east-1) ✅
-  - `terraform import`: 25 resources import 완료 ✅
-  - `terraform state rm`: `infra/data-dashboard` root에서 영구 리소스 20개 제거 완료 ✅
-  - `infra/data-dashboard` → `infra/data-dashboard-permanent` remote state 참조 교체 완료 ✅
-  - permanent plan: 2026-05-27 post-migration diff apply 후 No changes ✅
-  - data-dashboard state empty. 재생성 전까지 plan은 apply 후보로만 확인하고 destroy 대상 아님 ✅
-  - dashboard/API 엔드포인트 HTTP 200 확인 ✅
+  - `infra/data-dashboard-permanent/` 신규 root 생성 (providers: ap-south-1 + us-east-1)
+  - `terraform import`: 25 resources import 완료
+  - `terraform state rm`: `infra/data-dashboard` root에서 영구 리소스 20개 제거 완료
+  - `infra/data-dashboard` → `infra/data-dashboard-permanent` remote state 참조 교체 완료
+  - permanent plan: 2026-05-27 post-migration diff apply 후 No changes
+  - data-dashboard state empty. 재생성 전까지 plan은 apply 후보로만 확인하고 destroy 대상 아님
+  - dashboard/API 엔드포인트 HTTP 200 확인
 - 설계 세션 DoD:
-  - ADR 0024 작성 완료 ✅
-  - 영구화 리소스 분류 (그룹 A/B/C) 완료 ✅
-  - cross-root dependency 분석 완료 (ecs.tf 5개 참조 위치) ✅
-  - migration 순서 및 runbook checklist 문서화 완료 ✅
-  - git diff --check 통과 ✅
+  - ADR 0024 작성 완료
+  - 영구화 리소스 분류 (그룹 A/B/C) 완료
+  - cross-root dependency 분석 완료 (ecs.tf 5개 참조 위치)
+  - migration 순서 및 runbook checklist 문서화 완료
+  - git diff --check 통과
 - 허용 파일:
   - `docs/changes/0024-data-dashboard-permanent-resource-split.md` (신규)
   - `docs/planning/16_data_dashboard_vpc_workplan.md`

@@ -27,7 +27,7 @@
 
 ## Issue 0 - [리팩토링/CI-CD] 최종 테스트 전 Repository 분리 및 OIDC 기반 파이프라인 정리
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 M0~M6 기능 구현이 완료된 뒤 최종 통합 검증에 들어가기 전에 repository 구조와 CI/CD 책임 경계를 정리한다.
 
@@ -204,7 +204,7 @@ moving tags: main, latest
 - 실제 배포 상태는 `aegis-pi-gitops` repo와 ArgoCD가 소유한다.
 - Spoke K3s는 EKS node가 아니므로 ECR pull은 `imagePullSecret` 또는 후속 secret 관리 도구로 별도 처리한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 문서 repo와 코드/인프라 repo를 분리할지 최종 결정
 - [ ] repo 분리 시 migration 순서와 freeze window 정의
@@ -216,7 +216,7 @@ moving tags: main, latest
 - [ ] `aegis-pi-gitops` validation workflow와 image tag update 흐름 정리
 - [ ] 리팩토링 후 M7 Issue 1~6 최종 통합 검증을 시작할 수 있는 상태 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 장기 AWS Access Key 없이 GitHub OIDC로 AWS 접근 가능
 - PR에서는 리소스 생성/삭제 없이 plan만 확인 가능
@@ -229,7 +229,7 @@ moving tags: main, latest
 
 ## Issue 1 - [검증/운영형] `factory-a` 운영형 시나리오 검증
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 실제 센서와 라즈베리파이 환경에서 `factory-a`의 전체 운영 흐름을 검증한다.  
 실 데이터가 Edge Agent → IoT Core → S3 → Risk Score → 관제 화면까지 end-to-end로 흐르는 것을 확인한다.
@@ -238,7 +238,7 @@ moving tags: main, latest
 > 정상 상태 baseline(센서값, 관제 화면, 주요 파드 상태)을 먼저 기록하고,
 > 테스트 시간창과 센서 해제/복구 절차를 확정한 뒤 시나리오를 시작한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 정상 상태 baseline 기록
   - 센서값 / 주요 파드 상태 / 관제 화면 캡처 또는 로그 확보
@@ -254,7 +254,7 @@ moving tags: main, latest
 - [ ] 배포 반영 확인
   - Git push → ArgoCD → `factory-a` 롤아웃 → 데이터 수집 재개 흐름 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 정상 상태 baseline과 이상 상태 결과를 비교 가능하게 기록함
 - 실 센서 데이터 기반 Risk Score 계산 확인
@@ -266,12 +266,12 @@ moving tags: main, latest
 
 ## Issue 2 - [검증/테스트베드] `factory-b`, `factory-c` 테스트베드형 시나리오 검증
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Dummy Sensor를 사용하여 정상/주의/위험 상태 전환 시나리오를 검증한다.  
 Hub 배포 및 데이터 플레인 파이프라인이 VM 환경에서도 정상 동작하는지 확인한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `factory-b` 시나리오 검증
   - `normal` → `warning` 전환: Risk Score 50~84 진입 확인
@@ -285,7 +285,7 @@ Hub 배포 및 데이터 플레인 파이프라인이 VM 환경에서도 정상 
   - Dummy Sensor 중지 → `pipeline_delay` 또는 `pipeline_no_data` 판정 확인
   - 재시작 후 정상화 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `factory-b`, `factory-c` 각각 3단계 시나리오 전환 확인
 - 관제 화면에서 두 공장 상태 변화 실시간 반영
@@ -295,7 +295,7 @@ Hub 배포 및 데이터 플레인 파이프라인이 VM 환경에서도 정상 
 
 ## Issue 3 - [검증/Failover] Failover 시나리오 (Worker-2 장애 → Worker-1 승계 → Hub 반영)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `factory-a`의 핵심 생존성 기능인 Failover가 Hub 관제 관점에서도 올바르게 반영되는지 검증한다.  
 Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → Hub에서 `node_not_ready` 판정 → 관제 화면 반영의 전체 흐름을 확인한다.
@@ -304,7 +304,7 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
 > 장애 실험 허용 시간, Worker-2 전원 차단 방식, 복구 절차, Longhorn baseline 상태,
 > 관제에서 확인할 지표를 사전에 runbook으로 정리한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Failover 테스트 runbook 작성
   - 장애 유발 방식
@@ -325,7 +325,7 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
   - Failover 중 IoT Core 수신 공백 → `pipeline_status` 이상 판정
   - Worker-1 재기동 후 데이터 수집 재개 → `pipeline_status` 정상화
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - runbook 기준으로 장애 유발과 복구가 재현 가능하게 정리됨
 - Failover 2분 이내 달성
@@ -338,11 +338,11 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
 
 ## Issue 4 - [검증/ArgoCD] 배포 파이프라인 롤백 시나리오
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 배포 실패 상황에서 운영형/테스트베드형 Spoke의 롤백 정책이 각각 올바르게 동작하는지 검증한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 롤백 검증용 실패 패턴 정의
   - 존재하지 않는 이미지 태그 또는 기동 실패가 보장되는 manifest 오류 중 하나 선택
@@ -357,7 +357,7 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
 - [ ] 배포 실패 시 GitHub Actions 워크플로우 `Failure` 종료 확인
 - [ ] 배포 실패 알림 동작 확인 (설정한 경우)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 선택한 실패 패턴으로 배포 실패를 재현 가능하게 유도함
 - `factory-a`: 실패 시 기존 파드 유지, 수동 롤백으로 복구
@@ -368,12 +368,12 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
 
 ## Issue 5 - [검증/Test Checklist] `docs/ops/03_test_checklist.md` 전수 보정
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `docs/ops/03_test_checklist.md`에 정리된 "테스트 후 정할 것" 항목들을 실측 결과를 기반으로 모두 보정한다.  
 이 이슈가 완료되어야 설계 문서와 실제 구현이 일치하는 상태가 된다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] **데이터 플레인 보정**
   - 표준 입력 스키마 내부 구조 최종 확정 (실측 기반)
@@ -395,7 +395,7 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
 - [ ] **테스트 전략 보정**
   - 장애/복구 리허설 포함 여부 결정 및 범위 정의
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `docs/ops/03_test_checklist.md`의 모든 체크 항목 완료 표시
 - 보정된 수치가 각 관련 문서에 반영됨
@@ -405,12 +405,12 @@ Worker-2 장애 → Worker-1 AI 감시 승계 → Longhorn 데이터 보존 → 
 
 ## Issue 6 - [문서화/Docs] `docs/` 및 `configs/` 기준 문서 최종 갱신
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 M0~M7 전체 구현이 완료된 상태에서 `docs/`와 `configs/` 기준 문서를 실제 구현 상태와 일치하도록 최종 갱신한다.  
 이 문서가 완료되면 `Aegis-pi/`만 보고 전체 시스템을 이해하고 운영할 수 있는 상태가 된다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `data-plane.md` - 확정된 스키마, 주기, 보존 기간 반영
 - [ ] `risk-model.md` - 최종 가중치, 이상 기준값, Top 3 원인 코드 사전 반영
@@ -424,7 +424,7 @@ M0~M7 전체 구현이 완료된 상태에서 `docs/`와 `configs/` 기준 문�
 - [ ] `safe-edge-setup-plan.md` - 실제 설치 과정에서 달라진 부분 보정
 - [ ] `README.md` - 전체 구현 완료 상태 반영 및 운영 시작 선언
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 위 10개 문서 전부 갱신 완료
 - `Aegis-pi/` 내부 문서와 설정만 읽어도 현재 시스템 구조, 운영 방법, 주요 수치를 이해 가능

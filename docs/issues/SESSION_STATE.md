@@ -189,7 +189,7 @@ Step 1 - Frontend prototype/reference 정리 (병행 가능)
   + Step 9에서 S3 + CloudFront 배포 CI/CD 구현 완료, 실제 배포 대기
   + frontend/ 를 배포/CI/S3 source path로 직접 사용하지 않음
 
-Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/) ✅ 완료 (2026-05-21)
+Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/) 완료 (2026-05-21)
   + 전체 apply 완료: 47 resources (Route53 zone 1 + 40 + 잔여 6)
   + backend-bootstrap: kjw-aegis-terraform-state S3 backend bucket apply 완료
   + S3 backend: use_lockfile = true (Terraform S3 native lockfile 사용, DynamoDB lock table 미사용)
@@ -204,7 +204,7 @@ Step 2 - Terraform 1번 VPC 골격 (infra/data-dashboard/) ✅ 완료 (2026-05-2
     - dashboard_api_url: https://api.aegis-pi.cloud
     - dashboard_web_url: https://dashboard.aegis-pi.cloud
 
-Step 3 - Terraform 데이터 저장소 ✅ 완료 (2026-05-21)
+Step 3 - Terraform 데이터 저장소 완료 (2026-05-21)
   + DynamoDB 공식 hot store: AEGIS-DynamoDB-FactoryStatus (Step 5.5 이후 기준)
   + 중복 DynamoDB aegis-factory-status: Step 5.5에서 삭제 완료
   + DynamoDB aegis-daily-report: ACTIVE, on-demand
@@ -221,7 +221,7 @@ Step 3 - Terraform 데이터 저장소 ✅ 완료 (2026-05-21)
   + outputs.tf: Step 3 output 블록 추가 (secret value 미노출)
   + 누적 리소스: 47(Step 2) + 12(Step 3) = 59 resources
 
-Step 4 사전 정렬 ✅ 완료 (2026-05-21, ADR 0020 → ADR 0022로 table 기준 보정)
+Step 4 사전 정렬 완료 (2026-05-21, ADR 0020 → ADR 0022로 table 기준 보정)
   + apps/data-processor: 팀원 원격 코드(aegis-pi/Aegis-pi main) 동기화 완료
     - lambda_function.py / processor/{dynamo,envelope,normalizer,pipeline_status,risk,s3_writer}.py
     - tests/{test_dynamo,test_envelope,test_pipeline_status,test_risk,test_s3_writer}.py
@@ -238,7 +238,7 @@ Step 4 사전 정렬 ✅ 완료 (2026-05-21, ADR 0020 → ADR 0022로 table 기�
   + pytest: 20 passed
   + 다음: Step 4 본 구현 (IoT Rule trigger + Lambda 배포) — Codex 검토 후 진행
 
-Step 4 본 구현 ✅ 완료 (2026-05-21, ADR 0021)
+Step 4 본 구현 완료 (2026-05-21, ADR 0021)
   + Lambda KJW-AEGIS-Data-Lambda-data-processor: active (Python 3.12, 256MB, 30s)
   + IAM KJW-AEGIS-Data-IAMRole-Lambda-data-processor: DDB GetItem/PutItem/UpdateItem + S3 PutObject(processed/*)
   + IoT Rule KJW_AEGIS_Data_IoTRule_factory_state_processor: active, SELECT * FROM 'aegis/+/factory_state'
@@ -257,7 +257,7 @@ Step 4 본 구현 ✅ 완료 (2026-05-21, ADR 0021)
   + outputs.tf: lambda_data_processor_name / iot_rule_factory_state_processor / iot_rule_infra_state_processor
   + ADR: docs/changes/0021-data-processor-iot-rule-trigger.md
 
-Step 5 본 구현 ✅ 완료 (2026-05-21, ADR 0022로 table 기준 보정)
+Step 5 본 구현 완료 (2026-05-21, ADR 0022로 table 기준 보정)
   + Lambda notifier KJW-AEGIS-Data-Lambda-notifier: active (Python 3.12, 256MB, 30s, VPC-attach)
     - VPC: private_app subnet × 2 (Azone/Czone), SG: KJW-AEGIS-Data-SG-LambdaNotifier
     - env: REDIS_HOST=master.kjw-aegis-data-redis.wai0jm.aps1.cache.amazonaws.com REDIS_PORT=6379 REDIS_AUTH_SECRET_NAME=kjw-aegis-data-redis-auth
@@ -284,7 +284,7 @@ Step 5 본 구현 ✅ 완료 (2026-05-21, ADR 0022로 table 기준 보정)
 다음 세션 최우선 실행 순서 (본 환경):
 
 ```text
-Step 5.5 — DynamoDB 공식 hot store 재정렬 + aegis-factory-status 삭제 ✅ 완료 (2026-05-21, ADR 0022)
+Step 5.5 — DynamoDB 공식 hot store 재정렬 + aegis-factory-status 삭제 완료 (2026-05-21, ADR 0022)
   + AEGIS-DynamoDB-FactoryStatus Streams NEW_AND_OLD_IMAGES 활성화 (aws dynamodb update-table 직접 적용)
   + dynamodb.tf: aws_dynamodb_table.factory_status(aegis-factory-status) resource 블록 완전 제거
   + dynamodb.tf: data "aws_dynamodb_table" "official_factory_status" → AEGIS-DynamoDB-FactoryStatus 참조
@@ -303,7 +303,7 @@ Step 5.5 — DynamoDB 공식 hot store 재정렬 + aegis-factory-status 삭제 �
   + AEGIS-DynamoDB-FactoryStatus factory-a LATEST 조회 확인 (updated_at 2026-05-21T07:59:05.956Z)
   + AEGIS-DynamoDB-FactoryStatus factory-a HISTORY count: 3,616
 
-Step 6 — Dashboard Backend FastAPI 구현 ✅ 완료 (2026-05-26)
+Step 6 — Dashboard Backend FastAPI 구현 완료 (2026-05-26)
   + apps/dashboard-backend/ 신설 완료
     - main.py / routers/factories.py / routers/reports.py / routers/ws.py
     - deps/auth.py (Cognito JWT 앱 레벨 검증, JWKS)

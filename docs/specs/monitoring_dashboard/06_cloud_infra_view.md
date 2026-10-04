@@ -143,10 +143,10 @@ staleness 기준(doc 29 / 코드): `fast` age > 180초, `slow` age > 900초 → 
 
 ## 구현 순서
 
-1. ✅ Backend `services/cloud_infra.py` + `routers/cloud_infra.py` + main router 등록. pytest(없을 때 `available:false`, 있을 때 staleness 계산). — 구현/배포 완료(`tests/test_cloud_infra.py`, ECS revision 28).
-2. ✅ Frontend 타입/adapter/client + 페이지 + sidebar 항목 + empty-state. vitest(정규화/배지 색/stale 표시). — 구현/배포 완료(`CloudInfraPage.tsx`, `adapters/cloudInfra.ts`, `tests/cloudInfra.test.ts`).
-3. ⬜ doc 29 LATEST 예시로 end-to-end mock 확인.
-4. ⬜ (팀원 데이터 후) 실제 DDB 값으로 정합성 미세 조정.
+1. (완료) Backend `services/cloud_infra.py` + `routers/cloud_infra.py` + main router 등록. pytest(없을 때 `available:false`, 있을 때 staleness 계산). — 구현/배포 완료(`tests/test_cloud_infra.py`, ECS revision 28).
+2. (완료) Frontend 타입/adapter/client + 페이지 + sidebar 항목 + empty-state. vitest(정규화/배지 색/stale 표시). — 구현/배포 완료(`CloudInfraPage.tsx`, `adapters/cloudInfra.ts`, `tests/cloudInfra.test.ts`).
+3. (미완료) doc 29 LATEST 예시로 end-to-end mock 확인.
+4. (미완료) (팀원 데이터 후) 실제 DDB 값으로 정합성 미세 조정.
 
 ## 명시적 비채택 / 경계
 
