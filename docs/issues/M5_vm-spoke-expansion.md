@@ -30,12 +30,12 @@
 
 ## Issue 1 - [Spoke/K3s] Mac mini VM K3s 구성 (`factory-b`)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Mac mini(M4, 24GB)에 VM을 구성하고 K3s를 설치하여 `factory-b` Spoke 기반을 만든다.  
 VM 기반 Spoke는 파이프라인 검증에 집중하므로 Longhorn, NFS, 버퍼링 구조는 제외한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Mac mini에서 VM 구성 방식 결정 및 적용
   - 방식 예: UTM, Multipass, OrbStack 등
@@ -48,7 +48,7 @@ VM 기반 Spoke는 파이프라인 검증에 집중하므로 Longhorn, NFS, 버�
   - `input_module_type: dummy`
 - [ ] K3s 정상 동작 확인 (`kubectl get nodes`)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `kubectl get nodes`에서 `factory-b` 노드 `Ready` 상태
 - K3s 버전 확인 및 기록
@@ -58,7 +58,7 @@ VM 기반 Spoke는 파이프라인 검증에 집중하므로 Longhorn, NFS, 버�
 
 ## Issue 2 - [Spoke/K3s] Windows VirtualBox K3s 구성 (`factory-c`, master + worker 2-VM)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Windows 환경 (Computer 3) 에 VirtualBox 기반 VM **2 대** (`factory-c-master`, `factory-c-worker`) 를 구성하고, K3s server + agent 2-노드 클러스터를 만들어 `factory-c` Spoke 기반을 만든다.
 
@@ -66,7 +66,7 @@ Windows 환경 (Computer 3) 에 VirtualBox 기반 VM **2 대** (`factory-c-maste
 
 single-node 가 아닌 2-VM 으로 가는 이유는 (1) Dashboard 가 표시하는 `infra_state.payload.nodes` 배열이 2개로 보여 "실제 공장처럼" 시연되도록 하고, (2) `aegis.input-module-type=dummy` label + workload placement 검증이 의미를 갖게 하기 위함이다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Computer 3 (Windows 11, i7-10700F + 16 GiB 권장) 에 VirtualBox 7.x 설치
 - [ ] VM `factory-c-master` 생성 (2 vCPU / 2 GiB / 20 GiB, Ubuntu Server LTS 24.04, NAT)
@@ -82,7 +82,7 @@ single-node 가 아닌 2-VM 으로 가는 이유는 (1) Dashboard 가 표시하�
 - [ ] Windows 호스트 무인 운영 설정: 절전 OFF / 자동 로그인 / Task Scheduler 2 작업 (master 즉시 + worker 60s 지연)
 - [ ] Windows 재부팅 후 사람 개입 없이 두 VM 부팅 + 두 노드 Ready 자동 복구
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `kubectl get nodes` 에 `factory-c-master` (`control-plane,master`) + `factory-c-worker` (`<none>`) 모두 `Ready`
 - K3s 버전 두 노드 동일하게 기록
@@ -94,12 +94,12 @@ single-node 가 아닌 2-VM 으로 가는 이유는 (1) Dashboard 가 표시하�
 
 ## Issue 3 - [Spoke/Tailscale] `factory-b`, `factory-c` Tailscale 참여 및 Hub 연결
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 두 VM Spoke를 Tailscale 네트워크에 참여시키고 Hub ArgoCD에서 접근 가능하게 한다.  
 테스트베드형 Spoke는 운영형보다 상대적으로 넓은 접근 허용 범위를 가진다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `factory-b` VM에 Tailscale 설치 및 네트워크 참여
   - M2에서 발급한 `factory-b` Auth Key 사용
@@ -115,7 +115,7 @@ single-node 가 아닌 2-VM 으로 가는 이유는 (1) Dashboard 가 표시하�
 - [ ] EKS 환경에서 두 kubeconfig로 `kubectl get nodes` 성공
   - `factory-c.kubeconfig` 는 두 노드 (`factory-c-master`, `factory-c-worker`) 모두 Ready 출력
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - EKS에서 `factory-b`, `factory-c` kubeconfig로 K3s API 접근 성공
 - Tailscale Admin 콘솔에서 `factory-b` + `factory-c-master` + `factory-c-worker` 모두 `Connected` 상태
@@ -124,12 +124,12 @@ single-node 가 아닌 2-VM 으로 가는 이유는 (1) Dashboard 가 표시하�
 
 ## Issue 4 - [배포/ArgoCD] ApplicationSet에 `factory-b`, `factory-c` 추가
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 M3에서 구성한 ApplicationSet에 `factory-b`, `factory-c` Spoke를 추가하여  
 3개 공장 모두 중앙 Hub에서 배포 관리되는 구조를 완성한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] ArgoCD에 `factory-b`, `factory-c` 클러스터 등록
   ```bash
@@ -141,7 +141,7 @@ M3에서 구성한 ApplicationSet에 `factory-b`, `factory-c` Spoke를 추가하
 - [ ] ArgoCD ApplicationSet에 `factory-b`, `factory-c` values 경로 추가
 - [ ] ApplicationSet에서 `aegis-spoke-factory-b`, `aegis-spoke-factory-c` Application 자동 생성 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - ArgoCD UI에서 3개 Application 모두 확인
   - `aegis-spoke-factory-a` (운영형)
@@ -154,12 +154,12 @@ M3에서 구성한 ApplicationSet에 `factory-b`, `factory-c` Spoke를 추가하
 
 ## Issue 5 - [Spoke/Dummy Sensor] Dummy Sensor 모듈 구현 및 배포
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 VM 환경에서 실센서 없이 표준 입력 스키마에 맞는 더미 데이터를 생성하여 IoT Core로 전송하는 Dummy Sensor 모듈을 구현한다.  
 시나리오별(정상/주의/위험) 값 생성과 수동 전환이 가능해야 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Dummy Sensor 모듈 구현
   - 표준 입력 스키마 준수
@@ -174,7 +174,7 @@ VM 환경에서 실센서 없이 표준 입력 스키마에 맞는 더미 데이
 - [ ] IoT Core 연결 및 메시지 전송 로직 (Edge Agent와 동일 방식)
 - [ ] `factory-b`, `factory-c`에 각각 배포
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `factory-b`, `factory-c` K3s에서 Dummy Sensor 파드 `Running`
 - ArgoCD에서 `factory-b`, `factory-c` Application `Synced` + `Healthy` 확인
@@ -185,12 +185,12 @@ VM 환경에서 실센서 없이 표준 입력 스키마에 맞는 더미 데이
 
 ## Issue 6 - [배포/ArgoCD] 테스트베드형 동기화 정책 및 자동 롤백 적용
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `factory-b`, `factory-c`에 운영형(`factory-a`)과 차별화된 배포 정책을 적용한다.  
 테스트베드형은 빠른 반영과 자동 롤백을 허용하여 검증 사이클을 단축한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 테스트베드형 Sync 정책 적용
   - 자동 Sync (운영형보다 빠른 주기)
@@ -200,7 +200,7 @@ VM 환경에서 실센서 없이 표준 입력 스키마에 맞는 더미 데이
 - [ ] 정책 차이가 ArgoCD ApplicationSet에 명확히 반영됨 확인
 - [ ] 정책 내용을 배포 파이프라인 관련 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 의도적으로 잘못된 이미지 배포 후 `factory-b` 자동 롤백 확인
 - `factory-a`는 동일 상황에서 자동 롤백 없이 `Degraded` 상태 유지
@@ -210,7 +210,7 @@ VM 환경에서 실센서 없이 표준 입력 스키마에 맞는 더미 데이
 
 ## Issue 7 - [검증/데이터] `factory-b`, `factory-c` 데이터 플레인 연결 확인
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Dummy Sensor에서 생성된 데이터가 `factory-a`와 동일한 파이프라인으로  
 IoT Core → S3까지 흐르는지 확인한다.  
@@ -220,7 +220,7 @@ IoT Core → S3까지 흐르는지 확인한다.
 > M4의 Lambda data processor가 `factory_id` 기준으로 다중 공장을 식별하고,
 > Grafana/Hub에서 3개 공장 상태를 구분해 조회할 수 있어야 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `factory-b` 더미 데이터 → IoT Core → S3 적재 확인
   - 경로: `s3://bucket/factory-b/...`
@@ -229,7 +229,7 @@ IoT Core → S3까지 흐르는지 확인한다.
 - [ ] S3에서 3개 공장 데이터가 독립 경로에 분리 적재 확인
 - [ ] `pipeline_status` 집계 대상에 `factory-b`, `factory-c` 추가
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - S3 콘솔에서 `factory-a/`, `factory-b/`, `factory-c/` 경로에 각각 데이터 적재 확인
 - 3개 공장 `pipeline_status` 집계 결과 확인 가능

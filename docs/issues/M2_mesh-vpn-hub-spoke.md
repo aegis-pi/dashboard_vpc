@@ -20,13 +20,13 @@
 
 ## Issue 1 - [Mesh/Tailscale] 계정 및 Spoke별 키 발급 정책 수립
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Tailscale 네트워크의 인증/키 관리 정책을 먼저 수립한다.  
 키가 Spoke별로 분리 발급되어야 개별 Spoke의 접근을 독립적으로 제어할 수 있다.  
 정책 없이 키를 나누면 이후 운영 중 Tailscale 장애 대응이 어려워진다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] Tailscale 계정 생성 및 Tailnet 구성
 - [x] Spoke별 Auth Key 발급 방식 결정
@@ -38,7 +38,7 @@ Tailscale 네트워크의 인증/키 관리 정책을 먼저 수립한다.
   - 테스트베드형(`factory-b`, `factory-c`): 검증 중단, 재시도
 - [x] 접근 정책을 Mesh VPN 관련 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Tailscale Admin 콘솔에서 Tailnet 생성 확인
 - 각 환경별 Auth Key 생성 확인
@@ -126,12 +126,12 @@ Tailscale Admin Console 설정, OAuth client 생성, Spoke별 Auth Key 생성, H
 
 ## Issue 2 - [Mesh/Tailscale] `factory-a` Master Tailscale 참여 및 확인
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `factory-a` K3s 클러스터의 Master 노드를 Tailscale 네트워크에 참여시킨다.  
 Worker 노드는 초기 Mesh 참여 대상에서 제외하고, Master 중심 접근 정책을 유지한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] Master 노드에 Tailscale 설치
 - [x] Tailscale 네트워크 참여
@@ -139,7 +139,7 @@ Worker 노드는 초기 Mesh 참여 대상에서 제외하고, Master 중심 접
 - [x] Tailscale Admin 콘솔에서 `factory-a` Master 노드 확인
 - [x] Tailscale IP로 Master SSH 접근 가능 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Tailscale Admin 콘솔에서 `factory-a` Master 노드 `Connected` 상태
 - 외부 환경(Host PC 또는 로컬)에서 Tailscale IP로 `ping` 응답
@@ -169,7 +169,7 @@ Worker 노드는 초기 Mesh 참여 대상에서 제외하고, Master 중심 접
 
 ## Issue 3 - [Mesh/Tailscale] EKS Hub Tailscale 참여 및 확인
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 EKS Hub가 Tailscale 네트워크에 참여하여 각 Spoke Master에 도달할 수 있는 경로를 확보한다.  
 EKS 환경에서는 Operator, DaemonSet, 또는 별도 Subnet Router 중 하나의 운영 방식을 먼저 결정해야 하며,  
@@ -177,7 +177,7 @@ EKS 환경에서는 Operator, DaemonSet, 또는 별도 Subnet Router 중 하나�
 
 이 이슈에서 ArgoCD UI 접근 경로도 함께 정리한다. M1에서는 사용자가 로컬 PC에서 `kubectl port-forward`로 접속하고, M2 이후에는 public LoadBalancer 없이 Tailscale 기반 private access로 접근하는 것을 목표로 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] EKS 환경에서 Tailscale 운영 방식 결정 및 적용
   - 방식 예: Tailscale Operator, DaemonSet, 또는 별도 EC2 Subnet Router
@@ -189,7 +189,7 @@ EKS 환경에서는 Operator, DaemonSet, 또는 별도 Subnet Router 중 하나�
 - [x] ArgoCD public `LoadBalancer`를 만들지 않는 기준 유지
 - [x] EKS API endpoint public CIDR `0.0.0.0/0` 축소는 설계 마무리 후 재검토로 보류 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 선택한 운영 방식이 문서에 명시되어 있음
 - Tailscale Admin 콘솔에서 EKS Hub `Connected` 상태
@@ -224,7 +224,7 @@ EKS 환경에서는 Operator, DaemonSet, 또는 별도 Subnet Router 중 하나�
 
 ## Issue 4 - [Mesh/Tailscale] kubeconfig Tailscale IP 기반 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 ArgoCD가 `factory-a` K3s API에 접근할 수 있도록 kubeconfig를 Tailscale IP 기반으로 구성한다.  
 이름 기반 주소는 후속 전환 시에만 사용하고, 현재는 Tailscale IP를 기준으로 한다.
@@ -233,7 +233,7 @@ ArgoCD가 `factory-a` K3s API에 접근할 수 있도록 kubeconfig를 Tailscale
 > K3s API 서버 인증서가 Tailscale IP 접속을 허용하는지 먼저 검증한다.
 > 필요하면 API 서버 인증서 SAN 설정 또는 접근 방식을 조정한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] `factory-a` K3s API 서버 인증서의 Tailscale IP 허용 여부 확인
 - [x] `factory-a` K3s API 서버 주소를 Tailscale IP로 교체한 kubeconfig 생성
@@ -243,7 +243,7 @@ ArgoCD가 `factory-a` K3s API에 접근할 수 있도록 kubeconfig를 Tailscale
 - [x] kubeconfig 파일 보안 보관 방법 결정 (Secret 또는 파일)
 - [x] EKS 환경에서 해당 kubeconfig로 `factory-a` K3s API 접근 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Tailscale IP 기반 K3s API 접속 시 TLS/인증서 오류 없이 `kubectl get nodes` 성공
 - EKS 환경에서 `factory-a` kubeconfig로 `kubectl get nodes` 성공
@@ -279,12 +279,12 @@ ArgoCD가 `factory-a` K3s API에 접근할 수 있도록 kubeconfig를 Tailscale
 
 ## Issue 5 - [배포/ArgoCD] `factory-a` Spoke 클러스터 등록
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 ArgoCD가 `factory-a` K3s 클러스터를 배포 대상으로 인식하게 한다.  
 이 등록이 완료되어야 ArgoCD에서 Application/ApplicationSet을 생성해 Spoke에 배포할 수 있다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] ArgoCD CLI로 `factory-a` 클러스터 등록
   ```bash
@@ -294,7 +294,7 @@ ArgoCD가 `factory-a` K3s 클러스터를 배포 대상으로 인식하게 한�
 - [x] ArgoCD에서 `factory-a` 클러스터 상태 `Successful` 확인
 - [x] 클러스터 이름 및 레이블 규칙 기록 (추후 ApplicationSet 자동화 기반)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - ArgoCD UI Clusters 탭에서 `factory-a` 클러스터 확인
 - 클러스터 상태 `Connection Status: Successful`
@@ -327,12 +327,12 @@ ApplicationSet 대비 cluster 이름은 `factory-a`로 고정한다. 후속 labe
 
 ## Issue 6 - [검증/ArgoCD] Hub → `factory-a` K3s API 접근 및 Sync 확인
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Hub ArgoCD가 `factory-a` Spoke를 실제로 바라보고 Sync가 동작하는지 end-to-end로 검증한다.  
 이 확인이 완료되어야 M2 마일스톤이 완료되고 M3(배포 파이프라인), M4(데이터 플레인)로 넘어갈 수 있다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] 테스트용 최소 Application 정의
   - 예: 단순 Deployment + Service 형태의 `nginx` 또는 동등 수준 앱
@@ -344,7 +344,7 @@ Hub ArgoCD가 `factory-a` Spoke를 실제로 바라보고 Sync가 동작하는�
 - [x] Tailscale 연결이 끊어진 상태에서 ArgoCD Sync 실패 동작 확인 (장애 대응 검증)
 - [x] M2 완료 기준 및 결과를 Mesh VPN 관련 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - ArgoCD에서 `factory-a` 대상 Application `Synced` + `Healthy` 확인
 - 테스트용 Application이 `factory-a`에 실제 배포되어 `Running` 확인

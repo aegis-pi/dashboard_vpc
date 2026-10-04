@@ -151,13 +151,13 @@ Aegis-Pi Hub의 실행 환경인 EKS 클러스터를 생성한다.
 
 ## Issue 2 - [Hub/Kubernetes] 네임스페이스 설계 및 생성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 EKS 내부 기능을 역할 기준으로 분리하여 관리한다.  
 네임스페이스 경계가 명확해야 이후 ArgoCD ApplicationSet 배포 대상과 Grafana 데이터 소스 구분이 가능하다.
 최신 클라우드 아키텍처 기준에서 별도 Risk 계산 파드는 두지 않고, Risk 계산은 Lambda data processor 내부 로직으로 처리한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] 아래 네임스페이스 생성 및 역할 정의 문서화
   - `argocd` - Hub에서 Spoke 배포 제어
@@ -167,7 +167,7 @@ EKS 내부 기능을 역할 기준으로 분리하여 관리한다.
 - [x] 각 네임스페이스에 기본 ResourceQuota 또는 LimitRange 설정 (선택)
 - [x] 네임스페이스 구조를 `docs/architecture/00_current_architecture.md` 또는 Hub 운영 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `kubectl get namespaces`에서 4개 네임스페이스 확인
 - 각 네임스페이스 역할이 문서에 명시되어 있음
@@ -195,13 +195,13 @@ EKS 내부 기능을 역할 기준으로 분리하여 관리한다.
 
 ## Issue 3 - [Hub/ArgoCD] ArgoCD 설치 (Spoke 등록 전 단계)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Hub의 중앙 배포 제어 계층인 ArgoCD를 EKS에 설치한다.  
 이 단계에서는 Spoke 클러스터 등록은 하지 않는다. (M2에서 Mesh VPN 연결 후 진행)  
 ArgoCD 자체가 정상 동작하는 상태까지만 완료한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] `argocd` 네임스페이스에 ArgoCD 설치
 - [x] ArgoCD 초기 admin 비밀번호 확인
@@ -209,7 +209,7 @@ ArgoCD 자체가 정상 동작하는 상태까지만 완료한다.
 - [x] ArgoCD CLI 로컬 설정 완료
 - [x] ArgoCD 버전 및 설치 방식 관련 문서에 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - ArgoCD UI 브라우저 접근 가능
 - `argocd cluster list`에서 in-cluster(EKS 자체) 확인
@@ -294,12 +294,12 @@ scripts/build/build-hub.sh
 
 ## Issue 4 - [Hub/S3] 버킷 생성 및 경로 파티셔닝 설계
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Edge에서 올라온 데이터를 장기 보존하는 중앙 원본 적재 지점을 구성한다.  
 공장/source_type/날짜 기준 파티셔닝으로 이후 정규화 서비스가 데이터를 효율적으로 읽을 수 있게 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] S3 버킷 생성 (버킷 이름, 리전, 퍼블릭 액세스 차단 설정)
 - [x] 경로 파티셔닝 규칙 확정 및 Terraform 코드 반영
@@ -355,7 +355,7 @@ Public access block은 다른 VPC 접근을 막기 위한 설정이 아니라 �
   - Allowed write: `s3://aegis-bucket-data/latest/factory-a/irsa-test.json`
   - Denied write: `s3://aegis-bucket-data/raw/factory-a/irsa-denied.txt`
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - IoT Core 테스트 메시지 발행 후 S3 지정 경로에 파일 적재 확인
 - EKS 내부 파드에서 S3 버킷 접근 가능 (IRSA 기반)
@@ -373,12 +373,12 @@ Public access block은 다른 VPC 접근을 막기 위한 설정이 아니라 �
 
 ## Issue 5 - [Hub/IoT Core] Thing / 인증서 / 규칙 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 각 Spoke의 Edge Agent가 데이터를 전송할 IoT Core 진입점을 구성한다.  
 Thing, 인증서, 정책, IoT Rule을 설정하여 Edge → IoT Core → S3 파이프라인의 앞단을 완성한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] IoT Core Thing 생성 (공장별 Thing 또는 통합 Thing 방식 결정 및 적용)
 - [x] X.509 인증서 생성 및 Thing 연결
@@ -387,7 +387,7 @@ Thing, 인증서, 정책, IoT Rule을 설정하여 Edge → IoT Core → S3 파�
 - [x] IoT Core 엔드포인트 확인 및 기록
 - [x] 테스트 메시지 발행 및 IoT Core 수신 확인
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - AWS 콘솔 IoT Core `MQTT 테스트 클라이언트`에서 테스트 메시지 수신 확인
 - IoT Rule이 트리거되어 S3에 메시지 적재 확인 (Issue 4 이후)
@@ -419,19 +419,19 @@ Thing, 인증서, 정책, IoT Rule을 설정하여 Edge → IoT Core → S3 파�
 
 ## Issue 6 - [관제/AMP] AMP(Amazon Managed Prometheus) Workspace 생성 및 접근 권한 준비
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 각 Spoke 메트릭의 중앙 수집 대상이 되는 AMP Workspace를 먼저 준비한다.  
 이 이슈에서는 Workspace 생성과 쓰기 권한 준비까지 완료하고, 실제 메트릭 전송은 다음 이슈에서 수행한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] AMP Workspace 생성
 - [x] IAM Role 및 IRSA 설정 (Prometheus → AMP 쓰기 권한)
 - [x] AMP Workspace ARN 및 엔드포인트 기록
 - [x] AMP 접근 정책을 Hub 관제 관련 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - AWS 콘솔에서 AMP Workspace 생성 확인
 - Prometheus 서비스 계정에 연결할 IAM/IRSA 구성이 준비됨
@@ -464,12 +464,12 @@ Thing, 인증서, 정책, IoT Rule을 설정하여 Edge → IoT Core → S3 파�
 
 ## Issue 7 - [관제/Prometheus] Hub Prometheus 설치 및 AMP remote_write 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Hub EKS 내부에서 메트릭을 수집할 Prometheus(또는 Agent)를 설치하고 AMP로 전송한다.  
 이 단계가 완료되어야 내부 관측용 Grafana 또는 후속 Dashboard API가 AMP/metrics 계층을 참조할 수 있다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] `observability` 네임스페이스에 Prometheus 또는 Prometheus Agent 설치
 - [x] EKS 기본 메트릭 수집 대상 확인
@@ -478,7 +478,7 @@ Hub EKS 내부에서 메트릭을 수집할 Prometheus(또는 Agent)를 설치�
 - [x] IRSA 기반으로 AMP 쓰기 권한 연결
 - [x] 메트릭 수신 여부 확인 및 설정 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Prometheus(또는 Agent) 파드 `Running`
 - AMP 콘솔 또는 쿼리로 메트릭 수신 확인
@@ -513,13 +513,13 @@ Hub EKS 내부에서 메트릭을 수집할 Prometheus(또는 Agent)를 설치�
 
 ## Issue 8 - [관제/Grafana] 내부 관측용 Grafana/AMP 데이터 소스 기준 결정
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Hub 내부 관측에 사용할 Grafana 또는 AMP 조회 기준을 구성한다.
 
 본사 관리자용 최종 대시보드는 Dashboard VPC의 Web/API로 확장한다. 다만 MVP 단계에서는 관리자들이 ArgoCD와 Grafana 웹 UI에 실제 HTTPS 경로로 접근할 수 있는지 검증하기 위해 Issue 9~10에서 별도 Admin Ingress를 구성/검증했다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] `observability` 네임스페이스에 Grafana 설치 여부 결정
 - [x] Grafana를 설치하는 경우 초기 admin 비밀번호 설정
@@ -529,7 +529,7 @@ Hub 내부 관측에 사용할 Grafana 또는 AMP 조회 기준을 구성한다.
 - [x] Grafana 버전 및 설치 방식 기록
 - [x] Dashboard VPC가 조회할 DynamoDB LATEST/HISTORY와 S3 processed 후보를 문서에 명시
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Grafana를 설치하는 경우 UI 접근 가능
 - AMP 데이터 소스 `Test` 버튼 성공
@@ -570,13 +570,13 @@ Hub 내부 관측에 사용할 Grafana 또는 AMP 조회 기준을 구성한다.
 
 ## Issue 9 - [Hub/Ingress] AWS Load Balancer Controller 준비
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Hub EKS의 Kubernetes Ingress가 AWS Application Load Balancer를 생성하고 관리할 수 있도록 AWS Load Balancer Controller를 구성한다.
 
 이 이슈는 ArgoCD/Grafana를 외부에 직접 노출하지 않는다. Issue 10에서 HTTPS Admin Ingress를 구성하기 위한 선행 작업이다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] AWS Load Balancer Controller용 IAM policy와 IRSA role 구성
 - [x] `kube-system` 또는 지정 namespace에 AWS Load Balancer Controller Helm release 설치
@@ -588,7 +588,7 @@ Hub EKS의 Kubernetes Ingress가 AWS Application Load Balancer를 생성하고 �
 - [x] `scripts/destroy/destroy-hub.sh` 또는 관련 destroy 흐름에서 controller/Ingress 생성 ALB가 삭제되는 순서 확인
 - [x] 운영 문서에 controller 책임 경계와 비용 영향 기록
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `aws-load-balancer-controller` pod가 `Running/Ready` 상태다.
 - controller ServiceAccount가 IRSA role annotation을 가진다.
@@ -608,13 +608,13 @@ Hub EKS의 Kubernetes Ingress가 AWS Application Load Balancer를 생성하고 �
 
 ## Issue 10 - [Hub/Admin UI] ArgoCD/Grafana HTTPS Admin Ingress 구성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 관리자가 로컬 `kubectl port-forward`나 SSM 터널 없이 브라우저에서 ArgoCD와 Grafana UI에 접근할 수 있도록 HTTPS 기반 Admin Ingress를 구성한다.
 
 ArgoCD와 Grafana는 계속 EKS 내부 Pod/Service로 실행한다. Service는 `ClusterIP`로 유지하고, 외부 진입점은 Public ALB 1개와 host 기반 Ingress rule로 통합한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] Admin UI용 도메인과 ACM public certificate 기준 결정
   - `argocd.minsoo-tech.cloud`, `grafana.minsoo-tech.cloud`
@@ -634,7 +634,7 @@ ArgoCD와 Grafana는 계속 EKS 내부 Pod/Service로 실행한다. Service는 `
 - [x] ACM certificate `ISSUED` 상태 확인
 - [x] `ADMIN_UI_INGRESS_ENABLED=true`로 Admin Ingress 실제 적용 및 HTTPS 접속 검증
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `https://argocd.<domain>`으로 ArgoCD 로그인 화면에 접근할 수 있다.
 - `https://grafana.<domain>`으로 Grafana 로그인 화면에 접근할 수 있다.
@@ -672,13 +672,13 @@ ArgoCD와 Grafana는 계속 EKS 내부 Pod/Service로 실행한다. Service는 `
 
 ## Issue 11 - [Hub/Admin UI] 운영 보안 강화 백로그
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 MVP HTTPS Admin Ingress가 검증된 뒤, 운영 전환에 필요한 추가 보안 계층을 설계하고 적용한다.
 
 이 이슈는 MVP 필수 범위가 아니다. 외부 접근 가능 여부를 먼저 검증한 뒤, 운영 노출 기준이 필요해질 때 진행한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] WAF 적용 여부와 rule set 결정
 - [ ] Cognito 자체 User Pool과 외부 OIDC/SSO 중 인증 방식 결정
@@ -687,7 +687,7 @@ MVP HTTPS Admin Ingress가 검증된 뒤, 운영 전환에 필요한 추가 보�
 - [ ] IP allowlist만으로 충분하지 않은 운영 위험 정리
 - [ ] 비용 문서에 WAF/Cognito/OIDC 추가 비용 기준 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Route53 -> ALB -> WAF/Auth -> ArgoCD/Grafana 흐름이 설명 가능하다.
 - WAF/Cognito/OIDC를 적용하지 않는 MVP 상태와 운영 전환 상태의 차이가 문서화되어 있다.
@@ -705,13 +705,13 @@ MVP HTTPS Admin Ingress가 검증된 뒤, 운영 전환에 필요한 추가 보�
 
 ## Issue 12 - [Risk/Config] `runtime-config.yaml` 파일 구조 초안 작성
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Hub 단에서 공장별 필드 사용 여부와 Risk 가중치를 제어하는 중앙 설정 파일 구조를 확정한다.  
 이 구조가 M6(Risk Twin)에서 실제 가중치 계산의 기반이 되며,  
 공장별 override 구조도 이 파일에서 관리된다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [x] `configs/runtime/runtime-config.yaml` 경로 생성
 - [x] 전역(`global`) 섹션 구조 정의
@@ -763,7 +763,7 @@ factories:
   - `factory-b`보다 높은 anomaly/network loss 확률로 불안정 테스트베드 기준을 표현
 - 전역 risk weight 합계: `100`
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - `configs/runtime/runtime-config.yaml` 파일이 존재하고 유효한 YAML 형식
 - `global` / `factories` 섹션 구조 확인

@@ -195,11 +195,11 @@ destroy 명령은 절대 실행하지 않는다.
 
 ## 업데이트 필요한 문서
 
-- `docs/planning/16_data_dashboard_vpc_workplan.md` — Step 9.5 추가 ✅ (이번 세션)
-- `docs/issues/SESSION_STATE.md` — 다음 작업 Step 9.5 갱신 ✅ (이번 세션)
-- `docs/AI_AGENT_HARNESS.md` — Step 9.5 DoD / 허용 파일 / 금지 명령 추가 ✅ (이번 세션)
-- `docs/ops/22_data_dashboard_vpc_runbook.md` — Permanent resource split migration checklist 추가 ✅ (이번 세션)
-- `docs/ops/15_aws_cost_baseline.md` — permanent root 잔여 비용 추가 ✅ (이번 세션)
+- `docs/planning/16_data_dashboard_vpc_workplan.md` — Step 9.5 추가 (이번 세션)
+- `docs/issues/SESSION_STATE.md` — 다음 작업 Step 9.5 갱신 (이번 세션)
+- `docs/AI_AGENT_HARNESS.md` — Step 9.5 DoD / 허용 파일 / 금지 명령 추가 (이번 세션)
+- `docs/ops/22_data_dashboard_vpc_runbook.md` — Permanent resource split migration checklist 추가 (이번 세션)
+- `docs/ops/15_aws_cost_baseline.md` — permanent root 잔여 비용 추가 (이번 세션)
 
 ## 검증 (이번 설계 세션)
 

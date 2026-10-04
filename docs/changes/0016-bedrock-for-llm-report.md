@@ -85,7 +85,7 @@
 
 | 옵션 | 장점 | 단점 |
 | --- | --- | --- |
-| **Bedrock + Claude 3 Haiku** ★ | AWS IAM 통합, VPC Endpoint 지원, 한국어 양호, 저렴 | 모델 선택 폭 제한 |
+| **Bedrock + Claude 3 Haiku** (선택) | AWS IAM 통합, VPC Endpoint 지원, 한국어 양호, 저렴 | 모델 선택 폭 제한 |
 | OpenAI API | 모델 선택 폭 | 외부 API key 관리, IAM 통합 불가 |
 | 자체 호스팅 LLM (EKS GPU) | 완전 통제 | GPU 노드 ~$300+/월, Phase 1 범위에서 과잉 |
 | SageMaker JumpStart | AWS 통합 | 엔드포인트 상시 비용 ~$50+/월 |

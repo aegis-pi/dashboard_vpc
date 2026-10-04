@@ -288,10 +288,10 @@ Step 9.5 migration 완료 후 `infra/data-dashboard`를 destroy해도 아래 리
 
 ### 절감 옵션 (이미 적용된 것 + 추가 후보)
 
-- ✅ **데모 운영 패턴 (build/destroy 사이클)**: 상시 ~$125/월 → ~$8~10/월 (90%+ 절감). 핵심 절감 수단
-- ✅ **NAT GW 1개로 제한 (단일 AZ)**: 2 AZ × $45 → 1 × $45 (50% 절감, 가용성은 데모용 한정)
-- ✅ **RDS PostgreSQL Single-AZ**: Multi-AZ 대비 1개 instance만 사용 (Phase 2에서 활성화 검토)
-- ✅ **Redis 단일 노드 (cluster mode 비활성화)**: 비용 ~30% 절감
+- (적용) **데모 운영 패턴 (build/destroy 사이클)**: 상시 ~$125/월 → ~$8~10/월 (90%+ 절감). 핵심 절감 수단
+- (적용) **NAT GW 1개로 제한 (단일 AZ)**: 2 AZ × $45 → 1 × $45 (50% 절감, 가용성은 데모용 한정)
+- (적용) **RDS PostgreSQL Single-AZ**: Multi-AZ 대비 1개 instance만 사용 (Phase 2에서 활성화 검토)
+- (적용) **Redis 단일 노드 (cluster mode 비활성화)**: 비용 ~30% 절감
 - **Fargate Spot 사용**: stateless ECS task이면 ~70% 절감 가능 (Phase 2에서 검토)
 - **VPC Endpoint (Interface) for Bedrock/Secrets/ECR**: NAT data processing 비용 우회. 단, Interface endpoint 자체 ~$7/월/endpoint → 손익분기 확인 후 도입
 - **DynamoDB HISTORY TTL 단축**: 24h → 6h로 줄이면 storage 비용 ↓ (이미 작음, 효용 작음)

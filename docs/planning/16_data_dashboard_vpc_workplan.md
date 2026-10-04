@@ -238,7 +238,7 @@ Step 1 진행 시:
 - CloudWatch Logs + retry / DLQ
 ```
 
-### Step 6 — Dashboard Backend 컨테이너 구현 (ADR 0012) ✅ 완료 (2026-05-26)
+### Step 6 — Dashboard Backend 컨테이너 구현 (ADR 0012) 완료 (2026-05-26)
 
 ```text
 완료된 구현:
@@ -274,7 +274,7 @@ Step 1 진행 시:
 - Backend 활성화 완료: 이후 ADR 0030 기준 ECS desired/running 2, task 1 vCPU / 2 GB, `/healthz` 200
 ```
 
-### Step 7 — ECS Service / ALB 배포 (`infra/data-dashboard/`) ✅ 완료 (2026-05-26)
+### Step 7 — ECS Service / ALB 배포 (`infra/data-dashboard/`) 완료 (2026-05-26)
 
 ```text
 - ECS Cluster (Fargate, capacity provider: FARGATE)
@@ -293,7 +293,7 @@ Step 1 진행 시:
 - GitHub Secret `AWS_OIDC_DASHBOARD_ROLE_ARN` 은 `aegis-pi` organization 수준 등록 완료(사용자 확인 기준)
 ```
 
-### Step 7.5 — Route53 Hosted Zone 영구 분리 ✅ 완료 (2026-05-26)
+### Step 7.5 — Route53 Hosted Zone 영구 분리 완료 (2026-05-26)
 
 ```text
 목표:
@@ -328,7 +328,7 @@ Step 1 진행 시:
   - destroy 명령은 사용자 명시 승인 없이 실행 금지
 ```
 
-### Step 8 — 운영용 Frontend Vite + React 마이그레이션 ✅ 완료 (2026-05-26)
+### Step 8 — 운영용 Frontend Vite + React 마이그레이션 완료 (2026-05-26)
 
 ```text
 완료된 구현:
@@ -371,7 +371,7 @@ LLM 일간 보고서 자동 생성기(ADR 0016, Lambda report-generator + Bedroc
 
 ### Step 9 — S3+CloudFront 배포 CI/CD + End-to-end 통합 검증
 
-#### Step 9 Part 1 — S3+CloudFront 배포 CI/CD ✅ 구현 완료 (2026-05-26, ADR 0023)
+#### Step 9 Part 1 — S3+CloudFront 배포 CI/CD 구현 완료 (2026-05-26, ADR 0023)
 
 ```text
 완료된 구현:
@@ -435,7 +435,7 @@ GitHub 설정:
 - 부하 테스트: k6/artillery WebSocket 100 concurrent connection
 ```
 
-### Step 9.5 — Permanent Resource Split (infra/data-dashboard-permanent/ 분리) ✅ migration 완료 (2026-05-26, ADR 0024)
+### Step 9.5 — Permanent Resource Split (infra/data-dashboard-permanent/ 분리) migration 완료 (2026-05-26, ADR 0024)
 
 ```text
 목적:
@@ -504,13 +504,13 @@ RDS 미영구화 결정:
 ### Step 10 — 운영 문서화 + 자동화 스크립트 (대부분 완료, 데모 검증 후속)
 
 ```text
-- scripts/build/build-data-dashboard.sh (DNS/permanent preflight 후 재생성 root apply 자동화) ✅ 구현 완료
-- scripts/destroy/destroy-data-dashboard.sh (대화형 확인 + RDS PostgreSQL snapshot → 재생성 root destroy) ✅ 구현 완료
+- scripts/build/build-data-dashboard.sh (DNS/permanent preflight 후 재생성 root apply 자동화) 구현 완료
+- scripts/destroy/destroy-data-dashboard.sh (대화형 확인 + RDS PostgreSQL snapshot → 재생성 root destroy) 구현 완료
 - scripts/ops/data-dashboard-port-forward.sh (필요 시 로컬 fallback) — 미작성 (필요 시 추가)
-- docs/architecture/drawio/ 신규 다이어그램 ✅ 완료 — `agiespi_architecture_overview_final1.drawio` / `images/agiespi_architecture_overview_final3.drawio.png` 단일 overview로 통합. Cloud Infra Collector·notifier DLQ·OIDC 웹배포·RBAC·`CLOUD#infra`·`GRAPH#5M`·ECS Auto Scaling 반영 (ADR 0032)
-- docs/architecture/01_target_architecture.md 갱신 ✅ 완료
-- README.md / docs/ops/00_quick_start.md / docs/ops/22_data_dashboard_vpc_runbook.md (빠른 build/destroy + Foundation/root 경계 + 도메인/ACM/Cognito + 트러블슈팅) ✅ 작성 완료
-- docs/ops/15_aws_cost_baseline.md 실측 후 재갱신 ✅ v3.8까지 갱신 완료(Nova 모델 비용 + 2026-06-16 destroy 상태 포함)
+- docs/architecture/drawio/ 신규 다이어그램 완료 — `agiespi_architecture_overview_final1.drawio` / `images/agiespi_architecture_overview_final3.drawio.png` 단일 overview로 통합. Cloud Infra Collector·notifier DLQ·OIDC 웹배포·RBAC·`CLOUD#infra`·`GRAPH#5M`·ECS Auto Scaling 반영 (ADR 0032)
+- docs/architecture/01_target_architecture.md 갱신 완료
+- README.md / docs/ops/00_quick_start.md / docs/ops/22_data_dashboard_vpc_runbook.md (빠른 build/destroy + Foundation/root 경계 + 도메인/ACM/Cognito + 트러블슈팅) 작성 완료
+- docs/ops/15_aws_cost_baseline.md 실측 후 재갱신 v3.8까지 갱신 완료(Nova 모델 비용 + 2026-06-16 destroy 상태 포함)
 ```
 
 2026-06-16 기준 현재 상태:

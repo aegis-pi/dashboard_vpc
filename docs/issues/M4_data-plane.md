@@ -59,7 +59,7 @@ M4 문서의 기존 이슈들은 삭제하지 않고, 구현 시 아래 항목�
 
 ## Issue 1 - [데이터/Schema] 표준 입력 스키마 확정
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `입력 모듈 → Edge Agent` 사이의 데이터 구조를 고정한다.  
 이 스키마가 확정되어야 Edge Agent, Dummy Sensor, Lambda data processor가 모두 같은 포맷을 기준으로 구현된다.
@@ -68,7 +68,7 @@ M4 문서의 기존 이슈들은 삭제하지 않고, 구현 시 아래 항목�
 2026-05-14 기준 표준 입력 스키마 source of truth는 `docs/specs/iot_data_format.md`다.
 최종 source type은 `factory_state`, `infra_state` 두 개로 단순화한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] 필수 공통 필드 확정
   - `factory_id` (string)
@@ -116,7 +116,7 @@ M4 문서의 기존 이슈들은 삭제하지 않고, 구현 시 아래 항목�
 }
 ```
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 스키마 JSON 예시가 관련 입력/데이터 모델 문서에 source_type별로 작성됨
 - Edge Agent 구현 시 이 스키마를 기준으로 바로 개발 가능한 수준
@@ -126,12 +126,12 @@ M4 문서의 기존 이슈들은 삭제하지 않고, 구현 시 아래 항목�
 
 ## Issue 2 - [데이터/Edge Agent] `factory-a` Edge Agent 수집/변환 로직 구현
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `factory-a` 라즈베리파이 환경에서 실제 센서 데이터와 시스템 상태를 수집하여 표준 스키마로 변환하는 Edge Agent 핵심 로직을 구현한다.  
 이 이슈에서는 수집/변환 로직 자체에 집중하고, 컨테이너 이미지화와 K3s 배포 준비는 다음 이슈에서 진행한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Edge Agent 구현 언어/프레임워크 결정 (Python 권장, 라즈베리파이 ARM64 호환)
 - [ ] 수집 대상 구현
@@ -146,7 +146,7 @@ M4 문서의 기존 이슈들은 삭제하지 않고, 구현 시 아래 항목�
 - [ ] 수집 주기 설정 (주기값은 `docs/ops/03_test_checklist.md` 기반 테스트 후 확정)
   - 확정 초기값: `factory_state` 3초, `infra_state` 20초
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - 로컬 실행 또는 개발 환경 기준으로 수집/변환 로직 동작 확인
 - 표준 스키마 형식의 메시지 payload 생성 확인
@@ -156,12 +156,12 @@ M4 문서의 기존 이슈들은 삭제하지 않고, 구현 시 아래 항목�
 
 ## Issue 3 - [데이터/Container] `factory-a` Edge Agent 컨테이너화 및 K3s 배포 준비
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Issue 2에서 구현한 Edge Agent 로직을 ARM64 환경에서 실행 가능한 컨테이너 이미지로 만들고,  
 `factory-a` K3s에 배포 가능한 상태까지 준비한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Edge Agent ARM64 Docker 이미지 빌드 가능 상태 확인
 - [ ] ECR 푸시 가능한 이미지 태그 전략 연결
@@ -169,7 +169,7 @@ Issue 2에서 구현한 Edge Agent 로직을 ARM64 환경에서 실행 가능한
 - [ ] `worker-2` 배치 기준 배포 스펙 정리
 - [ ] 파드 실행에 필요한 Secret / Config / 디바이스 마운트 요구사항 정리
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Edge Agent 이미지가 ARM64 기준으로 빌드됨 확인
 - `factory-a` 배포 대상 매니페스트에서 Edge Agent를 참조 가능
@@ -179,12 +179,12 @@ Issue 2에서 구현한 Edge Agent 로직을 ARM64 환경에서 실행 가능한
 
 ## Issue 4 - [데이터/IoT Core] Edge Agent → IoT Core 연결 및 수신 확인
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 Edge Agent가 실제 IoT Core 엔드포인트에 연결되어 데이터가 수신되는지 확인한다.  
 인증서 관리와 연결 안정성을 검증하고, 연결 장애 시 재연결 로직을 확인한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] IoT Core 인증서 파일을 K3s Secret으로 배포
 - [ ] Edge Agent 파드에서 인증서 마운트 및 MQTT 연결 성공
@@ -192,7 +192,7 @@ Edge Agent가 실제 IoT Core 엔드포인트에 연결되어 데이터가 수�
 - [ ] 연결 장애 시 재연결 로직 동작 확인
 - [ ] IoT Core 연결 로그 확인 (CloudWatch 또는 파드 로그)
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - IoT Core 콘솔 `MQTT 테스트 클라이언트`에서 `factory-a` 메시지 수신 확인
 - 메시지 구조가 표준 입력 스키마와 일치
@@ -202,12 +202,12 @@ Edge Agent가 실제 IoT Core 엔드포인트에 연결되어 데이터가 수�
 
 ## Issue 5 - [데이터/S3] IoT Core → S3 적재 확인 (경로 파티셔닝 포함)
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 IoT Core Rule이 수신된 메시지를 S3 지정 경로에 자동 적재하는지 확인한다.  
 `factory_id` / `source_type` / 날짜 기반 파티셔닝이 올바르게 적용되는지 검증한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] IoT Rule Action이 S3에 메시지 적재하는 것 확인
 - [ ] 경로 파티셔닝 규칙 적용 확인
@@ -217,7 +217,7 @@ IoT Core Rule이 수신된 메시지를 S3 지정 경로에 자동 적재하는�
 - [ ] `source_type`별 경로가 올바르게 분리되어 적재되는지 확인
 - [ ] S3 적재 실패 시 IoT Rule 오류 로그 확인 방법 정의
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - S3 콘솔에서 `raw/factory-a/factory_state/`, `raw/factory-a/infra_state/` 경로에 파일 적재 확인
 - 적재된 파일 내용이 표준 스키마와 일치
@@ -227,12 +227,12 @@ IoT Core Rule이 수신된 메시지를 S3 지정 경로에 자동 적재하는�
 
 ## Issue 6 - [데이터/Lambda] IoT Core Lambda data processor 구현
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 IoT Core 수신 메시지를 Lambda data processor로 처리해 정규화, Risk 계산, `pipeline_status` 계산, DynamoDB/S3 processed 저장까지 수행한다.
 S3 raw는 IoT Rule로 원본 보존을 유지하고, Dashboard 현재 상태 조회는 DynamoDB LATEST/HISTORY를 기준으로 한다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Lambda data processor 구현
   - IoT Core Rule 또는 메시지 라우팅으로 Lambda 호출
@@ -249,7 +249,7 @@ S3 raw는 IoT Rule로 원본 보존을 유지하고, Dashboard 현재 상태 조
 - [ ] 정규화 실패 데이터 처리 원칙 정의 (스킵 또는 오류 로그)
 - [ ] Dashboard VPC 조회용 DynamoDB/S3 processed 계약 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - IoT Core 메시지 수신 후 Lambda가 자동 실행됨
 - `factory_state` 처리 후 DynamoDB LATEST의 `factory_state`, `risk`가 갱신됨
@@ -261,12 +261,12 @@ S3 raw는 IoT Rule로 원본 보존을 유지하고, Dashboard 현재 상태 조
 
 ## Issue 7 - [데이터/Pipeline] `pipeline_status` Lambda 처리 검증
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 IoT Core 수신 상태와 S3 적재 상태를 기준으로 `pipeline_status`가 Lambda data processor에서 계산되고 DynamoDB LATEST/HISTORY에 반영되는지 검증한다.
 `pipeline_status`는 Edge가 직접 보내는 값이 아니라 cloud-side에서 계산하는 관제용 상태다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] Lambda data processor의 `pipeline_status` 계산 구현
   - IoT Core `infra_state` 수신 여부 확인 로직
@@ -277,7 +277,7 @@ IoT Core 수신 상태와 S3 적재 상태를 기준으로 `pipeline_status`가 
 - [ ] Dashboard VPC 조회용 latest/status 저장소 반영
 - [ ] `pipeline_status` 판단 기준을 데이터 플레인 관련 문서에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - Lambda 처리 결과에서 `factory-a`의 pipeline 상태 확인 가능
 - DynamoDB LATEST에서 `factory-a`의 pipeline 상태 조회 가능
@@ -287,12 +287,12 @@ IoT Core 수신 상태와 S3 적재 상태를 기준으로 `pipeline_status`가 
 
 ## Issue 8 - [검증/데이터] `factory-a` 데이터 플레인 end-to-end 검증
 
-### 🎯 목표 (What & Why)
+### 목표 (What & Why)
 
 `factory-a` 센서 데이터가 Edge Agent에서 IoT Core, S3 raw, Lambda, DynamoDB/S3 processed까지 실제로 흐르는 전체 파이프라인을 검증한다.
 이 검증이 완료되어야 M4 마일스톤이 완료되고 M5(VM Spoke 확장)와 M6(Risk Twin)으로 넘어갈 수 있다.
 
-### ✅ 완료 조건 (Definition of Done)
+### 완료 조건 (Definition of Done)
 
 - [ ] `입력 모듈 → Edge Agent → IoT Core → S3 raw` 흐름 end-to-end 확인
 - [ ] `IoT Core → Lambda data processor → DynamoDB/S3 processed` 흐름 확인
@@ -303,7 +303,7 @@ IoT Core 수신 상태와 S3 적재 상태를 기준으로 `pipeline_status`가 
 - [ ] 데이터 지연/누락 발생 시 `pipeline_status` 이상 판정 확인
 - [ ] 검증 결과를 데이터 플레인 관련 문서와 `docs/ops/03_test_checklist.md`에 반영
 
-### 🔍 Acceptance Criteria
+### Acceptance Criteria
 
 - S3에서 `factory-a` 데이터 주기적 적재 확인 (최소 10분 이상 연속)
 - `factory_state`, `infra_state` 두 경로에 데이터 분리 적재 확인
